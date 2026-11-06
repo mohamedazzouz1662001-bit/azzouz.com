@@ -31,8 +31,9 @@ header{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var
 .acts{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}
 .act{background:#2a3942;border:none;color:var(--acc);font-size:11.5px;padding:4px 9px;border-radius:14px;cursor:pointer;font-family:inherit}
 .act:active{background:#374b56}
-.refs{display:none;margin-top:6px;border-top:1px solid var(--line);padding-top:6px;max-height:230px;overflow-y:auto;font-size:11.5px;color:var(--dim)}
-.msg.open .refs{display:block}
+.refs{display:block;margin-top:7px;border-top:1px solid var(--line);padding-top:6px;max-height:190px;overflow-y:auto;font-size:11.5px;color:var(--dim)}
+.refs.all{max-height:420px}
+.rhead{font-size:11.5px;color:#9fb3bd;margin-bottom:3px}
 .refs a{color:#8ecdf7;text-decoration:none;display:block;padding:3px 0;line-height:1.5}
 .typing{align-self:flex-start;background:var(--in);border-radius:10px;padding:9px 12px;font-size:12.5px;color:var(--dim);display:flex;gap:8px;align-items:center;max-width:88%}
 .dots{display:flex;gap:3px}
@@ -155,27 +156,55 @@ function bubble(text, who = 'in') {
   return el;
 }
 
+function smallTalk(text) {
+  const raw = String(text || '').trim();
+  const t = raw.replace(/[!،,.؟?]+$/g, '').trim();
+  const greet = /^(السلام|سلام|صباح الخير|صباح النور|مساء الخير|مساء النور|أهلا|اهلا|مرحبا|هاي|hello|hi)\b/i.test(t);
+  const askIntent = /(بغيت نسولك|بغيت نسألك|عندي سؤال|سولك|نسولك|سؤال)/i.test(t);
+  if (greet && askIntent) return 'وعليكم السلام 🌿 تفضل، سول براحتك وكنسمع.';
+  if (greet) {
+    if (/صباح/.test(t)) return 'صباح النور 🌿 كيفاش نقدر نعاونك اليوم؟';
+    if (/مساء/.test(t)) return 'مساء النور 🌿 كيفاش نقدر نعاونك؟';
+    return 'وعليكم السلام ورحمة الله 🌿 كيفاش نقدر نعاونك؟';
+  }
+  if (askIntent && t.split(/\s+/).length <= 6) return 'تفضل، سول براحتك — كنسمع.';
+  if (/^(كيف حالك|كيداير|لباس|كيفك|labas)/i.test(t)) return 'الحمد لله، خدام كنبحث فالخلفية. ونتا كيف داير؟ 🌿';
+  if (/^(شكرا|بارك الله|تبارك الله|merci|thanks)/i.test(t)) return 'على الرحب والسعة 🌿 أي وقت.';
+  if (/^(بسلامة|سلام|إلى اللقاء|باي|bye)/i.test(t) && t.length < 14) return 'بسلامة الله 👋 إلا بغيتي شي حاجة أنا هنا.';
+  if (/(شكون نتا|سميتك|من نتا|who are you)/i.test(t)) return 'أنا Azzouz 🌿 مساعد كيقرا فـ20+ محرك ومستودع، وكيعطيك الجواب أولا ومن بعد المراجع.';
+  if (/^(واش كتفهمني|فهمتني|سمعتني)/i.test(t)) return 'واخا، فهمتك 🌿 كمل.';
+  return null;
+}
+
 function addActions(el, res) {
   const acts = document.createElement('div');
   acts.className = 'acts';
+
   if (res.refs && res.refs.length) {
-    const b = document.createElement('button');
-    b.className = 'act';
-    b.textContent = '📚 المراجع (' + res.refs.length + ')';
-    b.onclick = () => {
-      if (!el.querySelector('.refs')) {
-        const box = document.createElement('div');
-        box.className = 'refs';
-        box.innerHTML = res.refs.slice(0, 400).map(r =>
-          '<a href="' + r.url + '" target="_blank" rel="noopener">' + r.n + '. ' + String(r.title || '').slice(0, 110) +
-          (r.year ? ' (' + r.year + ')' : '') + '</a>').join('');
-        el.append(box);
-      }
-      el.classList.toggle('open');
-      b.textContent = el.classList.contains('open') ? '📚 خبي المراجع (' + res.refs.length + ')' : '📚 المراجع (' + res.refs.length + ')';
-    };
-    acts.append(b);
+    const refs = res.refs;
+    const box = document.createElement('div');
+    box.className = 'refs';
+    const render = n => '<div class="rhead">المراجع:</div>' + refs.slice(0, n).map(r =>
+      '<a href="' + r.url + '" target="_blank" rel="noopener">' + r.n + '. ' +
+      String(r.title || r.url || '').slice(0, 105) + (r.year ? ' (' + r.year + ')' : '') + '</a>').join('');
+    box.innerHTML = render(Math.min(6, refs.length));
+    el.append(box);
+
+    if (refs.length > 6) {
+      const all = document.createElement('button');
+      all.className = 'act';
+      all.textContent = 'عرض كل المراجع (' + refs.length + ')';
+      let open = false;
+      all.onclick = () => {
+        open = !open;
+        box.innerHTML = render(open ? refs.length : 6);
+        box.classList.toggle('all', open);
+        all.textContent = open ? 'خبي المراجع' : 'عرض كل المراجع (' + refs.length + ')';
+      };
+      acts.append(all);
+    }
   }
+
   const copy = document.createElement('button');
   copy.className = 'act';
   copy.textContent = '📋 نسخ';
@@ -185,7 +214,8 @@ function addActions(el, res) {
     setTimeout(() => { copy.textContent = '📋 نسخ'; }, 1500);
   };
   acts.append(copy);
-  el.append(acts);
+
+  if (acts.children.length) el.append(acts);
 }
 
 function addSuggestions(el, list) {
@@ -227,6 +257,15 @@ async function ask(text) {
   if (busy || !text.trim()) return;
   busy = true; sendBtn.disabled = true;
   bubble(text, 'out');
+
+  const quick = smallTalk(text);
+  if (quick) {
+    const el = bubble(quick, 'in');
+    void el;
+    busy = false; sendBtn.disabled = false;
+    return;
+  }
+
   const t = typing();
   try {
     const res = await deepAnswer(text, {
