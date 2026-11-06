@@ -58,6 +58,9 @@ border-radius:12px;font-size:17px;cursor:pointer;font-weight:800;flex:0 0 auto}
 .bgtog{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--dim);
 background:#0f1a28;border:1px solid var(--line);border-radius:20px;padding:6px 12px;cursor:pointer}
 .bgtog input{accent-color:var(--acc);width:14px;height:14px}
+.codeblock{margin-top:10px;background:#060d16;border:1px solid var(--line);border-radius:10px;overflow:auto;max-height:340px}
+.codeblock pre{margin:0;padding:12px;font-family:'Courier New',monospace;font-size:12px;line-height:1.7;white-space:pre;direction:ltr;text-align:left;color:#c8e6ff}
+.codetools{display:flex;gap:6px;margin-top:8px}
 </style>
 </head>
 <body>
@@ -198,6 +201,36 @@ function addBot(res) {
     bMore.onclick = () => { run('عاود بحث'); };
     acts.append(bRefs, bCopy, bWa, bMore);
     wrap.append(acts, box);
+  }
+
+  if (res.code && res.code.code) {
+    const box = document.createElement('div');
+    box.className = 'codeblock';
+    const pre = document.createElement('pre');
+    pre.textContent = res.code.code;
+    box.appendChild(pre);
+    const tools = document.createElement('div');
+    tools.className = 'codetools';
+    const copyBtn = document.createElement('button');
+    copyBtn.className = 'act';
+    copyBtn.textContent = '📋 نسخ الكود';
+    copyBtn.onclick = async () => {
+      try { await navigator.clipboard.writeText(res.code.code); copyBtn.textContent = '✅ تنسخ'; }
+      catch { copyBtn.textContent = '⚠️ فشل'; }
+      setTimeout(() => { copyBtn.textContent = '📋 نسخ الكود'; }, 1600);
+    };
+    const dlBtn = document.createElement('button');
+    dlBtn.className = 'act';
+    dlBtn.textContent = '⬇️ تحميل';
+    dlBtn.onclick = () => {
+      const blob = new Blob([res.code.code], { type: 'text/plain;charset=utf-8' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = res.code.filename || ('code.' + (res.code.lang === 'python' ? 'py' : res.code.lang === 'html' ? 'html' : 'js'));
+      a.click();
+    };
+    tools.append(copyBtn, dlBtn);
+    wrap.append(tools, box);
   }
 
   log.appendChild(wrap);
