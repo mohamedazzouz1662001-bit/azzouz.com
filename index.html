@@ -96,6 +96,7 @@ background:#0f1a28;border:1px solid var(--line);border-radius:20px;padding:6px 1
 </footer>
 
 <script type="module">
+import { wideResearch } from './wide.mjs';
 import { chatTurn, stats, backgroundTick, ensureSeeds, bgStats, isAuto, setAuto } from './chat.mjs';
 
 const $ = (id) => document.getElementById(id);
@@ -231,6 +232,47 @@ function addBot(res) {
     };
     tools.append(copyBtn, dlBtn);
     wrap.append(tools, box);
+  }
+
+  if (res.type === 'article' && res.question) {
+    const wide = document.createElement('button');
+    wide.className = 'act';
+    wide.textContent = '🌐 وسّع المصادر (1000)';
+    wide.onclick = async () => {
+      wide.disabled = true;
+      wide.textContent = '⏳ كنوسّع...';
+      try {
+        const out = await wideResearch(res.question, {
+          target: 1000,
+          onProgress: (n) => { wide.textContent = '⏳ ' + n + ' مصدر...'; }
+        });
+        const merged = [...(res.refs || [])];
+        const seen = new Set(merged.map(r => r.url));
+        out.refs.forEach(r => { if (!seen.has(r.url)) { seen.add(r.url); merged.push(r); } });
+        merged.forEach((r, i) => { r.n = i + 1; });
+        res.refs = merged;
+        res.wide = out.stats;
+        wide.textContent = '🌐 ' + merged.length + ' مصدر ✓';
+        const rb = wrap.querySelector('.acts .act');
+        if (rb) rb.textContent = '📚 المراجع (' + merged.length + ')';
+        const csv = 'n,title,url,engine\n' + merged.map(r => [r.n, '"' + String(r.title).replace(/"/g, '""') + '"', r.url, r.engine || ''].join(',')).join('\n');
+        const dl = document.createElement('button');
+        dl.className = 'act';
+        dl.textContent = '⬇️ CSV';
+        dl.onclick = () => {
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+          a.download = 'azzouz-refs.csv';
+          a.click();
+        };
+        const actsEl = wrap.querySelector('.acts');
+        if (actsEl) actsEl.append(dl); else wrap.append(dl);
+      } catch (e) {
+        wide.textContent = '⚠️ فشل التوسيع';
+      }
+    };
+    const actsEl = wrap.querySelector('.acts');
+    if (actsEl) actsEl.append(wide); else wrap.append(wide);
   }
 
   log.appendChild(wrap);
