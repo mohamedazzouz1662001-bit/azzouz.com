@@ -1,6 +1,7 @@
 /* wide.mjs v2 — سلسلة بحث واسعة: 30+ محرك ومستودع، مع مقتطفات وصور وفيديو */
 
 import { connectorSearch } from './connectors.mjs?v=1';
+import { depthTarget, maxSerpExtra } from './identity.mjs?v=1';
 
 const enc = encodeURIComponent;
 
@@ -401,16 +402,45 @@ const ENGINES = [
     add('place', (d || []).map(p => ({ title: p.display_name, url: 'https://www.openstreetmap.org/' + p.osm_type + '/' + p.osm_id, snippet: p.type })));
   }},
 
+
+  { name: 'Bluesky', kind: 'social', run: async (q, en, add) => {
+    const d = await jget(`https://public.api.bsky.app/xrpc/app.bsky.feed.searchPosts?limit=50&q=${enc(en || q)}`);
+    add('social', (d.posts || []).map(p => ({
+      title: (p.record?.text || '').slice(0, 90),
+      url: 'https://bsky.app/profile/' + (p.author?.handle || '') + '/post/' + String(p.uri || '').split('/').pop(),
+      snippet: clean(p.record?.text), year: (p.record?.createdAt || '').slice(0, 4)
+    })));
+  }},
+
+  { name: 'Lemmy', kind: 'social', run: async (q, en, add) => {
+    const d = await jget(`https://lemmy.world/api/v3/search?type_=All&limit=50&q=${enc(en || q)}`);
+    add('social', (d.posts || []).map(p => ({
+      title: p.post?.name, url: p.post?.url || ('https://lemmy.world/post/' + p.post?.id),
+      snippet: clean(p.post?.body)
+    })));
+  }},
+
   { name: 'Web', kind: 'article', run: async (q, en, add) => {
+    const ddg = t => `https://r.jina.ai/https://html.duckduckgo.com/html/?q=${enc(t)}`;
     const serps = [
-      ['duckduckgo', `https://r.jina.ai/https://html.duckduckgo.com/html/?q=${enc(q)}`],
-      ['duckduckgo-en', `https://r.jina.ai/https://html.duckduckgo.com/html/?q=${enc(en || q)}`],
-      ['reddit', `https://r.jina.ai/https://www.reddit.com/search/?q=${enc(en || q)}`],
-      ['stackoverflow-web', `https://r.jina.ai/https://stackoverflow.com/search?q=${enc(en || q)}`]
+      ['duckduckgo', ddg(q)],
+      ['duckduckgo-en', ddg(en || q)]
     ];
+    // الحساب المربوط كيوسع البحث: ملفات عامة، أنواع الملفات، وشبكات اجتماعية
+    if (maxSerpExtra()) {
+      serps.push(
+        ['drive-public', ddg('site:drive.google.com ' + (en || q))],
+        ['pdf', ddg((en || q) + ' filetype:pdf')],
+        ['docs', ddg((en || q) + ' (filetype:doc OR filetype:ppt OR filetype:xlsx)')],
+        ['x', ddg('site:x.com ' + (en || q))],
+        ['facebook', ddg('site:facebook.com ' + (en || q))],
+        ['instagram', ddg('site:instagram.com ' + (en || q))],
+        ['linkedin', ddg('site:linkedin.com ' + (en || q))]
+      );
+    }
     for (const [name, url] of serps) {
       try { add('article', parseSerp(await jtext(url), name)); } catch (e) {}
-      await new Promise(r => setTimeout(r, 1200));
+      await new Promise(r => setTimeout(r, 900));
     }
   }},
 
@@ -442,7 +472,7 @@ const ENGINES = [
   }}
 ];
 
-export async function wideResearch(question, { target = 3000, onProgress = () => {} } = {}) {
+export async function wideResearch(question, { target = depthTarget(), onProgress = () => {} } = {}) {
   const q = String(question || '').trim();
   const en = englishQuery(q);
   const seen = new Set();
