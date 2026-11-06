@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>GitHub Studios — جميع المستودعات</title>
+<style>
+:root{--bg:#05080e;--card:rgba(255,255,255,.04);--line:rgba(255,255,255,.1);--txt:#e9eff7;--dim:#8fa3bd;--acc:#3ddc97}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--txt);font-family:'Segoe UI',Tahoma,sans-serif;line-height:1.7}
+.shell{max-width:1000px;margin:auto;padding:24px 18px 60px}
+.nav{display:flex;gap:14px;flex-wrap:wrap;align-items:center;padding-bottom:18px;border-bottom:1px solid var(--line);margin-bottom:22px;font-size:14px}
+.nav a{color:var(--dim);text-decoration:none}
+.nav a:hover{color:var(--acc)}
+.brand{color:var(--acc);font-weight:800}
+h1{font-size:26px;margin-bottom:6px}
+p.sub{color:var(--dim);font-size:14px;margin-bottom:18px}
+.controls{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px}
+input,select{background:#0b131f;border:1px solid var(--line);color:var(--txt);padding:10px 12px;border-radius:9px;font-size:14px}
+input{flex:1;min-width:200px}
+.grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(280px,1fr))}
+.card{background:var(--card);border:1px solid var(--line);border-radius:13px;padding:14px;display:flex;flex-direction:column;gap:6px}
+.card h3{font-size:15px;color:var(--acc)}
+.card p{font-size:13px;color:var(--dim);min-height:36px}
+.meta{display:flex;gap:10px;font-size:12px;color:#6f849e;flex-wrap:wrap}
+.card a{color:#7cc4ff;font-size:13px;text-decoration:none;margin-top:4px}
+.status{padding:14px;border:1px dashed var(--line);border-radius:10px;color:var(--dim);font-size:13px}
+</style>
+</head>
+<body>
+<main class="shell">
+<nav class="nav">
+  <a class="brand" href="/">Local-first workspace</a>
+  <a href="/tools">Tools</a><a href="/chat-studio">Chat Studio</a>
+  <a href="/contact/">Contact</a><a href="/hosting-studio">Hosting Studio</a><a href="/github-studios">GitHub Studios</a>
+</nav>
+<h1>GitHub Studios</h1>
+<p class="sub">كل المستودعات ديال elazzouz-dotcom مباشرة من GitHub — بحث، فلترة باللغة، وروابط مباشرة.</p>
+<div class="controls">
+  <input id="q" placeholder="قلب على مستودع...">
+  <select id="lang"><option value="">كل اللغات</option></select>
+  <select id="sort">
+    <option value="updated">آخر تحديث</option>
+    <option value="stars">النجوم</option>
+    <option value="name">الاسم</option>
+  </select>
+</div>
+<div id="count" class="status">كنجيب المستودعات...</div>
+<div id="grid" class="grid"></div>
+</main>
+<script>
+const USER = 'elazzouz-dotcom';
+let repos = [];
+const $ = id => document.getElementById(id);
+
+function render() {
+  const q = $('q').value.trim().toLowerCase();
+  const lang = $('lang').value;
+  const sort = $('sort').value;
+  let list = repos.filter(r =>
+    (!q || (r.name + ' ' + (r.description || '')).toLowerCase().includes(q)) &&
+    (!lang || r.language === lang)
+  );
+  if (sort === 'stars') list.sort((a, b) => b.stargazers_count - a.stargazers_count);
+  else if (sort === 'name') list.sort((a, b) => a.name.localeCompare(b.name));
+  else list.sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
+
+  $('count').textContent = list.length + ' مستودع من ' + repos.length;
+  $('grid').innerHTML = list.map(r => {
+    const live = r.homepage || (r.has_pages ? 'https://' + USER + '.github.io/' + r.name + '/' : '');
+    return '<div class="card"><h3><a href="' + r.html_url + '" target="_blank" rel="noopener" style="color:inherit;text-decoration:none">' + r.name + '</a></h3>' +
+      '<p>' + (r.description || 'بلا وصف') + '</p>' +
+      '<div class="meta"><span>⭐ ' + r.stargazers_count + '</span>' +
+      (r.language ? '<span>' + r.language + '</span>' : '') +
+      '<span>' + new Date(r.updated_at).toLocaleDateString('ar-MA') + '</span></div>' +
+      '<a href="' + r.html_url + '" target="_blank" rel="noopener">فتح المستودع ←</a>' +
+      (live ? '<a href="' + live + '" target="_blank" rel="noopener">النسخة المباشرة ←</a>' : '') +
+      '</div>';
+  }).join('');
+}
+
+async function load() {
+  try {
+    const res = await fetch('https://api.github.com/users/' + USER + '/repos?per_page=100&sort=updated', { headers: { Accept: 'application/vnd.github+json' } });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    repos = await res.json();
+    if (!Array.isArray(repos)) throw new Error(repos.message || 'رد غير متوقع');
+    const langs = [...new Set(repos.map(r => r.language).filter(Boolean))].sort();
+    $('lang').innerHTML = '<option value="">كل اللغات</option>' + langs.map(l => '<option>' + l + '</option>').join('');
+    render();
+  } catch (e) {
+    $('count').textContent = '⚠️ ما قدرتش نجيب المستودعات: ' + e.message + ' — جرب تعاود تحميل الصفحة.';
+  }
+}
+
+$('q').oninput = render; $('lang').onchange = render; $('sort').onchange = render;
+load();
+</script>
+</body>
+</html>
