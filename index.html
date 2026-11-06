@@ -159,7 +159,7 @@ function bubble(text, who = 'in') {
 function smallTalk(text) {
   const raw = String(text || '').trim();
   const t = raw.replace(/[!،,.؟?]+$/g, '').trim();
-  const greet = /^(السلام|سلام|صباح الخير|صباح النور|مساء الخير|مساء النور|أهلا|اهلا|مرحبا|هاي|hello|hi)\b/i.test(t);
+  const greet = /^(السلام|سلام|صباح الخير|صباح النور|مساء الخير|مساء النور|أهلا|اهلا|مرحبا|هاي|hello|hi)/i.test(t);
   const askIntent = /(بغيت نسولك|بغيت نسألك|عندي سؤال|سولك|نسولك|سؤال)/i.test(t);
   if (greet && askIntent) return 'وعليكم السلام 🌿 تفضل، سول براحتك وكنسمع.';
   if (greet) {
