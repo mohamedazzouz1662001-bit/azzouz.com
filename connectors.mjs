@@ -1,149 +1,168 @@
-/* connectors.mjs — وصلات التطبيقات: كل مفتاح كيتخزن غير فالجهاز */
+/* connectors.mjs v2 — الوصلات كتخدم بتسجيل الدخول (OAuth) ماشي بمفاتيح */
 
-const STORE = 'azzouz-connectors-v1';
+import { googleApi, SCOPES, getSession, hasScope } from './auth.mjs';
 
-export function loadAll() {
-  try { return JSON.parse(localStorage.getItem(STORE) || '{}'); } catch (e) { return {}; }
+const SVC_KEY = 'azzouz-svc-v1';
+
+function state() {
+  try { return JSON.parse(localStorage.getItem(SVC_KEY) || '{}'); } catch (e) { return {}; }
 }
-
-export function saveOne(id, values) {
-  const all = loadAll();
-  all[id] = { ...(all[id] || {}), ...values, on: values.on !== undefined ? values.on : true, ts: Date.now() };
-  try { localStorage.setItem(STORE, JSON.stringify(all)); } catch (e) {}
-  return all[id];
+function setState(s) {
+  try { localStorage.setItem(SVC_KEY, JSON.stringify(s)); } catch (e) {}
 }
+export function isOn(id) { return state()[id] !== false; }
+export function setOn(id, v) { const s = state(); s[id] = !!v; setState(s); }
+export function anyOn() { return SERVICES.some(s => { const st = getSession(); return st && hasScope(st, s.scope) && isOn(s.id); }); }
 
-export function toggle(id, on) {
-  const all = loadAll();
-  all[id] = { ...(all[id] || {}), on };
-  try { localStorage.setItem(STORE, JSON.stringify(all)); } catch (e) {}
-}
+const clamp = (s, n = 220) => String(s || '').replace(/\s+/g, ' ').trim().slice(0, n);
 
-export function removeOne(id) {
-  const all = loadAll();
-  delete all[id];
-  try { localStorage.setItem(STORE, JSON.stringify(all)); } catch (e) {}
-}
-
-export function statusOf(id) {
-  const c = (loadAll() || {})[id];
-  if (!c) return 'off';
-  const filled = (c.fields || {});
-  const ready = Object.values(filled).some(v => String(v || '').trim().length > 4);
-  return c.on && ready ? 'on' : 'off';
-}
-
-async function jget(url, headers = {}, ms = 12000) {
-  const c = new AbortController();
-  const t = setTimeout(() => c.abort(), ms);
-  try {
-    const r = await fetch(url, { signal: c.signal, headers });
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    return await r.json();
-  } finally { clearTimeout(t); }
-}
-
-const clean = s => String(s || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 240);
-
-export const CONNECTORS = [
+export const SERVICES = [
   {
-    id: 'google', name: 'Google', icon: '🔍', kind: 'article',
-    note: 'Custom Search JSON API — محرك بحث جوجل كامل',
-    fields: [{ k: 'key', label: 'API Key', ph: 'AIza...' }, { k: 'cx', label: 'CX', ph: 'معرف محرك البحث' }],
-    run: async (v, q) => (await jget(`https://www.googleapis.com/customsearch/v1?key=${encodeURIComponent(v.key)}&cx=${encodeURIComponent(v.cx)}&q=${encodeURIComponent(q)}&num=10`)).items?.map(i => ({ title: i.title, url: i.link, snippet: clean(i.snippet), thumb: i.pagemap?.cse_thumbnail?.[0]?.src })) || []
-  },
-  {
-    id: 'youtube', name: 'YouTube', icon: '🎬', kind: 'video',
-    note: 'YouTube Data API v3 — فيديوهات وقنوات',
-    fields: [{ k: 'key', label: 'API Key', ph: 'AIza...' }],
-    run: async (v, q) => (await jget(`https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=25&type=video&key=${encodeURIComponent(v.key)}&q=${encodeURIComponent(q)}`)).items?.map(i => ({
-      title: i.snippet?.title, url: 'https://www.youtube.com/watch?v=' + i.id?.videoId,
-      snippet: clean(i.snippet?.description), thumb: i.snippet?.thumbnails?.medium?.url
-    })) || []
-  },
-  {
-    id: 'serpapi', name: 'SerpAPI', icon: '🌐', kind: 'article',
-    note: 'جوجل + خرائط + أخبار + صور عبر SerpAPI',
-    fields: [{ k: 'key', label: 'API Key', ph: 'serpapi key' }],
-    run: async (v, q) => (await jget(`https://serpapi.com/search.json?engine=google&q=${encodeURIComponent(q)}&api_key=${encodeURIComponent(v.key)}&num=20`)).organic_results?.map(i => ({ title: i.title, url: i.link, snippet: clean(i.snippet) })) || []
-  },
-  {
-    id: 'tavily', name: 'Tavily', icon: '🧠', kind: 'article',
-    note: 'محرك بحث مصمم للوكلاء الذكيين',
-    fields: [{ k: 'key', label: 'API Key', ph: 'tvly-...' }],
-    run: async (v, q) => {
-      const c = new AbortController();
-      const t = setTimeout(() => c.abort(), 14000);
-      try {
-        const r = await fetch('https://api.tavily.com/search', {
-          method: 'POST', signal: c.signal,
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ api_key: v.key, query: q, max_results: 15, include_answer: false })
-        });
-        if (!r.ok) throw new Error('HTTP ' + r.status);
-        const d = await r.json();
-        return (d.results || []).map(x => ({ title: x.title, url: x.url, snippet: clean(x.content) }));
-      } finally { clearTimeout(t); }
+    id: 'youtube', name: 'YouTube', icon: '🎬', scope: SCOPES.youtube,
+    desc: 'كيقلب فالفيديوهات ويجيب الروابط من حسابك',
+    run: async (q) => {
+      const r = await googleApi('https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=25&q=' + encodeURIComponent(q), SCOPES.youtube);
+      const d = await r.json();
+      return (d.items || []).map(v => ({
+        title: v.snippet?.title || '',
+        url: 'https://www.youtube.com/watch?v=' + v.id?.videoId,
+        snippet: clamp(v.snippet?.description),
+        thumb: v.snippet?.thumbnails?.medium?.url || '',
+        kind: 'video'
+      }));
     }
   },
   {
-    id: 'unsplash', name: 'Unsplash', icon: '🖼️', kind: 'image',
-    note: 'صور عالية الجودة',
-    fields: [{ k: 'key', label: 'Access Key', ph: 'unsplash key' }],
-    run: async (v, q) => (await jget(`https://api.unsplash.com/search/photos?per_page=20&query=${encodeURIComponent(q)}`, { Authorization: 'Client-ID ' + v.key })).results?.map(p => ({
-      title: p.description || p.alt_description || 'صورة', url: p.links?.html, snippet: 'تصوير: ' + (p.user?.name || ''), thumb: p.urls?.small
-    })) || []
-  },
-  {
-    id: 'github', name: 'GitHub', icon: '💻', kind: 'code',
-    note: 'بحث موسع فالمستودعات والكود (توكن اختياري)',
-    fields: [{ k: 'token', label: 'Token', ph: 'ghp_... (اختياري)' }],
-    run: async (v, q) => {
-      const h = v.token ? { Authorization: 'Bearer ' + v.token } : {};
-      const d = await jget(`https://api.github.com/search/repositories?q=${encodeURIComponent(q)}&sort=stars&per_page=30`, h);
-      return (d.items || []).map(r => ({ title: r.full_name + ' — ' + (r.description || ''), url: r.html_url, snippet: clean(r.description), thumb: r.owner?.avatar_url }));
+    id: 'drive', name: 'Google Drive', icon: '📁', scope: SCOPES.drive,
+    desc: 'كيقلب فملفاتك ومستنداتك ويرجع العناوين',
+    run: async (q) => {
+      const url = 'https://www.googleapis.com/drive/v3/files?pageSize=30&fields=files(id,name,description,webViewLink,thumbnailLink,mimeType,modifiedTime)&q=' +
+        encodeURIComponent("fullText contains '" + String(q).replace(/'/g, ' ') + "'");
+      const r = await googleApi(url, SCOPES.drive);
+      const d = await r.json();
+      return (d.files || []).map(f => ({
+        title: f.name,
+        url: f.webViewLink || ('https://drive.google.com/file/d/' + f.id),
+        snippet: clamp(f.description || (f.mimeType || '') + ' · ' + (f.modifiedTime || '').slice(0, 10)),
+        thumb: f.thumbnailLink || '',
+        kind: 'archive'
+      }));
     }
   },
   {
-    id: 'openweather', name: 'الطقس', icon: '🌦️', kind: 'data',
-    note: 'OpenWeather — أحوال الطقس والتنبؤات',
-    fields: [{ k: 'key', label: 'API Key', ph: 'openweather key' }],
-    run: async (v, q) => {
-      const d = await jget(`https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(q)}&appid=${encodeURIComponent(v.key)}&units=metric&lang=ar`);
-      if (!d || !d.main) return [];
-      return [{
-        title: 'الطقس فـ' + (d.name || q) + ': ' + (d.weather?.[0]?.description || ''),
-        url: 'https://openweathermap.org/city/' + d.id,
-        snippet: `الحرارة ${Math.round(d.main.temp)}° · الرطوبة ${d.main.humidity}% · الريح ${d.wind?.speed} م/ث`
-      }];
+    id: 'gmail', name: 'Gmail', icon: '✉️', scope: SCOPES.gmail,
+    desc: 'كيقلب فالرسائل اللي عندك فالبريد',
+    run: async (q) => {
+      const lr = await googleApi('https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=8&q=' + encodeURIComponent(q), SCOPES.gmail);
+      const list = (await lr.json()).messages || [];
+      const out = [];
+      for (const m of list.slice(0, 6)) {
+        try {
+          const mr = await googleApi('https://gmail.googleapis.com/gmail/v1/users/me/messages/' + m.id + '?format=metadata&metadataHeaders=Subject&metadataHeaders=From&metadataHeaders=Date', SCOPES.gmail);
+          const md = await mr.json();
+          const h = Object.fromEntries((md.payload?.headers || []).map(x => [x.name.toLowerCase(), x.value]));
+          out.push({
+            title: h.subject || '(بلا عنوان)',
+            url: 'https://mail.google.com/mail/u/0/#all/' + m.id,
+            snippet: clamp([h.from, h.date, md.snippet].filter(Boolean).join(' · ')),
+            thumb: '',
+            kind: 'article'
+          });
+        } catch (e) {}
+      }
+      return out;
+    }
+  },
+  {
+    id: 'calendar', name: 'Google Calendar', icon: '📅', scope: SCOPES.calendar,
+    desc: 'كيقلب فالمواعيد والأحداث ديالك',
+    run: async (q) => {
+      const url = 'https://www.googleapis.com/calendar/v3/calendars/primary/events?singleEvents=true&orderBy=startTime&maxResults=20&q=' + encodeURIComponent(q);
+      const r = await googleApi(url, SCOPES.calendar);
+      const d = await r.json();
+      return (d.items || []).map(ev => ({
+        title: ev.summary || '(حدث)',
+        url: ev.htmlLink || '',
+        snippet: clamp([(ev.start?.dateTime || ev.start?.date || ''), ev.location, ev.description].filter(Boolean).join(' · ')),
+        thumb: '',
+        kind: 'article'
+      }));
     }
   }
 ];
 
-export async function connectorSearch(question) {
-  const all = loadAll();
-  const out = {};
-  await Promise.all(CONNECTORS.map(async c => {
-    const cfg = all[c.id];
-    if (!cfg || !cfg.on) return;
-    const v = cfg.fields || {};
-    if (!Object.values(v).some(x => String(x || '').trim().length > 4)) return;
-    try {
-      const items = await c.run(v, question);
-      if (items && items.length) out[c.name] = items.map(i => ({ ...i, kind: i.kind || c.kind }));
-    } catch (e) { out[c.name] = []; }
-  }));
-  return out;
+/* وصلات اختيارية بمفاتيح (متقدمة) — كتبقى خدامة إلى حطيتيها */
+export const KEY_CONNECTORS = [
+  { id: 'googlecse', name: 'Google Programmable Search', icon: '🔍', fields: [['key', 'API Key'], ['cx', 'CX']],
+    run: async (v, q) => {
+      const u = `https://www.googleapis.com/customsearch/v1?key=${encodeURIComponent(v.key)}&cx=${encodeURIComponent(v.cx)}&num=10&q=${encodeURIComponent(q)}`;
+      const d = await (await fetch(u)).json();
+      return (d.items || []).map(i => ({ title: i.title, url: i.link, snippet: clamp(i.snippet), thumb: i.pagemap?.cse_thumbnail?.[0]?.src || '', kind: 'article' }));
+    } },
+  { id: 'serpapi', name: 'SerpAPI', icon: '🌐', fields: [['key', 'API Key']],
+    run: async (v, q) => {
+      const d = await (await fetch(`https://serpapi.com/search.json?engine=google&num=10&q=${encodeURIComponent(q)}&api_key=${encodeURIComponent(v.key)}`)).json();
+      return (d.organic_results || []).map(i => ({ title: i.title, url: i.link, snippet: clamp(i.snippet), thumb: '', kind: 'article' }));
+    } },
+  { id: 'tavily', name: 'Tavily', icon: '🧠', fields: [['key', 'API Key']],
+    run: async (v, q) => {
+      const d = await (await fetch('https://api.tavily.com/search', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ api_key: v.key, query: q, max_results: 10 })
+      })).json();
+      return (d.results || []).map(i => ({ title: i.title, url: i.url, snippet: clamp(i.content), thumb: '', kind: 'article' }));
+    } },
+  { id: 'unsplash', name: 'Unsplash', icon: '🖼️', fields: [['key', 'Access Key']],
+    run: async (v, q) => {
+      const d = await (await fetch(`https://api.unsplash.com/search/photos?per_page=20&query=${encodeURIComponent(q)}&client_id=${encodeURIComponent(v.key)}`)).json();
+      return (d.results || []).map(i => ({ title: i.description || i.alt_description || 'صورة', url: i.links?.html, snippet: clamp(i.user?.name), thumb: i.urls?.small, kind: 'image' }));
+    } },
+  { id: 'github', name: 'GitHub', icon: '💻', fields: [['key', 'Personal Access Token']],
+    run: async (v, q) => {
+      const h = { Authorization: 'Bearer ' + v.key, Accept: 'application/vnd.github+json' };
+      const d = await (await fetch(`https://api.github.com/search/repositories?per_page=20&q=${encodeURIComponent(q)}`, { headers: h })).json();
+      return (d.items || []).map(i => ({ title: i.full_name, url: i.html_url, snippet: clamp(i.description), thumb: i.owner?.avatar_url || '', kind: 'code' }));
+    } }
+];
+
+export function keyCfg(id) {
+  try { return JSON.parse(localStorage.getItem('azzouz-conn-' + id) || 'null') || {}; } catch (e) { return {}; }
+}
+export function saveKeyCfg(id, vals) {
+  try { localStorage.setItem('azzouz-conn-' + id, JSON.stringify(vals || {})); } catch (e) {}
+}
+export function removeKeyCfg(id) {
+  try { localStorage.removeItem('azzouz-conn-' + id); } catch (e) {}
+}
+export function keyOn(id) {
+  try { return localStorage.getItem('azzouz-conn-on-' + id) === '1'; } catch (e) { return false; }
+}
+export function setKeyOn(id, v) {
+  try { localStorage.setItem('azzouz-conn-on-' + id, v ? '1' : '0'); } catch (e) {}
 }
 
-export async function testConnector(id, question = 'artificial intelligence') {
-  const c = CONNECTORS.find(x => x.id === id);
-  const cfg = (loadAll() || {})[id];
-  if (!c || !cfg) return { ok: false, n: 0, error: 'غير مضبوط' };
-  try {
-    const items = await c.run(cfg.fields || {}, question);
-    return { ok: true, n: (items || []).length };
-  } catch (e) {
-    return { ok: false, n: 0, error: e.message };
+const withTimeout = async (p, ms = 12000) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), ms))]);
+
+export async function connectorSearch(q) {
+  const out = {};
+  const st = getSession();
+  if (st) {
+    for (const s of SERVICES) {
+      if (!isOn(s.id) || !hasScope(st, s.scope)) continue;
+      try {
+        const items = await withTimeout(s.run(q));
+        if (items.length) out[s.name] = items;
+      } catch (e) {}
+    }
   }
+  for (const k of KEY_CONNECTORS) {
+    if (!keyOn(k.id)) continue;
+    const v = keyCfg(k.id);
+    if (!v || !v.key) continue;
+    try {
+      const items = await withTimeout(k.run(v, q));
+      if (items.length) out[k.name] = items;
+    } catch (e) {}
+  }
+  return out;
 }
