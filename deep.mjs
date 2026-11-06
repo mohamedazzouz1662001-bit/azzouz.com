@@ -4,6 +4,7 @@
 import { advancedResearch, instantAnswer, tokenize } from './research.mjs?v=6';
 import { wideResearch, englishQuery } from './wide.mjs?v=7';
 import { archiveAnswer } from './archive.mjs?v=1';
+import { recall, learn } from './brain.mjs?v=1';
 
 const VARIANTS = q => {
   const bare = q.replace(/^(ما هو|ما هي|كيفاش|كيف|لماذا|علاش|واش|هل)\s+/i, '').trim();
@@ -249,11 +250,23 @@ export async function deepAnswer(question, { onStage = () => {}, onCount = () =>
   const confidence = Math.min(92, Math.max(45, 40 + Math.round(Math.log2(refs.length + 1) * 6)));
   const built = compose(q, forCompose, engines, confidence, refs.length);
 
-  const text = built.text;
+  let text = built.text;
+
+  // العقل: كيرجع شنو تعلم من قبل ويطبقو
+  let remembered = { facts: [], score: 0 };
+  try { remembered = await recall(q, 2); } catch (e) {}
+  if (remembered.facts && remembered.facts.length && remembered.score >= 0.6) {
+    const line = '🧠 من اللي تعلمتو من قبل: ' + remembered.facts[0].text;
+    text = text.replace('📚 ', line + '\n\n📚 ');
+  }
+
   archiveAnswer(q, refs.slice(0, 400), { confidence, engines, total: refs.length });
+  try {
+    await learn({ question: q, answer: text, refs, terms: [built.text.slice(0, 400)] });
+  } catch (e) {}
 
   return {
-    type: 'article', text, refs, question: q, confidence,
+    type: 'article', text, remembered: remembered.facts || [], refs, question: q, confidence,
     words: text.split(/\s+/).length, ms: Date.now() - started, engines,
     wide: { total: wide.total || 0 }, suggestions: suggestionsFor(q)
   };
