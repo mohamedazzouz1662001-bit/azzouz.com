@@ -288,6 +288,10 @@ micBtn.onclick = () => {
       bubble('خاصني إذن الميكرو. من إعدادات المتصفح سمح بالميكرو لهاد الموقع وعاود.', 'in');
     } else if (ev.error === 'no-speech') {
       bubble('ما سمعت حتى كلام. عاود اضغط 🎙 وهضر قريب من الميكرو.', 'in');
+    } else if (ev.error === 'audio-capture') {
+      bubble('ما لقيتش ميكرو فهاد الجهاز.', 'in');
+    } else if (ev.error !== 'aborted') {
+      bubble('تعذر السمع (الخطأ: ' + ev.error + '). كتب سؤالك باليد ولا عاود جرب.', 'in');
     }
   };
 
