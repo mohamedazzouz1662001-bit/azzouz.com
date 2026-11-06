@@ -36,6 +36,18 @@ function parseSerp(text, engine) {
   return out;
 }
 
+const COMPOUND = {
+  'ضغط البيانات': 'data compression', 'ضغط الصور': 'image compression', 'ضغط الفيديو': 'video compression',
+  'التشفير المتماثل': 'symmetric encryption', 'التشفير غير المتماثل': 'asymmetric encryption',
+  'الصيام المتقطع': 'intermittent fasting', 'أمن المعلومات': 'information security',
+  'الطاقة المتجددة': 'renewable energy', 'تغير المناخ': 'climate change',
+  'التعلم الآلي': 'machine learning', 'التعلم العميق': 'deep learning',
+  'قواعد البيانات': 'databases', 'الشبكات العصبية': 'neural networks',
+  'الذكاء الاصطناعي': 'artificial intelligence', 'معالجة اللغة الطبيعية': 'natural language processing',
+  'أمن الشبكات': 'network security', 'الاقتصاد الرقمي': 'digital economy',
+  'الصحة النفسية': 'mental health', 'الاقتصاد الكلي': 'macroeconomics'
+};
+
 const GLOSSARY = {
   'تشفير': 'encryption', 'التشفير': 'encryption', 'المتماثل': 'symmetric', 'متماثل': 'symmetric',
   'ذكاء': 'artificial intelligence', 'اصطناعي': 'artificial intelligence',
@@ -61,6 +73,9 @@ const GLOSSARY = {
 export function englishQuery(question) {
   const q = String(question).toLowerCase();
   const hits = [];
+  for (const [ar, en] of Object.entries(COMPOUND)) {
+    if (q.includes(ar) && !hits.includes(en)) hits.unshift(en);
+  }
   for (const [ar, en] of Object.entries(GLOSSARY)) {
     if (q.includes(ar) && !hits.includes(en)) hits.push(en);
   }
