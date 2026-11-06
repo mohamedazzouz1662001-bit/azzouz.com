@@ -309,7 +309,7 @@ export function takeTopic() {
 
 export async function backgroundTick() {
   const topic = takeTopic();
-  const r = await advancedResearch({ question: topic });
+  const r = await advancedResearch({ question: topic, noCache: true });
   const b = bg();
   b.cycles += 1;
   b.last = Date.now();
