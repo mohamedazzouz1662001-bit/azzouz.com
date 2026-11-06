@@ -1,264 +1,454 @@
-/* research.mjs v2 — بحث شامل من المتصفح مباشرة (بلا خدمة خارجية)
-   المصادر: ويكيبيديا (ar/en) · Stack Exchange · Hacker News · OpenAlex ·
-            Crossref · GitHub · DuckDuckGo IA
-   كولها كتدعم CORS، يعني كتخدم مباشرة من GitHub Pages.
-   يعطي: مقال واحد مركّب من المصادر + مراجع مرقمة فالأسفل + ذاكرة وتعلّم محلي.
-*/
+/* research.mjs v3 — محرك بحث شامل بمراجع، يعمل من المتصفح مباشرة.
+   مصادر: ويكيبيديا ar/en · بحث ويب (Bing) · OpenAlex · Crossref · Europe PMC ·
+           PubMed · GitHub · Stack Overflow · Hacker News · DEV · DuckDuckGo
+   المخرجات: مقال واحد + TL;DR + مراجع مرقمة + ذاكرة وتعلّم محلي. */
 
-const TIMEOUT = 9000;
-const CACHE_KEY = 'azzouz-research-cache-v2';
-const LEARN_KEY = 'azzouz-learn-v2';
-const MEM_KEY = 'azzouz-memory-v2';
+const TIMEOUT = 14000;
+const JINA = 'https://r.jina.ai/';
+const LEARN_KEY = 'azzouz-learn-v3';
+const MEM_KEY = 'azzouz-memory-v3';
 
 /* ---------- أدوات ---------- */
-const ENT = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', '#39': "'", '#34': '"', '#38': '&' };
-const strip = (s = '') => String(s)
-  .replace(/<[^>]*>/g, ' ')
-  .replace(/&(#?\w+);/g, (m, e) => ENT[e] ?? ' ')
-  .replace(/\s+/g, ' ').trim();
-const cut = (s, n = 260) => (s.length > n ? s.slice(0, n).replace(/\s\S*$/, '') + '…' : s);
-const host = (u) => { try { return new URL(u).hostname.replace(/^www\./, ''); } catch { return ''; } };
+const enc = encodeURIComponent;
+function readJSON(key, def) { try { return JSON.parse(localStorage.getItem(key) || 'null') ?? def; } catch (e) { return def; } }
+function writeJSON(key, v) { try { localStorage.setItem(key, JSON.stringify(v)); } catch (e) {} }
 
-async function getJSON(url, signal) {
+function htmlDecode(s = '') {
+  return String(s)
+    .replace(/&#(\d+);/g, (_, d) => String.fromCodePoint(+d))
+    .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCodePoint(parseInt(h, 16)))
+    .replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&nbsp;/g, ' ')
+    .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+}
+function strip(s = '') { return htmlDecode(String(s).replace(/<[^>]*>/g, ' ')).replace(/\s+/g, ' ').trim(); }
+function trimText(s, n = 320) { s = strip(s); return s.length > n ? s.slice(0, n - 1).trim() + '…' : s; }
+function yearOf(v) {
+  if (!v) return null;
+  const m = String(v).match(/(19|20)\d{2}/);
+  return m ? +m[0] : null;
+}
+function hostOf(url) { try { return new URL(url).hostname.replace(/^www\./, ''); } catch (e) { return ''; } }
+
+async function get(url, { json = true, ms = TIMEOUT, text = false } = {}) {
   const c = new AbortController();
-  const t = setTimeout(() => c.abort(), TIMEOUT);
-  if (signal) signal.addEventListener('abort', () => c.abort());
+  const t = setTimeout(() => c.abort(), ms);
   try {
-    const r = await fetch(url, { signal: c.signal, headers: { Accept: 'application/json', 'User-Agent': 'AzzouzResearch/2.0 (browser)' } });
+    const r = await fetch(url, { signal: c.signal, headers: { Accept: json ? 'application/json' : 'text/plain', 'User-Agent': 'AzzouzResearch/3.0 (+github.io)' } });
     if (!r.ok) throw new Error('HTTP ' + r.status);
-    return await r.json();
+    return json ? await r.json() : await r.text();
   } finally { clearTimeout(t); }
 }
 
+/* ---------- مفكك روابط Bing ---------- */
+function bingUrl(raw) {
+  const m = String(raw).match(/u=a1([A-Za-z0-9_\-=]+)/);
+  if (!m) return raw;
+  let s = m[1].replace(/-/g, '+').replace(/_/g, '/');
+  s += '='.repeat((4 - (s.length % 4)) % 4);
+  try { return decodeURIComponent(escape(atob(s))); } catch (e) { return raw; }
+}
+
 /* ---------- المصادر ---------- */
+const TRUST = {
+  'ar.wikipedia.org': 1, 'en.wikipedia.org': 1, 'pubmed.ncbi.nlm.nih.gov': 0.97,
+  'europepmc.org': 0.95, 'arxiv.org': 0.95, 'openalex.org': 0.93, 'doi.org': 0.93,
+  'stackoverflow.com': 0.88, 'github.com': 0.84, 'dev.to': 0.75,
+  'news.ycombinator.com': 0.72, 'reddit.com': 0.6
+};
+const KIND_TITLES = {
+  general: 'المعرفة العامة',
+  web: 'الويب والصفحات',
+  academic: 'الأبحاث والمراجع العلمية',
+  dev: 'التقنية والبرمجة',
+  community: 'المجتمع والنقاشات'
+};
+
 const SOURCES = [
   {
-    id: 'wikipedia-ar', label: 'ويكيبيديا العربية', weight: 1.15, kind: 'general',
-    run: async (q, sig) => {
-      const d = await getJSON(`https://ar.wikipedia.org/w/rest.php/v1/search/page?q=${encodeURIComponent(q)}&limit=4`, sig);
-      return (d?.pages || []).map(p => ({
-        title: p.title, url: `https://ar.wikipedia.org/wiki/${encodeURIComponent(p.key || p.title)}`,
-        snippet: cut(strip(p.excerpt || p.description || ''))
+    id: 'wikipedia-ar', label: 'ويكيبيديا العربية', kind: 'general', ms: 9000,
+    run: async (q) => {
+      const d = await get(`https://ar.wikipedia.org/w/rest.php/v1/search/page?q=${enc(q)}&limit=4`);
+      return (d.pages || []).map(p => ({
+        title: p.title, url: `https://ar.wikipedia.org/wiki/${enc(p.key || p.title)}`,
+        snippet: trimText(p.description || p.excerpt || '', 300), year: null
       }));
     }
   },
   {
-    id: 'wikipedia-en', label: 'Wikipedia (EN)', weight: 1.05, kind: 'general',
-    run: async (q, sig) => {
-      const d = await getJSON(`https://en.wikipedia.org/w/rest.php/v1/search/page?q=${encodeURIComponent(q)}&limit=4`, sig);
-      return (d?.pages || []).map(p => ({
-        title: p.title, url: `https://en.wikipedia.org/wiki/${encodeURIComponent(p.key || p.title)}`,
-        snippet: cut(strip(p.excerpt || p.description || ''))
+    id: 'wikipedia-en', label: 'Wikipedia (EN)', kind: 'general', ms: 9000,
+    run: async (q) => {
+      const d = await get(`https://en.wikipedia.org/w/rest.php/v1/search/page?q=${enc(q)}&limit=3`);
+      return (d.pages || []).map(p => ({
+        title: p.title, url: `https://en.wikipedia.org/wiki/${enc(p.key || p.title)}`,
+        snippet: trimText(p.description || p.excerpt || '', 300), year: null
       }));
     }
   },
   {
-    id: 'stackexchange', label: 'Stack Overflow / SE', weight: 1.0, kind: 'dev',
-    run: async (q, sig) => {
-      const d = await getJSON(`https://api.stackexchange.com/2.3/search/excerpts?order=desc&sort=relevance&q=${encodeURIComponent(q)}&site=stackoverflow&pagesize=5`, sig);
-      return (d?.items || []).map(it => ({
-        title: strip(it.title), url: it.question_id ? `https://stackoverflow.com/q/${it.question_id}` : 'https://stackoverflow.com',
-        snippet: cut(strip(it.excerpt))
-      }));
-    }
-  },
-  {
-    id: 'github', label: 'GitHub', weight: 0.95, kind: 'dev',
-    run: async (q, sig) => {
-      const d = await getJSON(`https://api.github.com/search/repositories?q=${encodeURIComponent(q)}&sort=stars&per_page=5`, sig);
-      return (d?.items || []).map(r => ({
-        title: r.full_name, url: r.html_url,
-        snippet: cut(strip((r.description || '') + ' · ⭐ ' + r.stargazers_count + ' · ' + (r.language || '')))
-      }));
-    }
-  },
-  {
-    id: 'hackernews', label: 'Hacker News', weight: 0.9, kind: 'community',
-    run: async (q, sig) => {
-      const d = await getJSON(`https://hn.algolia.com/api/v1/search?query=${encodeURIComponent(q)}&tags=story&hitsPerPage=5`, sig);
-      return (d?.hits || []).map(h => ({
-        title: strip(h.title || ''), url: h.url || `https://news.ycombinator.com/item?id=${h.objectID}`,
-        snippet: cut(strip((h.story_text || '') + ' · ' + (h.points || 0) + ' نقطة · ' + (h.num_comments || 0) + ' تعليق')),
-        date: h.created_at
-      }));
-    }
-  },
-  {
-    id: 'openalex', label: 'OpenAlex', weight: 1.0, kind: 'academic',
-    run: async (q, sig) => {
-      const d = await getJSON(`https://api.openalex.org/works?search=${encodeURIComponent(q)}&per_page=4`, sig);
-      return (d?.results || []).map(w => ({
-        title: strip(w.title || ''), url: w.doi || w.id,
-        snippet: cut(abstractOf(w)), date: String(w.publication_year || '')
-      }));
-    }
-  },
-  {
-    id: 'crossref', label: 'Crossref', weight: 0.95, kind: 'academic',
-    run: async (q, sig) => {
-      const d = await getJSON(`https://api.crossref.org/works?query=${encodeURIComponent(q)}&rows=4&select=title,DOI,URL,abstract,issued`, sig);
-      return (d?.message?.items || []).map(w => ({
-        title: strip((w.title || [''])[0]), url: w.URL || ('https://doi.org/' + w.DOI),
-        snippet: cut(strip(w.abstract || '')), date: String(w.issued?.['date-parts']?.[0]?.[0] || '')
-      }));
-    }
-  },
-  {
-    id: 'duckduckgo', label: 'DuckDuckGo', weight: 0.8, kind: 'general',
-    run: async (q, sig) => {
-      const d = await getJSON(`https://api.duckduckgo.com/?q=${encodeURIComponent(q)}&format=json&no_html=1&skip_disambig=1`, sig);
+    id: 'web-bing', label: 'بحث الويب', kind: 'web', ms: 22000,
+    run: async (q) => {
+      const md = await get(JINA + 'https://www.bing.com/search?q=' + enc(q) + '&count=8', { json: false, ms: 22000 });
+      const lines = md.split('\n');
       const out = [];
-      if (d?.AbstractText) out.push({ title: d.Heading || q, url: d.AbstractURL || 'https://duckduckgo.com', snippet: cut(strip(d.AbstractText)) });
-      (d?.RelatedTopics || []).slice(0, 4).forEach(t => {
-        const it = t.FirstURL ? t : (t.Topics?.[0] || null);
-        if (it?.FirstURL && it.Text) out.push({ title: cut(strip(it.Text), 70), url: it.FirstURL, snippet: cut(strip(it.Text)) });
+      for (let i = 0; i < lines.length && out.length < 6; i++) {
+        const L = lines[i];
+        const m = L.match(/^##\s*\[(.+?)\]\((https?:\/\/[^)]+)\)/);
+        if (!m) continue;
+        const title = strip(m[1].replace(/\*\*/g, ''));
+        const url = bingUrl(m[2]);
+        if (!/^https?:/i.test(url) || /bing\.com\/ck/.test(url)) continue;
+        let snip = '';
+        for (let j = i + 1; j < Math.min(i + 5, lines.length); j++) {
+          const t = strip(lines[j]);
+          if (t && !/^\[|^##|^!\[|^\d+\./.test(t)) { snip = trimText(t, 300); break; }
+        }
+        if (title && snip) out.push({ title, url, snippet: snip, year: yearOf(snip) });
+      }
+      return out;
+    }
+  },
+  {
+    id: 'openalex', label: 'OpenAlex', kind: 'academic', ms: 11000,
+    run: async (q) => {
+      const d = await get(`https://api.openalex.org/works?search=${enc(q)}&per_page=5&sort=relevance_score:desc`);
+      return (d.results || []).map(w => {
+        let abs = '';
+        const inv = w.abstract_inverted_index;
+        if (inv) {
+          const words = [];
+          for (const [word, pos] of Object.entries(inv)) for (const p of pos) words[p] = word;
+          abs = words.filter(Boolean).join(' ');
+        }
+        return {
+          title: w.display_name, url: w.doi || w.id,
+          snippet: trimText(abs || w.display_name, 320), year: w.publication_year
+        };
+      });
+    }
+  },
+  {
+    id: 'crossref', label: 'Crossref', kind: 'academic', ms: 11000,
+    run: async (q) => {
+      const d = await get(`https://api.crossref.org/works?query=${enc(q)}&rows=5&select=title,URL,abstract,issued,is-referenced-by-count`);
+      return ((d.message && d.message.items) || []).map(it => ({
+        title: (it.title && it.title[0]) || '',
+        url: it.URL,
+        snippet: trimText(it.abstract || (it.title && it.title[0]) || '', 320),
+        year: it.issued && it.issued['date-parts'] ? it.issued['date-parts'][0][0] : null
+      }));
+    }
+  },
+  {
+    id: 'europepmc', label: 'Europe PMC', kind: 'academic', ms: 11000,
+    run: async (q) => {
+      const d = await get(`https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=${enc(q)}&format=json&pageSize=5`);
+      const rs = (d.resultList && d.resultList.result) || [];
+      return rs.map(r => ({
+        title: r.title,
+        url: r.doi ? 'https://doi.org/' + r.doi : `https://europepmc.org/article/${r.source}/${r.id}`,
+        snippet: trimText(r.abstractText || r.title, 320), year: yearOf(r.pubYear)
+      }));
+    }
+  },
+  {
+    id: 'pubmed', label: 'PubMed', kind: 'academic', ms: 14000,
+    run: async (q) => {
+      const s = await get(`https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term=${enc(q)}&retmode=json&retmax=4`);
+      const ids = (s.esearchresult && s.esearchresult.idlist) || [];
+      if (!ids.length) return [];
+      const d = await get(`https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=pubmed&id=${ids.join(',')}&retmode=json`);
+      return ids.map(id => {
+        const r = d.result && d.result[id];
+        if (!r) return null;
+        return {
+          title: r.title, url: `https://pubmed.ncbi.nlm.nih.gov/${id}/`,
+          snippet: trimText((r.source || '') + ' · ' + (r.title || ''), 300), year: yearOf(r.pubdate)
+        };
+      }).filter(Boolean);
+    }
+  },
+  {
+    id: 'github', label: 'GitHub', kind: 'dev', ms: 11000,
+    run: async (q) => {
+      const d = await get(`https://api.github.com/search/repositories?q=${enc(q)}&sort=stars&per_page=4`);
+      return (d.items || []).map(r => ({
+        title: r.full_name, url: r.html_url,
+        snippet: trimText((r.description || '') + ' · ⭐ ' + r.stargazers_count + ' · ' + (r.language || ''), 300),
+        year: yearOf(r.updated_at)
+      }));
+    }
+  },
+  {
+    id: 'stackoverflow', label: 'Stack Overflow', kind: 'dev', ms: 11000,
+    run: async (q) => {
+      const d = await get(`https://api.stackexchange.com/2.3/search/excerpts?order=desc&sort=relevance&q=${enc(q)}&site=stackoverflow&pagesize=4`);
+      return (d.items || []).filter(i => i.question_id).map(i => ({
+        title: i.title, url: `https://stackoverflow.com/q/${i.question_id}`,
+        snippet: trimText(i.excerpt, 300), year: i.creation_date ? new Date(i.creation_date * 1000).getFullYear() : null
+      }));
+    }
+  },
+  {
+    id: 'hackernews', label: 'Hacker News', kind: 'community', ms: 10000,
+    run: async (q) => {
+      const d = await get(`https://hn.algolia.com/api/v1/search?query=${enc(q)}&tags=story&hitsPerPage=4`);
+      return (d.hits || []).map(h => ({
+        title: h.title || h.story_title || '',
+        url: h.url || `https://news.ycombinator.com/item?id=${h.objectID}`,
+        snippet: trimText(strip(h.story_text || '') || (h.title || '') + ' · ' + (h.points || 0) + ' نقطة', 300),
+        year: yearOf(h.created_at)
+      })).filter(x => x.title);
+    }
+  },
+  {
+    id: 'devto', label: 'DEV Community', kind: 'dev', ms: 10000,
+    run: async (q) => {
+      const latin = (q.match(/[a-zA-Z][a-zA-Z0-9-]{2,}/g) || []).slice(0, 1);
+      if (!latin.length) return [];
+      const d = await get(`https://dev.to/api/articles?tag=${enc(latin[0].toLowerCase())}&per_page=3&top=30`);
+      return (Array.isArray(d) ? d : []).map(a => ({
+        title: a.title, url: a.url, snippet: trimText(a.description || '', 300), year: yearOf(a.published_at)
+      }));
+    }
+  },
+  {
+    id: 'duckduckgo', label: 'DuckDuckGo', kind: 'web', ms: 9000,
+    run: async (q) => {
+      const d = await get(`https://api.duckduckgo.com/?q=${enc(q)}&format=json&no_html=1&skip_disambig=1`);
+      const out = [];
+      if (d.AbstractText) out.push({ title: d.Heading || q, url: d.AbstractURL || 'https://duckduckgo.com/?q=' + enc(q), snippet: trimText(d.AbstractText, 320), year: null });
+      (d.RelatedTopics || []).slice(0, 3).forEach(t => {
+        if (t.Text && t.FirstURL) out.push({ title: t.Text.split(' - ')[0], url: t.FirstURL, snippet: trimText(t.Text, 260), year: null });
       });
       return out;
     }
   }
 ];
 
-function abstractOf(w) {
-  const idx = w.abstract_inverted_index;
-  if (!idx) return '';
-  const words = [];
-  Object.keys(idx).forEach(word => (idx[word] || []).forEach(p => (words[p] = word)));
-  return cut(words.filter(Boolean).join(' '));
+/* ---------- جمع ---------- */
+function normUrl(u) {
+  try {
+    const x = new URL(u);
+    for (const k of [...x.searchParams.keys()]) if (/^(utm_|ref$|fbclid|gclid|ntb|ocid)/.test(k)) x.searchParams.delete(k);
+    x.hash = '';
+    return x.toString();
+  } catch (e) { return u; }
 }
 
-/* ---------- ذاكرة وتعلّم ---------- */
-function readJSON(key, fallback) {
-  try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; } catch { return fallback; }
-}
-function writeJSON(key, value) {
-  try { localStorage.setItem(key, JSON.stringify(value)); } catch {}
-}
-export function learn() { return readJSON(LEARN_KEY, { hosts: {}, topics: [], queries: [] }); }
-export function topSources(n = 3) {
-  const l = learn();
-  return Object.entries(l.hosts).map(([h, v]) => ({ host: h, hits: v.hits, useful: v.useful, rate: v.hits ? v.useful / v.hits : 0 }))
-    .sort((a, b) => b.rate - a.rate || b.hits - a.hits).slice(0, n);
-}
-export function tokens(t) {
-  const stop = new Set('من في على إلى عن مع هذا هذه ذلك التي الذي هو هي كان تكون يتم حول بين بعد قبل عند أو و ثم كما إن أن لا ما قد كل what the and for with from that this how why is are'.split(' '));
-  return [...new Set(strip(t).toLowerCase().replace(/[\u0640\u064b-\u065f]/g, '').split(/[^\p{L}\p{N}]+/u).filter(w => w.length > 2 && !stop.has(w)))];
-}
-export function relatedLearning(q, limit = 2) {
-  const qs = new Set(tokens(q));
-  if (!qs.size) return [];
-  const memory = readJSON(MEM_KEY, []);
-  return memory.map(e => {
-    const overlap = tokens(e.question + ' ' + e.answer).filter(t => qs.has(t)).length;
-    return { e, score: overlap };
-  }).filter(x => x.score >= 2).sort((a, b) => b.score - a.score).slice(0, limit).map(x => x.e);
-}
-function recordLearning(q, sources, usedIds) {
-  const l = learn();
-  sources.forEach(s => {
-    const h = host(s.url); if (!h) return;
-    const e = l.hosts[h] || (l.hosts[h] = { hits: 0, useful: 0 });
-    e.hits++;
-    if (usedIds.has(s.n)) e.useful++;
-  });
-  tokens(q).slice(0, 8).forEach(t => { if (!l.topics.includes(t)) l.topics.unshift(t); });
-  l.topics = l.topics.slice(0, 400);
-  l.queries.unshift({ q, ts: Date.now() });
-  l.queries = l.queries.slice(0, 100);
-  writeJSON(LEARN_KEY, l);
-}
-export function saveEntry(entry) {
-  const memory = readJSON(MEM_KEY, []);
-  memory.unshift({ ...entry, ts: Date.now() });
-  writeJSON(MEM_KEY, memory.slice(0, 200));
-}
-export function recall(q, limit = 3) {
-  return readJSON(MEM_KEY, []).filter(e => tokens(e.question).some(t => tokens(q).includes(t))).slice(0, limit);
-}
-
-/* ---------- جمع وترتيب ---------- */
 export function mergeResults(batches) {
   const map = new Map();
-  batches.forEach(b => {
-    (b.items || []).forEach(it => {
-      const u = (it.url || '').replace(/[?#].*$/, '').toLowerCase();
-      if (!u) return;
-      const cur = map.get(u);
-      const score = b.weight * (0.4 + Math.min(0.6, (it.snippet || '').length / 300));
-      if (cur) { cur.score = Math.max(cur.score, score); cur.engines.push(b.label); }
-      else map.set(u, { ...it, url: it.url, score, engines: [b.label], kind: b.kind || 'general' });
+  for (const b of batches) {
+    for (const it of (b.items || [])) {
+      if (!it || !it.url || !it.title) continue;
+      const key = normUrl(it.url);
+      const prev = map.get(key);
+      if (!prev) {
+        map.set(key, { ...it, url: key, engines: [b.label], trust: TRUST[hostOf(key)] || 0.62, ts: Date.now() });
+      } else {
+        if (!prev.engines.includes(b.label)) prev.engines.push(b.label);
+        if ((it.snippet || '').length > (prev.snippet || '').length) prev.snippet = it.snippet;
+        if (it.year && !prev.year) prev.year = it.year;
+      }
+    }
+  }
+  return [...map.values()];
+}
+
+function tokenize(s) {
+  return strip(s).toLowerCase().replace(/[\u0640\u064b-\u065f]/g, '')
+    .split(/[^\p{L}\p{N}]+/u).filter(t => t.length > 2);
+}
+
+function scoreItem(it, qTokens, learned) {
+  const hay = (it.title + ' ' + (it.snippet || '')).toLowerCase();
+  let coverage = 0;
+  for (const t of qTokens) if (hay.includes(t)) coverage++;
+  const cov = qTokens.length ? coverage / qTokens.length : 0;
+  const agree = Math.min(1, (it.engines.length - 1) * 0.5);
+  const recency = it.year ? Math.max(0, Math.min(1, (it.year - 2005) / 21)) : 0.5;
+  const len = Math.min(1, (it.snippet || '').length / 300);
+  const learnedBoost = learned.hosts[hostOf(it.url)] ? Math.min(0.15, learned.hosts[hostOf(it.url)].rate * 0.15) : 0;
+  return it.trust * 1.5 + cov * 2 + agree * 0.8 + recency * 0.4 + len * 0.3 + learnedBoost;
+}
+
+export function rank(items, qTokens, learned) {
+  return items.map(it => ({ ...it, score: scoreItem(it, qTokens, learned) })).sort((a, b) => b.score - a.score);
+}
+
+/* ---------- التعلم والذاكرة ---------- */
+export function learn() { return readJSON(LEARN_KEY, { hosts: {}, topics: [], queries: [] }); }
+export function memory() { return readJSON(MEM_KEY, []); }
+
+export function topSources(n = 3) {
+  const L = learn();
+  return Object.entries(L.hosts).map(([host, v]) => ({ host, ...v }))
+    .sort((a, b) => b.rate - a.rate || b.hits - a.hits).slice(0, n);
+}
+
+export function relatedLearning(q, limit = 2) {
+  const toks = new Set(tokenize(q));
+  if (!toks.size) return [];
+  return memory().map(e => {
+    const et = new Set(e.tokens || []);
+    const inter = [...toks].filter(t => et.has(t)).length;
+    const score = inter / Math.sqrt(Math.max(1, toks.size) * Math.max(1, et.size));
+    return { e, score, inter };
+  }).filter(x => x.inter >= 2 && x.score > 0.12)
+    .sort((a, b) => b.score - a.score).slice(0, limit).map(x => x.e);
+}
+
+function recordLearning(question, sources, usedN) {
+  const L = learn();
+  for (const s of sources) {
+    const h = hostOf(s.url);
+    if (!h) continue;
+    L.hosts[h] = L.hosts[h] || { hits: 0, useful: 0, rate: 0 };
+    L.hosts[h].hits++;
+    if (usedN.has(s.n)) L.hosts[h].useful++;
+    L.hosts[h].rate = L.hosts[h].useful / L.hosts[h].hits;
+  }
+  for (const t of new Set(tokenize(question))) {
+    const found = L.topics.find(x => x.t === t);
+    if (found) found.n++;
+    else L.topics.push({ t, n: 1 });
+  }
+  L.topics = L.topics.sort((a, b) => b.n - a.n).slice(0, 400);
+  L.queries = [{ q: question, ts: Date.now() }, ...L.queries].slice(0, 60);
+  writeJSON(LEARN_KEY, L);
+}
+
+function saveEntry(entry) {
+  const m = memory();
+  m.unshift(entry);
+  writeJSON(MEM_KEY, m.slice(0, 120));
+}
+
+export function clearMemory() { writeJSON(MEM_KEY, []); }
+
+/* ---------- صياغة المقال ---------- */
+const SENT_SPLIT = /(?<=[.!?؟؛])\s+|\n+/;
+
+function sentences(text) {
+  return strip(text).split(SENT_SPLIT).map(s => s.trim()).filter(s => s.length > 45 && s.length < 420);
+}
+function bigrams(s) { const w = tokenize(s); const out = new Set(); for (let i = 0; i < w.length - 1; i++) out.add(w[i] + ' ' + w[i + 1]); return out; }
+function similar(a, b) {
+  const A = bigrams(a), B = bigrams(b);
+  if (!A.size || !B.size) return 0;
+  let inter = 0;
+  for (const x of A) if (B.has(x)) inter++;
+  return inter / Math.min(A.size, B.size);
+}
+
+export function synthesize(question, sources) {
+  if (!sources.length) return null;
+  const qTok = tokenize(question);
+  const qSet = new Set(qTok);
+
+  const cands = [];
+  sources.forEach(s => {
+    sentences(s.snippet || '').forEach(sent => {
+      const st = new Set(tokenize(sent));
+      let hit = 0;
+      for (const t of qSet) if (st.has(t)) hit++;
+      cands.push({ sent, n: s.n, score: hit * 2 + Math.min(1, st.size / 25) + s.score * 0.2 });
     });
   });
-  return [...map.values()].sort((a, b) => b.score - a.score);
-}
+  cands.sort((a, b) => b.score - a.score);
 
-export async function gather(question, { limit = 20, signal } = {}) {
-  const batches = await Promise.allSettled(SOURCES.map(async s => ({
-    label: s.label,
-    weight: s.weight,
-    kind: s.kind,
-    items: await s.run(question, signal)
-  })));
-  const ok = batches.filter(b => b.status === 'fulfilled').map(b => b.value);
-  const merged = mergeResults(ok);
-  const ranked = merged.map((r, i) => ({ ...r, n: i + 1 })).slice(0, limit);
-  const engines = ok.filter(b => b.items.length).map(b => ({ label: b.label, count: b.items.length }));
-  return { sources: ranked, engines };
-}
+  const picked = [];
+  for (const c of cands) {
+    if (picked.length >= 9) break;
+    if (picked.some(p => similar(p.sent, c.sent) > 0.55)) continue;
+    if (picked.some(p => p.n === c.n) && picked.filter(p => p.n === c.n).length >= 2) continue;
+    picked.push(c);
+  }
 
-/* ---------- تركيب المقال ---------- */
-const SECTION_TITLES = {
-  general: 'المعرفة العامة والسياق',
-  academic: 'الأبحاث والمراجع الأكاديمية',
-  dev: 'التطبيق البرمجي والمصادر التقنية',
-  community: 'النقاش المجتمعي والتجارب'
-};
-
-export function synthesize(question, sources, previous = []) {
-  if (!sources.length) return null;
-  const used = new Set();
-  const pick = (kind, n = 3) => {
-    const out = [];
-    for (const s of sources) {
-      if (out.length >= n) break;
-      if (s.kind === kind && s.snippet && s.snippet.length > 40 && !used.has(s.n)) { out.push(s); used.add(s.n); }
-    }
-    return out;
-  };
-
-  const introSrc = sources.slice(0, 2).filter(s => s.snippet);
-  introSrc.forEach(s => used.add(s.n));
-
-  const sections = ['general', 'academic', 'dev', 'community']
-    .map(k => ({ title: SECTION_TITLES[k], items: pick(k, 3) }))
-    .filter(sec => sec.items.length);
+  const used = new Set(picked.map(p => p.n));
+  const tldr = picked.slice(0, 3);
+  const rest = picked.slice(3);
 
   let text = `📌 ${question}\n\n`;
-  if (previous.length) text += `من البحوث السابقة (ذاكرتك): ${previous.map(p => p.question).join(' · ')}\n\n`;
-  if (introSrc.length) text += introSrc.map(s => `${s.snippet} [${s.n}]`).join(' ') + '\n\n';
-  sections.forEach(sec => {
-    text += `*${sec.title}*\n` + sec.items.map(s => `• ${s.snippet} [${s.n}]`).join('\n') + '\n\n';
+  if (tldr.length) {
+    text += `*الخلاصة السريعة*\n`;
+    tldr.forEach((p, i) => { text += `${i + 1}. ${p.sent} [${p.n}]\n`; });
+    text += '\n';
+  }
+
+  const byKind = {};
+  rest.forEach(p => {
+    const src = sources.find(s => s.n === p.n);
+    const k = src ? src.kind : 'general';
+    (byKind[k] = byKind[k] || []).push(p);
   });
+  for (const k of ['general', 'web', 'academic', 'dev', 'community']) {
+    const arr = (byKind[k] || []).slice(0, 3);
+    if (!arr.length) continue;
+    text += `*${KIND_TITLES[k]}*\n`;
+    arr.forEach(p => { text += `• ${p.sent} [${p.n}]\n`; });
+    text += '\n';
+  }
+
+  const nums = picked.filter(p => /\d/.test(p.sent)).slice(0, 3);
+  if (nums.length) {
+    text += `*أرقام ومعطيات*\n`;
+    nums.forEach(p => { text += `• ${p.sent} [${p.n}]\n`; });
+    text += '\n';
+  }
 
   const multi = sources.filter(s => s.engines.length > 1);
-  text += `*خلاصة*\n`;
-  if (multi.length) text += `المصادر اللي تكررو فجوج محركات فأكثر: ${multi.map(s => s.engines.join('+') + ' [' + s.n + ']').join(' · ')}\n`;
-  text += `تم الاعتماد على ${used.size} مصدر من ${sources.length} نتيجة مجموعة.\n`;
+  const years = sources.map(s => s.year).filter(Boolean);
+  text += `*خلاصة منهجية*\n`;
+  text += `• ${sources.length} نتيجة من ${new Set(sources.map(s => s.engines.join())).size} مصدر، استُعمل منها ${used.size} مصدر فالمقال.\n`;
+  if (multi.length) text += `• ${multi.length} نتيجة تكررت فأكثر من محرك (تطابق يعزز المعلومة): ${multi.slice(0, 4).map(s => `[${s.n}]`).join(' ')}\n`;
+  if (years.length) text += `• نطاق التواريخ: ${Math.min(...years)}–${Math.max(...years)}\n`;
 
-  const refs = sources.map(s => ({ n: s.n, title: s.title, url: s.url, engine: s.engines.join(' + '), snippet: s.snippet }));
-  text += `\n*المراجع*\n` + refs.map(r => `${r.n}. ${r.title}\n${r.url}`).join('\n\n');
-  return { text, refs, citations: refs, used: [...used] };
+  text += `\n*المراجع*\n`;
+  sources.forEach(s => {
+    text += `[${s.n}] ${s.title}${s.year ? ' (' + s.year + ')' : ''}\n${s.url}\n`;
+  });
+
+  const words = text.split(/\s+/).length;
+  return { text, used: [...used], refs: sources, citations: sources, words, minutes: Math.max(1, Math.round(words / 200)) };
 }
 
 /* ---------- الواجهة ---------- */
-export async function advancedResearch({ question, limit = 20 } = {}) {
+export async function gather(question, { onSource } = {}) {
+  const learned = learn();
+  const jobs = SOURCES.map(async (src) => {
+    try {
+      const items = (await src.run(question)).filter(x => x && x.title && x.url);
+      if (onSource) onSource(src.id, 'ok', items.length);
+      return { label: src.label, id: src.id, kind: src.kind, items };
+    } catch (e) {
+      if (onSource) onSource(src.id, 'err', 0);
+      return { label: src.label, id: src.id, kind: src.kind, items: [] };
+    }
+  });
+  const batches = await Promise.all(jobs);
+
+  const merged = mergeResults(batches);
+  const kindOf = {};
+  batches.forEach(b => (b.items || []).forEach(it => { kindOf[normUrl(it.url)] = b.kind; }));
+  merged.forEach(it => { it.kind = kindOf[it.url] || 'general'; });
+
+  const ranked = rank(merged, tokenize(question), learned).slice(0, 16);
+  ranked.forEach((it, i) => { it.n = i + 1; });
+
+  const engines = batches.map(b => ({ id: b.id, label: b.label, count: (b.items || []).length }));
+  return { sources: ranked, engines };
+}
+
+export async function advancedResearch({ question, onSource } = {}) {
   if (!question || question.trim().length < 3) return null;
   const previous = relatedLearning(question);
-  const { sources, engines } = await gather(question, { limit });
-  const art = synthesize(question, sources, previous);
+  const { sources, engines } = await gather(question, { onSource });
+  if (!sources.length) return null;
+  const art = synthesize(question, sources);
   if (!art) return null;
   recordLearning(question, sources, new Set(art.used));
-  saveEntry({ question, answer: art.text, citations: art.refs, engines });
+  saveEntry({ question, answer: art.text, citations: art.refs, engines, ts: Date.now(), tokens: [...new Set(tokenize(question))] });
   return { ...art, engines, previous };
 }
 
-export { SOURCES };
+export { SOURCES, TRUST };
