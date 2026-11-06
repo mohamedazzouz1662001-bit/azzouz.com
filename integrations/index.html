@@ -105,7 +105,7 @@ code{background:#071019;border:1px solid var(--line);border-radius:6px;padding:2
 </div>
 
 <script type="module">
-const API_BASE = 'https://github-oauth-proxy.elazzouz4.workers.dev';
+const API_BASE = 'https://superagent-1906c8e6.base44.app/functions/githubDeviceProxy';
 const CLIENT_ID = 'Ov23liCSQUsIFcULd37T';
 const SCOPE = 'read:user user:email';
 
@@ -134,7 +134,7 @@ function fail(msg, hint) {
 async function health() {
   const pill = $('health');
   try {
-    const r = await fetch(API_BASE + '/health', { headers: { Accept: 'application/json' } });
+    const r = await fetch(API_BASE + '?path=health', { headers: { Accept: 'application/json' } });
     const j = await r.json();
     pill.className = 'pill ok';
     pill.textContent = 'الوسيط شاد ' + (j.version || '');
@@ -155,16 +155,16 @@ async function start() {
   $('loginBtn').disabled = true;
   $('idleStat').textContent = 'كنطلب كود من GitHub…';
   try {
-    const res = await fetch(API_BASE + '/device/code', {
+    const res = await fetch(API_BASE, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify({ client_id: CLIENT_ID, scope: SCOPE })
+      body: JSON.stringify({ action: 'device/code', client_id: CLIENT_ID, scope: SCOPE })
     });
     const j = await readJson(res);
 
     if (res.status === 403 || j.error === 'origin_not_allowed') {
-      fail('هاد النطاق ماشي مسموح فالوسيط (origin_not_allowed).',
-        'خاص يتزاد ' + location.origin + ' فقائمة الأصول المسموحة ديال الـ Worker. حتى يتزاد، تسجيل الدخول ما غاديش يخدم من هنا.');
+      fail('الوسيط رفض هاد النطاق.',
+        'الخطأ: ' + (j.error || res.status) + ' — الأصل: ' + location.origin);
       $('loginBtn').disabled = false;
       return;
     }
@@ -193,10 +193,11 @@ async function poll() {
   clearTimeout(timer);
   if (!device) return;
   try {
-    const res = await fetch(API_BASE + '/token', {
+    const res = await fetch(API_BASE, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify({
+        action: 'token',
         client_id: CLIENT_ID,
         device_code: device.device_code,
         grant_type: 'urn:ietf:params:oauth:grant-type:device_code'
@@ -232,7 +233,7 @@ async function poll() {
 
 async function loadUser() {
   try {
-    const res = await fetch(API_BASE + '/user', {
+    const res = await fetch(API_BASE + '?path=user', {
       headers: { Authorization: 'Bearer ' + token, Accept: 'application/json' }
     });
     const u = await readJson(res);
