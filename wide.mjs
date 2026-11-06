@@ -239,6 +239,18 @@ export async function wideResearch(question, { target = 2000, onProgress = () =>
     add('Commons', (d.pages || []).map(p => ({ title: p.title, url: 'https://commons.wikimedia.org/wiki/' + enc(p.key || p.title) })));
   });
 
+  // Lemmy (شبكة مجتمعية مفتوحة)
+  workers.push(async () => {
+    for (const inst of ['lemmy.world', 'lemmy.ml']) {
+      try {
+        const t = terms[terms.length - 1];
+        const d = await jget(`https://${inst}/api/v3/search?q=${enc(t)}&type_=Posts&limit=50&sort=TopAll`);
+        add('Lemmy ' + inst, (d.posts || []).map(p => ({ title: p.post?.name, url: p.post?.url || ('https://' + inst + '/post/' + p.post?.id) })));
+      } catch (e) {}
+      await new Promise(r => setTimeout(r, 150));
+    }
+  });
+
   // GitHub code search
   workers.push(async () => {
     const t = terms[terms.length - 1];
