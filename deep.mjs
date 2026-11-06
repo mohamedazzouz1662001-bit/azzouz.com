@@ -96,10 +96,12 @@ export function compose(question, refs, engines = {}, confidence = 65, total = 0
     for (const sn of splitSentences(r.snippet || '')) cands.push({ s: sn, score: scoreSentence(sn, q, kind), src: r });
   }
   cands.sort((a, b) => b.score - a.score);
+  const top = cands.length ? cands[0].score : 0;
+  const cut = top >= 8 ? Math.max(5, Math.floor(top * 0.6)) : 3;
   const picked = [];
   for (const c of cands) {
     if (picked.length >= 7) break;
-    if (c.score < 3) break;
+    if (c.score < cut) break;
     if (!picked.some(p => p.src.url === c.src.url)) picked.push(c);
   }
   const sentences = dedupe(picked.map(p => p.s));
