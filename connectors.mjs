@@ -1,6 +1,6 @@
 /* connectors.mjs v2 — الوصلات كتخدم بتسجيل الدخول (OAuth) ماشي بمفاتيح */
 
-import { googleApi, SCOPES, getSession, hasScope } from './auth.mjs';
+import { googleApi, SCOPES, getSession, hasScope, account } from './auth.mjs';
 
 const SVC_KEY = 'azzouz-svc-v1';
 
@@ -143,6 +143,28 @@ export function setKeyOn(id, v) {
 
 const withTimeout = async (p, ms = 12000) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), ms))]);
 
+
+async function githubAccountItems(q) {
+  const acc = account('github');
+  if (!acc || !acc.token) return [];
+  const h = { Authorization: 'Bearer ' + acc.token, Accept: 'application/vnd.github+json' };
+  const out = [];
+  try {
+    const r = await fetch('https://api.github.com/search/repositories?per_page=6&sort=stars&q=' + encodeURIComponent(q), { headers: h });
+    if (r.ok) {
+      const j = await r.json();
+      (j.items || []).forEach(i => out.push({
+        title: i.full_name,
+        url: i.html_url,
+        snippet: (i.description || '').slice(0, 200),
+        source: 'GitHub (حسابك)',
+        kind: 'code'
+      }));
+    }
+  } catch (e) {}
+  return out;
+}
+
 export async function connectorSearch(q) {
   const out = {};
   const st = getSession();
@@ -155,6 +177,11 @@ export async function connectorSearch(q) {
       } catch (e) {}
     }
   }
+  try {
+    const gh = await withTimeout(githubAccountItems(q));
+    if (gh.length) out['GitHub (حسابك)'] = gh;
+  } catch (e) {}
+
   for (const k of KEY_CONNECTORS) {
     if (!keyOn(k.id)) continue;
     const v = keyCfg(k.id);
