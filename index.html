@@ -77,7 +77,7 @@ $('go').onclick = async () => {
   let res = null;
   try { res = await advancedResearch({ question: q }); } catch (e) { console.warn(e); }
   $('go').disabled = false; $('go').textContent = 'ابحث ولخّص';
-  if (!res) { $('stat').textContent = '❌ ما وصلات حتى نتيجة — عاود جرب'; return; }
+  if (!res) { $('stat').textContent = '❌ ما وصلات حتى نتيجة — جرب كلمات أخرى ولا بالإنجليزية'; return; }
   $('out').style.display = 'block';
   $('art').textContent = res.text;
   const refs = $('refs');
@@ -90,9 +90,15 @@ $('go').onclick = async () => {
     d.appendChild(a);
     refs.appendChild(d);
   });
+  $('copyBtn').style.display = 'inline-block';
   const eng = (res.engines || []).map(e => e.label + ':' + e.count).join(' · ');
   $('stat').textContent = '✅ ' + res.citations.length + ' مرجع | ' + eng;
   stats();
+};
+
+$('copyBtn').onclick = async () => {
+  try { await navigator.clipboard.writeText($('art').textContent); $('copyBtn').textContent = '✅ تنسخ'; setTimeout(()=>{$('copyBtn').textContent='📋 نسخ الجواب كرسالة واحدة';},1800); }
+  catch (e) { $('copyBtn').textContent = '⚠️ ما قدرتش ننسخ'; }
 };
 
 $('clear').onclick = () => {
