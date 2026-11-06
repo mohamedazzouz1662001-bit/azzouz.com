@@ -453,10 +453,21 @@ export async function gather(question, { onSource } = {}) {
   return { sources: ranked, engines };
 }
 
-export async function advancedResearch({ question, onSource } = {}) {
+export async function advancedResearch({ question, onSource, variants = [], deeper = false } = {}) {
   if (!question || question.trim().length < 3) return null;
   const previous = relatedLearning(question);
-  const { sources, engines } = await gather(question, { onSource });
+  const main = await gather(question, { onSource });
+  let sources = main.sources, engines = main.engines;
+  if (deeper && variants.length) {
+    const batches = await Promise.all(variants.slice(0, 3).map(v => gather(v, {}).catch(() => ({ sources: [], engines: [] }))));
+    const seen = new Set(sources.map(s => s.url));
+    const extra = batches.flatMap(b => b.sources).filter(s => { if (seen.has(s.url)) return false; seen.add(s.url); return true; });
+    const qt = tokenize(question);
+    sources = rank([...sources, ...extra], qt, learn()).map((it, i) => ({ ...it, n: i + 1 }));
+    const counts = new Map(engines.map(e => [e.id, e]));
+    batches.forEach(b => b.engines.forEach(e => counts.set(e.id, { ...e, count: (counts.get(e.id)?.count || 0) + e.count })));
+    engines = [...counts.values()];
+  }
   if (!sources.length) return null;
   const art = synthesize(question, sources);
   if (!art) return null;
