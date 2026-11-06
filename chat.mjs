@@ -162,3 +162,62 @@ export function stats() {
   const K = kb();
   return { rules: K.rules.length, facts: K.facts.length, searches: memory().length };
 }
+
+/* ===== البحث الدائم فالخلفية ===== */
+const BG_KEY = 'azzouz-bg-v1';
+const SEEDS = [
+  'كيف يتواصل البشر',
+  'لغة الجسد في التواصل',
+  'أنماط الحوار الفعّال',
+  'الذكاء الاصطناعي في التعليم',
+  'أمن المعلومات والتشفير',
+  'ضغط البيانات',
+  'الطاقة المتجددة',
+  'الصيام المتقطع والصحة',
+  'علم النفس المعرفي',
+  'تاريخ الكتابة',
+  'الاقتصاد الرقمي',
+  'الفضاء والاستكشاف'
+];
+
+export function bg() { return read(BG_KEY, { queue: [], done: [], cycles: 0, last: 0 }); }
+function saveBg(b) { localStorage.setItem(BG_KEY, JSON.stringify(b)); }
+
+export function ensureSeeds() {
+  const b = bg();
+  if (!b.queue.length) {
+    const used = new Set(b.done.map(d => d.topic));
+    b.queue = SEEDS.filter(t => !used.has(t));
+    saveBg(b);
+  }
+  return b;
+}
+
+export function takeTopic() {
+  const b = ensureSeeds();
+  if (!b.queue.length) {
+    const now = Date.now();
+    b.queue = SEEDS.map(t => `${t} — ${new Date(now).getFullYear()}`);
+    saveBg(b);
+  }
+  const topic = b.queue.shift();
+  saveBg(b);
+  return topic;
+}
+
+export async function backgroundTick() {
+  const topic = takeTopic();
+  const r = await advancedResearch({ question: topic });
+  const b = bg();
+  b.cycles += 1;
+  b.last = Date.now();
+  b.done.unshift({ topic, refs: (r?.refs || []).length, words: r?.words || 0, ts: Date.now() });
+  b.done = b.done.slice(0, 60);
+  saveBg(b);
+  return { topic, refs: (r?.refs || []).length, words: r?.words || 0 };
+}
+
+export function bgStats() {
+  const b = bg();
+  return { cycles: b.cycles, last: b.last, queue: b.queue.length, done: b.done.slice(0, 6) };
+}
