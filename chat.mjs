@@ -231,13 +231,33 @@ export async function chatTurn(text, { onSource, onStage } = {}) {
   if (ruleHit) return { type: 'reply', text: ruleHit.reply, learnedRule: true };
 
   onStage && onStage('كنبحث فكل المصادر...');
-  const res = await advancedResearch({ question: raw, onSource });
-  if (!res) return { type: 'reply', text: 'ما وصلات حتى نتيجة من المصادر. عاود جرب بصياغة أخرى ولا بالإنجليزية.' };
+  let res = await advancedResearch({ question: raw, onSource, timeout: 5000 });
+
+  // تدقيق وتوسيع تلقائي: إلا كانت الثقة ضعيفة، عاود البحث بلا سقف وقت وبصيغ موسّعة
+  let expanded = false;
+  if (!res || (res.confidence || 0) < 60) {
+    onStage && onStage('كنوسّع البحث...');
+    const wide = await advancedResearch({ question: raw, onSource, deeper: true, variants: variantsFor(raw) });
+    expanded = true;
+    if (wide && (!res || (wide.confidence || 0) >= (res.confidence || 0))) res = wide;
+  }
+
+  // صراحة: إلا ما لقيناش معلومات كافية، نقولوها بلا ما نختارعو
+  if (!res || (res.words || 0) < 25 || ((res.refs || []).length < 2)) {
+    const tried = (res && res.refs ? res.refs.length : 0) + ' مصدر';
+    return {
+      type: 'reply',
+      text: '🤔 ما لقيتش معلومات كافية باش نجاوب بثقة على: ' + raw +
+        '\n\nبحثت فـ' + tried + ' (ويكيبيديا، OpenAlex، Crossref، PubMed، GitHub، Stack Exchange…) وما لقيتش تطابق واضح.\n' +
+        'ما بغيتش نختارع ليك جواب. جرب: صياغة أخرى، ولا بالإنجليزية، ولا عطيني رابط تقرا منه.'
+    };
+  }
 
   st.lastQuestion = raw; st.depth = 0;
+  try { queueTopic(raw); } catch (e) {}
   st.history = [...(st.history || []), { role: 'user', text: raw, ts: Date.now() }, { role: 'bot', text: res.text.slice(0, 400), ts: Date.now() }].slice(-40);
   saveState(st);
-  return { type: 'article', text: res.text, refs: res.refs, words: res.words, question: raw, citations: res.citations };
+  return { type: 'article', text: res.text, refs: res.refs, words: res.words, question: raw, citations: res.citations, confidence: res.confidence, expanded, type2: res.type };
 }
 
 export function stats() {
@@ -297,6 +317,15 @@ export async function backgroundTick() {
   b.done = b.done.slice(0, 60);
   saveBg(b);
   return { topic, refs: (r?.refs || []).length, words: r?.words || 0 };
+}
+
+export function setAuto(on) { localStorage.setItem('azzouz-bg-auto', on ? '1' : '0'); }
+export function isAuto() { return localStorage.getItem('azzouz-bg-auto') === '1'; }
+export function queueTopic(t) {
+  const topic = String(t || '').trim();
+  if (topic.length < 6) return;
+  const b = ensureSeeds();
+  if (!b.queue.includes(topic)) { b.queue.push(topic); saveBg(b); }
 }
 
 export function bgStats() {
