@@ -1,8 +1,8 @@
 /* deep.mjs — بحث عميق افتراضي + تركيب جواب عربي مترابط، بلا رفض
    1) بحث واسع متعدد المحركات (1000+ مرجع)  2) بحث علمي للتركيب  3) صياغة نقاط وخلاصة */
 
-import { advancedResearch, instantAnswer, tokenize } from './research.mjs';
-import { wideResearch, englishQuery } from './wide.mjs';
+import { advancedResearch, instantAnswer, tokenize } from './research.mjs?v=6';
+import { wideResearch, englishQuery } from './wide.mjs?v=6';
 
 const VARIANTS = q => {
   const bare = q.replace(/^(ما هو|ما هي|كيفاش|كيف|لماذا|علاش|واش|هل)\s+/i, '').trim();
