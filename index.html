@@ -319,7 +319,7 @@ micBtn.onclick = async () => {
 
   const ok = await micPermission();
   if (!ok) {
-    vHint('خاصني إذن الميكرو. من إعدادات المتصفح سمح للميكرو لهاد الموقع وعاود جرب.', true);
+    vHint('خاصني إذن الميكرو. ضغط على 🔒 فجنب العنوان وسمح بالميكرو، ولا حلّ الصفحة فـChrome (ماشي فمتصفح الواتساب) وعاود.', true);
     return;
   }
 
@@ -358,6 +358,7 @@ micBtn.onclick = async () => {
     } else if (e === 'network') {
       vHint('خدمة الصوت ما قدرتش تتصل بالإنترنت. تأكد من الشبكة ولا جرب Chrome.', true);
     } else if (e === 'language-not-supported') {
+      try { rec.lang = 'ar-MA'; rec.start(); return; } catch (x) {}
       vHint('المتصفح ما كيدعمش العربية فالصوت. جرب Chrome.', true);
     } else {
       vHint('تعذر السمع (الخطأ: ' + e + '). كتب سؤالك باليد ولا عاود جرب.', true);
