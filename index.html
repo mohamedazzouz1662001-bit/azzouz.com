@@ -86,6 +86,39 @@ footer{background:var(--panel);padding:8px 10px calc(8px + env(safe-area-inset-b
 .vbar .dot{width:9px;height:9px;border-radius:50%;background:#e74c3c;animation:micpulse 1.1s infinite;flex-shrink:0}
 .vbar .txt{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .vbar .stp{background:#c0392b;border:none;color:#fff;font-size:12px;padding:5px 11px;border-radius:14px;cursor:pointer;font-family:inherit}
+.plug{width:30px;height:30px;border-radius:50%;background:#2a3942;border:none;color:#e9edef;font-size:14px;cursor:pointer;position:relative;flex-shrink:0;line-height:1}
+.plug.on{background:#0b6b57}
+.plug.on::after{content:'';position:absolute;top:1px;right:1px;width:8px;height:8px;border-radius:50%;background:#00e5a0;box-shadow:0 0 6px #00e5a0}
+.sheet{position:fixed;left:0;right:0;bottom:0;height:86vh;background:var(--bg);border-top:1px solid var(--line);border-radius:16px 16px 0 0;transform:translateY(103%);transition:transform .25s ease;z-index:60;display:flex;flex-direction:column;box-shadow:0 -14px 34px rgba(0,0,0,.5)}
+.sheet.on{transform:none}
+.sh{display:flex;align-items:center;gap:8px;padding:12px 14px;background:var(--panel);border-bottom:1px solid var(--line)}
+.sh b{flex:1;font-size:14px}
+.shtabs{display:flex;gap:6px;padding:9px 12px;background:var(--panel2)}
+.shtabs button{flex:1;background:#1b272e;border:1px solid #2a3942;color:#a8bcc7;font-size:12.5px;padding:7px;border-radius:10px;font-family:inherit;cursor:pointer}
+.shtabs button.on{background:var(--acc);color:#04241c;border-color:var(--acc);font-weight:700}
+.shbody{flex:1;overflow-y:auto;padding:10px 12px 18px}
+.conn{background:#16222a;border:1px solid #22323c;border-radius:12px;padding:10px;margin-bottom:9px}
+.ctop{display:flex;gap:8px;align-items:center}
+.cico{width:30px;height:30px;border-radius:9px;background:#20323c;display:flex;align-items:center;justify-content:center;font-size:15px}
+.cname{flex:1;min-width:0}
+.cname b{font-size:13px}
+.cname span{display:block;font-size:10.5px;color:#7d8f99;margin-top:1px}
+.pill{font-size:10px;padding:2px 8px;border-radius:9px;background:#20323c;color:#7d8f99}
+.pill.on{background:#0b6b57;color:#c9ffe9}
+.cf{display:flex;flex-direction:column;gap:5px;margin-top:8px}
+.cf input{background:#0f1a20;border:1px solid #22323c;border-radius:8px;padding:8px 10px;color:var(--txt);font-family:inherit;font-size:12px;outline:none;width:100%}
+.cf input:focus{border-color:var(--acc)}
+.crow2{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+.crow2 button{background:#2a3942;border:none;color:#cfe4f0;font-size:11.5px;padding:6px 11px;border-radius:14px;font-family:inherit;cursor:pointer}
+.crow2 button.pri{background:var(--acc);color:#04241c;font-weight:700}
+.cnote{font-size:10.5px;color:#7d8f99;margin-top:6px;line-height:1.5}
+.bstat{display:flex;gap:8px;margin-bottom:10px}
+.bstat div{flex:1;background:#16222a;border:1px solid #22323c;border-radius:11px;padding:9px;text-align:center}
+.bstat b{display:block;font-size:19px;color:#8fd7c4}
+.bstat span{font-size:10.5px;color:#7d8f99}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.chip{background:#20323c;color:#cfe4f0;font-size:11.5px;padding:5px 10px;border-radius:12px;cursor:pointer}
+.bt{font-size:12px;color:#9fb3bd;margin:10px 0 4px}
 .foot{text-align:center;font-size:10.5px;color:#44555e;padding:0 0 6px;background:var(--panel)}
 .foot a{color:#44555e;text-decoration:none}
 </style>
@@ -97,11 +130,22 @@ footer{background:var(--panel);padding:8px 10px calc(8px + env(safe-area-inset-b
     <b>Azzouz</b>
     <span id="status">متصل · كيبحث دابما فالخلفية</span>
   </div>
+  <button class="plug" id="plug" aria-label="الوصلات والعقل" title="الوصلات والعقل">🔌</button>
   <canvas id="spark" width="52" height="20" title="مصادر كل دورة بحث" style="opacity:.85"></canvas>
   <div class="live" id="live" title="البحث الدائم خدام"></div>
 </header>
 
 <div id="log"></div>
+
+<div class="sheet" id="sheet">
+  <div class="sh"><b>🔌 الوصلات والعقل</b><button class="mclose" id="shclose">✕</button></div>
+  <div class="shtabs">
+    <button data-p="conn" class="on">الوصلات</button>
+    <button data-p="brain">العقل</button>
+  </div>
+  <div class="shbody" id="paneConn"></div>
+  <div class="shbody" id="paneBrain" hidden></div>
+</div>
 
 <div class="modal" id="modal">
   <div class="mbox">
@@ -128,6 +172,8 @@ footer{background:var(--panel);padding:8px 10px calc(8px + env(safe-area-inset-b
 <script type="module">
 import { deepAnswer } from './deep.mjs?v=7';
 import { getArchived } from './archive.mjs?v=1';
+import { CONNECTORS, loadAll, saveOne, toggle, statusOf, testConnector } from './connectors.mjs?v=1';
+import { brainStats, related } from './brain.mjs?v=1';
 import { stats, backgroundTick, ensureSeeds, bgStats, setAuto, queueTopic } from './chat.mjs?v=7';
 
 const log = document.getElementById('log');
@@ -421,6 +467,108 @@ function typing() {
     done: () => { if (cur) { cur.classList.remove('act'); cur.classList.add('done'); } el.remove(); }
   };
 }
+
+
+/* ===== الوصلات والعقل ===== */
+const sheet = document.getElementById('sheet');
+const paneConn = document.getElementById('paneConn');
+const paneBrain = document.getElementById('paneBrain');
+const plug = document.getElementById('plug');
+
+function refreshPlug() {
+  const any = CONNECTORS.some(c => statusOf(c.id) === 'on');
+  plug.classList.toggle('on', any);
+}
+
+function renderConnectors() {
+  const all = loadAll();
+  paneConn.innerHTML = CONNECTORS.map(c => {
+    const cfg = all[c.id] || {};
+    const f = cfg.fields || {};
+    const st = statusOf(c.id) === 'on';
+    const fields = c.fields.map(x =>
+      `<input type="password" data-cid="${c.id}" data-fk="${x.k}" placeholder="${x.label}${x.ph ? ' — ' + x.ph : ''}" value="${String(f[x.k] || '').replace(/"/g, '&quot;')}">`
+    ).join('');
+    return `<div class="conn" data-box="${c.id}">
+      <div class="ctop">
+        <div class="cico">${c.icon}</div>
+        <div class="cname"><b>${c.name}</b><span>${c.note || ''}</span></div>
+        <span class="pill ${st ? 'on' : ''}" data-pill="${c.id}">${st ? 'مربوط' : 'مطفي'}</span>
+      </div>
+      <div class="cf">${fields}</div>
+      <div class="crow2">
+        <button class="pri" data-save="${c.id}">💾 حفظ وتشغيل</button>
+        <button data-test="${c.id}">اختبار</button>
+      </div>
+      <div class="cnote" data-res="${c.id}">المفتاح كيتخزن غير فالجهاز، وما كيتصيفطش لأي حد.</div>
+    </div>`;
+  }).join('') + `<div class="cnote">🔒 المفاتيح كتبقى فهاد الجهاز بوحدو. Google وYouTube كيستعملو API Key من Google Cloud، وSerpAPI وTavily كيعطيو مفتاح خاص بيهم.</div>`;
+}
+
+paneConn.addEventListener('click', async e => {
+  const saveId = e.target.dataset.save;
+  const testId = e.target.dataset.test;
+  if (saveId) {
+    const fields = {};
+    paneConn.querySelectorAll(`input[data-cid="${saveId}"]`).forEach(i => { fields[i.dataset.fk] = i.value.trim(); });
+    saveOne(saveId, { fields, on: true });
+    refreshPlug();
+    renderConnectors();
+  }
+  if (testId) {
+    const box = paneConn.querySelector(`[data-res="${testId}"]`);
+    const fields = {};
+    paneConn.querySelectorAll(`input[data-cid="${testId}"]`).forEach(i => { fields[i.dataset.fk] = i.value.trim(); });
+    saveOne(testId, { fields, on: true });
+    box.textContent = 'كنجرب...';
+    const r = await testConnector(testId);
+    box.textContent = r.ok ? `✅ خدام: رجع ${r.n} نتيجة` : `⚠️ ما خدمش: ${r.error || 'تحقق من المفتاح'}`;
+    refreshPlug();
+  }
+});
+
+async function renderBrain() {
+  paneBrain.innerHTML = '<div class="cnote">كنقرا العقل...</div>';
+  const s = await brainStats();
+  const chips = (s.top || []).map(t => `<span class="chip" data-w="${t.w}">${t.w} · ${t.c}</span>`).join('') || '<span class="cnote">باقي ما تعلمت حتى حاجة. سولني شي سؤال.</span>';
+  paneBrain.innerHTML = `
+    <div class="bstat">
+      <div><b>${s.concepts}</b><span>مفهوم</span></div>
+      <div><b>${s.memories}</b><span>ذكرى</span></div>
+      <div><b>${s.links}</b><span>رابط</span></div>
+    </div>
+    <div class="bt">أكثر الكلمات اللي تعلمتها</div>
+    <div class="chips">${chips}</div>
+    <div class="bt">كيفاش كيتعلم</div>
+    <div class="cnote">كل سؤال وجواب كيتحللو: كيستخرج الكلمات، كيربط بيناتها، وكيخزن الجمل المفيدة. من بعد فاش تسول على نفس الموضوع كيرجع ليك اللي تعلمو ويضيفو للجواب.</div>
+    <div id="relBox"></div>`;
+  paneBrain.querySelectorAll('.chip').forEach(ch => {
+    ch.onclick = async () => {
+      const rel = await related(ch.dataset.w);
+      const box = document.getElementById('relBox');
+      box.innerHTML = '<div class="bt">مرتبط بـ«' + ch.dataset.w + '»</div><div class="chips">' +
+        (rel.length ? rel.map(r => `<span class="chip">${r.w} · ${r.c}</span>`).join('') : '<span class="cnote">ما لقيتش ترابطات.</span>') + '</div>';
+    };
+  });
+}
+
+plug.onclick = () => {
+  sheet.classList.add('on');
+  renderConnectors();
+  refreshPlug();
+};
+document.getElementById('shclose').onclick = () => sheet.classList.remove('on');
+document.querySelectorAll('.shtabs button').forEach(b => {
+  b.onclick = () => {
+    document.querySelectorAll('.shtabs button').forEach(x => x.classList.remove('on'));
+    b.classList.add('on');
+    const isConn = b.dataset.p === 'conn';
+    paneConn.hidden = !isConn;
+    paneBrain.hidden = isConn;
+    if (isConn) renderConnectors(); else renderBrain();
+  };
+});
+refreshPlug();
 
 async function ask(text) {
   if (busy || !text.trim()) return;
