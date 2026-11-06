@@ -21,7 +21,7 @@ function htmlDecode(s = '') {
     .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
 }
 function strip(s = '') { return htmlDecode(String(s).replace(/<[^>]*>/g, ' ')).replace(/\s+/g, ' ').trim(); }
-function trimText(s, n = 320) { s = strip(s); return s.length > n ? s.slice(0, n - 1).trim() + '…' : s; }
+function trimText(s, n = 380) { s = strip(s); return s.length > n ? s.slice(0, n - 1).trim() + '…' : s; }
 function yearOf(v) {
   if (!v) return null;
   const m = String(v).match(/(19|20)\d{2}/);
@@ -329,7 +329,21 @@ export function clearMemory() { writeJSON(MEM_KEY, []); }
 const SENT_SPLIT = /(?<=[.!?؟؛])\s+|\n+/;
 
 function sentences(text) {
-  return strip(text).split(SENT_SPLIT).map(s => s.trim()).filter(s => s.length > 45 && s.length < 420);
+  let s = strip(text);
+  if (/[…]$|(\.\.\.)$/.test(s)) {
+    const cut = Math.max(s.lastIndexOf('. '), s.lastIndexOf('؟ '), s.lastIndexOf('! '), s.lastIndexOf('؛ '));
+    s = cut > 60 ? s.slice(0, cut + 1) : s.replace(/[…]$|\.\.\.$/, '');
+  }
+  const parts = s.split(SENT_SPLIT).map(x => x.trim()).filter(Boolean);
+  const out = [];
+  parts.forEach((p, i) => {
+    const last = i === parts.length - 1;
+    if (last && !/[.!?؟؛]$/.test(p)) return;      // ما ناخدوش جملة مقطوعة
+    if (p.length < 70 || p.length > 420) return;
+    if ((p.match(/\p{L}/gu) || []).length < 25) return;
+    out.push(p);
+  });
+  return out;
 }
 function bigrams(s) { const w = tokenize(s); const out = new Set(); for (let i = 0; i < w.length - 1; i++) out.add(w[i] + ' ' + w[i + 1]); return out; }
 function similar(a, b) {
@@ -389,7 +403,7 @@ export function synthesize(question, sources) {
     text += '\n';
   }
 
-  const nums = picked.filter(p => /\d/.test(p.sent)).slice(0, 3);
+  const nums = picked.filter(p => /\d/.test(p.sent) && !tldr.includes(p)).slice(0, 3);
   if (nums.length) {
     text += `*أرقام ومعطيات*\n`;
     nums.forEach(p => { text += `• ${p.sent} [${p.n}]\n`; });
