@@ -538,6 +538,23 @@ function svcRow(s) {
   </div>`;
 }
 
+
+function brokerCard() {
+  const base = getBroker();
+  const row = (p, icon, name, acc) => `<div class="conn">
+    <div class="ctop">
+      <div class="cico">${icon}</div>
+      <div class="cname"><b>${name}</b><span>${acc ? (acc.login || acc.name || 'الحساب مربوط') : 'دخول مباشر بتسجيل الدخول'}</span></div>
+      ${acc ? `<button class="mini" data-out="${p}">خروج</button>` : `<button class="mini" data-login="${p}">دخول</button>`}
+    </div>
+    <div class="cnote">${acc ? '✅ الحساب مربوط، والبحث كياخد منو النتائج.' : 'تسجيل دخول حقيقي بلا مفاتيح.'}</div>
+  </div>`;
+  return '<div class="bt">الحسابات</div>' + row('github', '🐙', 'GitHub', account('github')) + row('cloudflare', '☁️', 'Cloudflare', account('cloudflare')) +
+    `<input id="broker" placeholder="https://azzouz-oauth.workers.dev" value="${String(base).replace(/"/g, '&quot;')}">
+     <div class="crow2"><button class="pri" id="bsave">💾 حفظ رابط الجسر</button></div>
+     <div class="cnote" id="bres">الجسر هو Worker صغير كيخبي Client Secret. بلا جسر، ما كيبان حتى خطأ، غير «خاصك تسجيل الدخول».</div>`;
+}
+
 function renderConnectors() {
   const sess = getSession();
   const adv = KEY_CONNECTORS.map(k => {
@@ -551,7 +568,7 @@ function renderConnectors() {
       <div class="crow2"><button class="pri" data-ksave="${k.id}">💾 حفظ وتشغيل</button></div></div>`;
   }).join('');
 
-  paneConn.innerHTML = accountCard() + '<div class="bt">الوصلات</div>' + SERVICES.map(svcRow).join('') +
+  paneConn.innerHTML = accountCard() + brokerCard() + '<div class="bt">الوصلات</div>' + SERVICES.map(svcRow).join('') +
     `<details class="adv"><summary>متقدم: وصلات بمفاتيح API (اختياري)</summary>${adv}</details>`;
 
   bindConn();
