@@ -8,7 +8,7 @@ const TIMEOUT = 14000;
 let FAST = 0;
 const JINA = 'https://r.jina.ai/';
 const LEARN_KEY = 'azzouz-learn-v3';
-const MEM_KEY = 'azzouz-memory-v4';
+const MEM_KEY = 'azzouz-memory-v5';
 
 /* ---------- أدوات ---------- */
 const enc = encodeURIComponent;
