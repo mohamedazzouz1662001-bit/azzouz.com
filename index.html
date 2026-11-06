@@ -55,6 +55,7 @@ footer{background:var(--panel);padding:8px 10px calc(8px + env(safe-area-inset-b
     <b>Azzouz</b>
     <span id="status">متصل · كيبحث دابما فالخلفية</span>
   </div>
+  <canvas id="spark" width="52" height="20" title="مصادر كل دورة بحث" style="opacity:.85"></canvas>
   <div class="live" id="live" title="البحث الدائم خدام"></div>
 </header>
 
@@ -188,6 +189,23 @@ qEl.addEventListener('input', () => {
   qEl.style.height = Math.min(120, qEl.scrollHeight) + 'px';
 });
 
+function spark() {
+  try {
+    const done = (bgStats().done || []).slice(0, 12).reverse();
+    const c = document.getElementById('spark');
+    if (!c || !done.length) return;
+    const ctx = c.getContext('2d');
+    ctx.clearRect(0, 0, c.width, c.height);
+    const max = Math.max(1, ...done.map(d => d.refs || 0));
+    const w = c.width / done.length;
+    done.forEach((d, i) => {
+      const hgt = Math.max(2, ((d.refs || 0) / max) * (c.height - 2));
+      ctx.fillStyle = 'rgba(0,168,132,.85)';
+      ctx.fillRect(i * w + 1, c.height - hgt, Math.max(2, w - 2), hgt);
+    });
+  } catch (e) {}
+}
+
 /* ===== البحث الدائم: خدام دايماً، حتى إلا كنتي خارج الصفحة ===== */
 setAuto(true);
 ensureSeeds();
@@ -197,16 +215,16 @@ async function loopBackground() {
     const s = stats();
     statusEl.textContent = 'متصل · ' + s.searches + ' بحث محفوظ · البحث الدائم خدام';
     const b = await backgroundTick();
-    const st = bgStats();
     statusEl.textContent = 'متصل · بحث فـ«' + String(b.topic).slice(0, 26) + '» (' + (b.refs || 0) + ' مصدر)';
-    document.getElementById('live').style.opacity = 1;
-    void st;
+    spark();
   } catch (e) {
     statusEl.textContent = 'متصل · كيبحث فالخلفية';
   }
   setTimeout(loopBackground, 45000);
 }
 
+spark();
+setInterval(spark, 15000);
 loopBackground();
 
 /* ترحيب قصير */
