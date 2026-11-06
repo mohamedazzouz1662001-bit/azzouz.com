@@ -38,13 +38,11 @@ padding:2px 8px;margin:0 4px 4px 0;color:var(--dim)}
 <div class="wrap">
   <header>
     <h1>Azzouz <span>Research</span></h1>
-    <div class="sub">بحث في الويب كامل · مقال واحد · مراجع فالأسفل · ذاكرة محلية · تعلم مستمر</div>
+    <div class="sub">بحث مباشر من المتصفح في 8 مصادر · مقال واحد · مراجع فالأسفل · ذاكرة محلية وتعلّم</div>
   </header>
 
   <div class="box">
-    <label>رابط الـ Worker (Cloudflare)</label>
-    <input id="worker" placeholder="https://azzouz-research.xxx.workers.dev">
-    <label style="margin-top:12px">سؤالك</label>
+    <label>سؤالك</label>
     <textarea id="q" placeholder="مثال: ما هي أحدث تقنيات ضغط البيانات المستعملة في قواعد البيانات؟"></textarea>
     <div class="row">
       <button class="btn" id="go">ابحث ولخّص</button>
@@ -60,29 +58,26 @@ padding:2px 8px;margin:0 4px 4px 0;color:var(--dim)}
 </div>
 
 <script type="module">
-import { advancedResearch, learn, relatedLearning, clearLearn } from './research.mjs';
+import { advancedResearch, relatedLearning, topSources } from './research.mjs';
 
 const $ = (id) => document.getElementById(id);
-const WKEY = 'azzouz_worker_url';
-$('worker').value = localStorage.getItem(WKEY) || '';
-$('worker').onchange = () => localStorage.setItem(WKEY, $('worker').value.trim());
 
 function stats() {
-  const rel = relatedLearning('');
-  $('stat').textContent = 'الذاكرة المحلية: ' + rel.length + ' بحث محفوظ';
+  const mem = JSON.parse(localStorage.getItem('azzouz-memory-v2') || '[]');
+  const src = topSources(2).map(s => s.host).join(' · ');
+  $('stat').textContent = 'الذاكرة: ' + mem.length + ' بحث محفوظ' + (src ? ' | أفضل المصادر: ' + src : '');
 }
 stats();
 
 $('go').onclick = async () => {
-  const base = $('worker').value.trim().replace(/\/$/, '');
   const q = $('q').value.trim();
-  if (!base) { $('q').className = ''; $('stat').textContent = '⚠️ دخل رابط الـ Worker أولا'; return; }
   if (!q) return;
   $('go').disabled = true; $('go').textContent = 'جاري البحث...';
-  $('stat').textContent = '⏳ كنجمع من 12 مصدر...';
-  const res = await advancedResearch({ question: q, workerBase: base });
+  $('stat').textContent = '⏳ كنجمع من 8 مصادر فالوقت نفسه...';
+  let res = null;
+  try { res = await advancedResearch({ question: q }); } catch (e) { console.warn(e); }
   $('go').disabled = false; $('go').textContent = 'ابحث ولخّص';
-  if (!res) { $('stat').textContent = '❌ فشل الاتصال بالـ Worker — تحقق من الرابط'; return; }
+  if (!res) { $('stat').textContent = '❌ ما وصلات حتى نتيجة — عاود جرب'; return; }
   $('out').style.display = 'block';
   $('art').textContent = res.text;
   const refs = $('refs');
@@ -95,11 +90,17 @@ $('go').onclick = async () => {
     d.appendChild(a);
     refs.appendChild(d);
   });
-  $('stat').textContent = '✅ ' + res.citations.length + ' مرجع · ' + (res.meta ? res.meta.sources : 0) + ' نتيجة من ' + (res.meta ? res.meta.engines : 0) + ' محرك';
+  const eng = (res.engines || []).map(e => e.label + ':' + e.count).join(' · ');
+  $('stat').textContent = '✅ ' + res.citations.length + ' مرجع | ' + eng;
   stats();
 };
 
-$('clear').onclick = () => { clearLearn(); stats(); };
+$('clear').onclick = () => {
+  localStorage.removeItem('azzouz-memory-v2');
+  localStorage.removeItem('azzouz-learn-v2');
+  $('out').style.display = 'none';
+  stats();
+};
 </script>
 </body>
 </html>
