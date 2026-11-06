@@ -113,6 +113,34 @@ function fmt(text) {
     .replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener" style="color:#8ecdf7">$1</a>');
 }
 
+function dedupeText(input) {
+  let t = String(input || '').replace(/\s+/g, ' ').trim();
+  if (!t) return '';
+  let words = t.split(' ');
+  // 1) كلمات مكررة جنب بعضها
+  const seq = [];
+  for (const w of words) if (!seq.length || seq[seq.length - 1] !== w) seq.push(w);
+  words = seq;
+  // 2) مقاطع مكررة (من 8 كلمات حتى 2) جنب بعضها
+  let changed = true, guard = 0;
+  while (changed && guard++ < 60) {
+    changed = false;
+    for (let n = Math.min(8, Math.floor(words.length / 2)); n >= 2; n--) {
+      for (let i = 0; i + 2 * n <= words.length; i++) {
+        const a = words.slice(i, i + n).join(' ');
+        const b = words.slice(i + n, i + 2 * n).join(' ');
+        if (a === b) {
+          words = [...words.slice(0, i + n), ...words.slice(i + 2 * n)];
+          changed = true;
+          break;
+        }
+      }
+      if (changed) break;
+    }
+  }
+  return words.join(' ').trim();
+}
+
 function bubble(text, who = 'in') {
   const el = document.createElement('div');
   el.className = 'msg ' + who;
@@ -255,7 +283,7 @@ const vbar = document.getElementById('vbar');
 const vtxt = document.getElementById('vtxt');
 const vstop = document.getElementById('vstop');
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-const V = { on: false, final: '', interim: '', recog: null, timer: null, stopping: false, errShown: false };
+const V = { on: false, base: '', current: '', recog: null, timer: null, stopping: false, errShown: false };
 
 if (!SR) { micBtn.title = 'المتصفح ما كيدعمش التعرف على الصوت'; micBtn.style.opacity = '.55'; }
 
@@ -281,8 +309,8 @@ function vFinish() {
   vbar.classList.remove('on');
   qEl.placeholder = 'كتب سؤالك...';
   statusEl.textContent = 'متصل · البحث الدائم خدام';
-  const said = (V.final || V.interim || qEl.value || '').trim();
-  V.final = ''; V.interim = '';
+  const said = dedupeText(V.current || qEl.value || '');
+  V.base = ''; V.current = '';
   if (said.length > 2) {
     qEl.value = said;
     submit(said);
@@ -310,7 +338,7 @@ micBtn.onclick = async () => {
   }
   if (V.on) { vStop(true); return; }
 
-  V.on = true; V.stopping = false; V.final = ''; V.interim = ''; V.errShown = false;
+  V.on = true; V.stopping = false; V.base = ''; V.current = ''; V.errShown = false;
   micBtn.classList.add('rec');
   vbar.classList.add('on');
   vtxt.textContent = 'كنسمع... هضر عادياً';
@@ -333,16 +361,17 @@ micBtn.onclick = async () => {
   rec.onstart = () => { vtxt.textContent = 'كنسمع... هضر'; };
 
   rec.onresult = e => {
-    let interim = '';
-    for (let i = e.resultIndex; i < e.results.length; i++) {
-      const r = e.results[i];
-      if (r.isFinal) V.final += r[0].transcript;
-      else interim += r[0].transcript;
+    let cur = '';
+    for (let i = 0; i < e.results.length; i++) {
+      const alt = e.results[i][0];
+      if (alt && alt.transcript) cur += alt.transcript + ' ';
     }
-    V.interim = interim;
-    const shown = (V.final + ' ' + interim).trim();
-    vtxt.textContent = shown || 'كنسمع... هضر';
-    qEl.value = shown;
+    const full = dedupeText(((V.base || '') + ' ' + cur).trim());
+    V.current = full;
+    vtxt.textContent = full || 'كنسمع... هضر';
+    qEl.value = full;
+    qEl.style.height = 'auto';
+    qEl.style.height = Math.min(120, qEl.scrollHeight) + 'px';
     clearTimeout(V.timer);
     V.timer = setTimeout(() => vStop(), 2400);
   };
@@ -366,7 +395,10 @@ micBtn.onclick = async () => {
   };
 
   rec.onend = () => {
-    if (V.on && !V.stopping) { try { rec.start(); return; } catch (e) {} }
+    if (V.on && !V.stopping) {
+      V.base = V.current || V.base;
+      try { rec.start(); return; } catch (e) {}
+    }
     vFinish();
   };
 
