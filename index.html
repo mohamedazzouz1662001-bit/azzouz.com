@@ -190,7 +190,7 @@ input{width:100%;background:#111b21;border:1px solid var(--line);color:#e9edef;b
 
 <script type="module">
 import { deepAnswer } from './deep.mjs?v=8';
-import { profile as idProfile } from './identity.mjs?v=1';
+import { profile as idProfile, emailIdentity, signInEmail, signOutEmail } from './identity.mjs?v=2';
 import { getArchived } from './archive.mjs?v=1';
 import { SERVICES, KEY_CONNECTORS, anyOn, isOn as svcOn, setOn as svcSet, keyCfg, saveKeyCfg, keyOn, setKeyOn } from './connectors.mjs?v=3';
 import { getClientId, setClientId, getSession, signIn, signOut, hasScope, SCOPES, getBroker, setBroker, account, signOutAccount, brokerLogin } from './auth.mjs?v=3';
@@ -502,28 +502,43 @@ function refreshPlug() {
 
 function accountCard() {
   const s = getSession();
+  const em = emailIdentity();
+  const prof = idProfile();
+
+  const emailBlock = em ? `<div class="acct">
+      <div class="ahead"><div class="aico">✉️</div><div><b>${em.email}</b><span>🆔 ${em.id} · ${prof.label}</span></div>
+      <button class="mini" id="emout">خروج</button></div>
+      <div class="cnote">داخل بالبريد. البحث خدام بأقصى عمق بلا أي إعداد.</div>
+    </div>` : `<div class="acct">
+      <div class="ahead"><div class="aico">✉️</div><div><b>الدخول بالبريد</b><span>بلا Google Cloud، بلا مفاتيح، بلا إعداد</span></div></div>
+      <input id="em" type="email" inputmode="email" placeholder="you@gmail.com">
+      <div class="crow2"><button class="pri" id="emsave">دخول</button></div>
+      <div class="cnote" id="emres">كتب غير بريدك، ويتصنع ليك ID ديال البحث، وكيتوسع لـ4000 مصدر.</div>
+    </div>`;
+
   if (!s) {
     const cid = getClientId();
-    return `<div class="acct">
-      <div class="ahead"><div class="aico">G</div><div><b>تسجيل الدخول بجوجل</b><span>مرة وحدة، ومن بعد كل الوصلات كتخدم بالجلسة بلا مفاتيح</span></div></div>
+    return emailBlock + `<div class="acct">
+      <div class="ahead"><div class="aico">G</div><div><b>ربط جوجل (اختياري)</b><span>غير إلا بغيت البحث فDrive وGmail ديالك</span></div></div>
       ${cid ? `<button class="pri big" id="glogin">🔐 تسجيل الدخول بجوجل</button>` : `
-        <div class="cnote">باش يخدم تسجيل الدخول، خاصك Client ID ديال تطبيق ويب (مرة وحدة، وهو معرف عام ماشي سر):</div>
+        <div class="cnote">هادي إضافة اختيارية، ماشي ضرورية باش تخدم. إلا بغيتها، حط معرف التطبيق (مرة وحدة):</div>
         <input id="cid" placeholder="1234567890-xxxx.apps.googleusercontent.com">
         <div class="crow2"><button class="pri" id="cidsave">💾 حفظ المعرف</button>
         <a class="mini" href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener">فتح Google Cloud</a></div>
         <div class="cnote" id="cidres">زيد فـ Authorized JavaScript origins: <code>${location.origin}</code></div>`}
-      <div class="cnote">🆔 ${idProfile().id} · بحث قياسي. بالحساب كيتوسع لـ4000 مصدر + ملفات Drive والعامة + شبكات اجتماعية.</div>
-      <div class="cnote">🔒 الجلسة كتبقى فهاد الجهاز بوحدو، ما كتخرجش لأي سيرفر.</div>
+      <div class="cnote">🆔 ${prof.id} · ${prof.label}</div>
+      <div class="cnote">🔒 كلشي كيبقى فهاد الجهاز، ما كتخرجش لأي سيرفر.</div>
     </div>`;
   }
-  return `<div class="acct">
+
+  return emailBlock + `<div class="acct">
     <div class="ahead">
       ${s.pic ? `<img class="apic" src="${s.pic}" alt="">` : '<div class="aico">G</div>'}
       <div><b>${s.name || 'حساب جوجل'}</b><span>${s.email || ''}</span></div>
       <button class="mini" id="gout">خروج</button>
     </div>
     <div class="cnote">${s.stale ? 'الجلسة قديمة، غادي تتجدد أوتوماتيكيا فالاستعمال.' : 'الجلسة نشيطة.'}</div>
-    <div class="cnote">🆔 ${idProfile().id} · ${idProfile().label}</div>
+    <div class="cnote">🆔 ${prof.id} · ${prof.label}</div>
   </div>`;
 }
 
@@ -578,6 +593,20 @@ function renderConnectors() {
 }
 
 function bindConn() {
+  const ems = document.getElementById('emsave');
+  if (ems) ems.onclick = () => {
+    const v = document.getElementById('em').value;
+    try {
+      signInEmail(v);
+      renderConnectors();
+    } catch (e) {
+      const r = document.getElementById('emres');
+      if (r) r.textContent = '⚠️ ' + e.message;
+    }
+  };
+  const emo = document.getElementById('emout');
+  if (emo) emo.onclick = () => { signOutEmail(); renderConnectors(); };
+
   const gl = document.getElementById('glogin');
   if (gl) gl.onclick = async () => {
     gl.disabled = true; gl.textContent = 'كنحل نافذة جوجل...';
