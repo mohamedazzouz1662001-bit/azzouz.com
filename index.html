@@ -166,8 +166,9 @@ function smallTalk(text) {
     .replace(/(بغيت نسولك|بغيت نسألك|عندي سؤال|نسولك|سولك|سؤال|على|عن|ف|في)/gi, ' ')
     .replace(/[^\p{L}\p{N}\s]/gu, ' ')
     .trim();
-  const topicWords = stripped.split(/\s+/).filter(w => w.length > 2);
-  const hasTopic = topicWords.length >= 2;
+  const CHAT = new Set(['كيف', 'حالك', 'كيداير', 'داير', 'لباس', 'شكرا', 'بسلامة', 'نتا', 'سميتك', 'واخا', 'زعما', 'دابا', 'شي', 'حاجة', 'واش']);
+  const topicWords = stripped.split(/\s+/).filter(w => w.length > 3 && !CHAT.has(w));
+  const hasTopic = topicWords.length >= 1;
   if (hasTopic) return null;
   if (greet && askIntent) return 'وعليكم السلام 🌿 تفضل، سول براحتك وكنسمع.';
   if (greet) {
