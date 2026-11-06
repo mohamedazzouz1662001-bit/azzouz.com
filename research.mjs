@@ -4,6 +4,7 @@
    المخرجات: مقال واحد + TL;DR + مراجع مرقمة + ذاكرة وتعلّم محلي. */
 
 const TIMEOUT = 14000;
+let FAST = 0;
 const JINA = 'https://r.jina.ai/';
 const LEARN_KEY = 'azzouz-learn-v3';
 const MEM_KEY = 'azzouz-memory-v3';
@@ -30,8 +31,9 @@ function yearOf(v) {
 function hostOf(url) { try { return new URL(url).hostname.replace(/^www\./, ''); } catch (e) { return ''; } }
 
 async function get(url, { json = true, ms = TIMEOUT, text = false } = {}) {
+  const eff = FAST ? Math.min(ms, FAST) : ms;
   const c = new AbortController();
-  const t = setTimeout(() => c.abort(), ms);
+  const t = setTimeout(() => c.abort(), eff);
   try {
     const r = await fetch(url, { signal: c.signal, headers: { Accept: json ? 'application/json' : 'text/plain', 'User-Agent': 'AzzouzResearch/3.0 (+github.io)' } });
     if (!r.ok) throw new Error('HTTP ' + r.status);
@@ -254,9 +256,13 @@ export function mergeResults(batches) {
   return [...map.values()];
 }
 
-function tokenize(s) {
-  return strip(s).toLowerCase().replace(/[\u0640\u064b-\u065f]/g, '')
-    .split(/[^\p{L}\p{N}]+/u).filter(t => t.length > 2);
+export function tokenize(s) {
+  return strip(s).toLowerCase()
+    .replace(/[\u0640\u064b-\u065f\u0670]/g, '')
+    .replace(/[أإآٱ]/g, 'ا').replace(/ى/g, 'ي').replace(/ة/g, 'ه').replace(/ؤ/g, 'و').replace(/ئ/g, 'ي')
+    .split(/[^\p{L}\p{N}]+/u)
+    .map(t => (t.length > 4 && t.startsWith('ال')) ? t.slice(2) : t)
+    .filter(t => t.length > 2);
 }
 
 function scoreItem(it, qTokens, learned) {
@@ -317,7 +323,7 @@ function recordLearning(question, sources, usedN) {
   writeJSON(LEARN_KEY, L);
 }
 
-function saveEntry(entry) {
+export function saveEntry(entry) {
   const m = memory();
   m.unshift(entry);
   writeJSON(MEM_KEY, m.slice(0, 120));
@@ -427,7 +433,8 @@ export function synthesize(question, sources) {
 }
 
 /* ---------- الواجهة ---------- */
-export async function gather(question, { onSource } = {}) {
+export async function gather(question, { onSource, timeout = 0 } = {}) {
+  FAST = timeout;
   const learned = learn();
   const jobs = SOURCES.map(async (src) => {
     try {
@@ -453,10 +460,10 @@ export async function gather(question, { onSource } = {}) {
   return { sources: ranked, engines };
 }
 
-export async function advancedResearch({ question, onSource, variants = [], deeper = false } = {}) {
+export async function advancedResearch({ question, onSource, variants = [], deeper = false, timeout = 0 } = {}) {
   if (!question || question.trim().length < 3) return null;
   const previous = relatedLearning(question);
-  const main = await gather(question, { onSource });
+  const main = await gather(question, { onSource, timeout });
   let sources = main.sources, engines = main.engines;
   if (deeper && variants.length) {
     const batches = await Promise.all(variants.slice(0, 3).map(v => gather(v, {}).catch(() => ({ sources: [], engines: [] }))));
@@ -477,3 +484,67 @@ export async function advancedResearch({ question, onSource, variants = [], deep
 }
 
 export { SOURCES, TRUST };
+
+/* ===== قراءة أي صفحة ويب (محتوى عمومي فقط) ===== */
+const PAGES_KEY = 'azzouz-pages-v1';
+export function pages() { return readJSON(PAGES_KEY, []); }
+function savePages(list) { localStorage.setItem(PAGES_KEY, JSON.stringify(list.slice(0, 120))); }
+
+function mdClean(t) {
+  return String(t)
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, ' ')
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/^#{1,6}\s*/gm, ' ')
+    .replace(/\|/g, ' ')
+    .replace(/[*_~]{1,3}/g, ' ')
+    .replace(/\s+/g, ' ');
+}
+
+export async function readUrl(rawUrl) {
+  const url = String(rawUrl).trim();
+  const u = new URL(url);
+  if (!/^https?:$/.test(u.protocol)) throw new Error('غير http/https');
+  const res = await fetch('https://r.jina.ai/' + url, { headers: { Accept: 'text/plain' } });
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  const raw = await res.text();
+  const titleLine = (raw.match(/^Title:\s*(.+)$/m) || [])[1] || u.hostname;
+  const body = raw.split('Markdown Content:').pop() || raw;
+  const clean = strip(mdClean(body)).slice(0, 12000);
+  const sents = clean.split(SENT_SPLIT).map(x => x.trim()).filter(x => x.length > 70 && x.length < 400).slice(0, 40);
+  const page = { url: u.href, title: strip(titleLine).slice(0, 160), host: u.hostname.replace(/^www\./, ''), ts: Date.now(), sentences: sents };
+  const list = pages().filter(p => p.url !== page.url);
+  list.unshift(page);
+  savePages(list);
+  return page;
+}
+
+export function matchPage(question) {
+  const qt = new Set(tokenize(question));
+  if (!qt.size) return null;
+  let best = null, bestScore = 0;
+  for (const p of pages()) {
+    const pt = new Set(tokenize(p.title + ' ' + (p.sentences || []).join(' ')));
+    let inter = 0;
+    for (const t of qt) if (pt.has(t)) inter++;
+    const score = inter / qt.size;
+    if (score > bestScore) { bestScore = score; best = p; }
+  }
+  return bestScore >= 0.6 ? best : null;
+}
+
+/* إجابة فورية من الذاكرة */
+export function instantAnswer(question) {
+  const qt = new Set(tokenize(question));
+  if (!qt.size) return null;
+  let best = null, bestScore = 0;
+  for (const e of memory()) {
+    const et = new Set(e.tokens || []);
+    let inter = 0;
+    for (const t of qt) if (et.has(t)) inter++;
+    const score = inter / qt.size;
+    if (score > bestScore) { bestScore = score; best = e; }
+  }
+  if (bestScore < 0.66) return null;
+  return { ...best, score: bestScore };
+}
