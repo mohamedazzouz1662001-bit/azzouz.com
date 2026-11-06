@@ -96,7 +96,7 @@ background:#0f1a28;border:1px solid var(--line);border-radius:20px;padding:6px 1
 </footer>
 
 <script type="module">
-import { chatTurn, stats, backgroundTick, ensureSeeds, bgStats } from './chat.mjs';
+import { chatTurn, stats, backgroundTick, ensureSeeds, bgStats, isAuto, setAuto } from './chat.mjs';
 
 const $ = (id) => document.getElementById(id);
 const log = $('log');
@@ -320,9 +320,12 @@ function stopBg() {
 
 $('bgBtn').onclick = () => { bgOnce(true); };
 $('bgToggle').onchange = (e) => {
-  if (e.target.checked) { startBg(); addSys('✅ البحث الدائم تفعّل — كل 75 ثانية كيبحث فموضوع جديد.'); }
+  setAuto(e.target.checked);
+  if (e.target.checked) { startBg(); addSys('✅ البحث الدائم تفعّل — كل 75 ثانية كيبحث فموضوع جديد، وكيرجع بوحدو ملي تحل الصفحة.'); }
   else { stopBg(); addSys('⏸️ البحث الدائم توقف.'); }
 };
+
+if (isAuto()) { $('bgToggle').checked = true; startBg(); }
 
 $('q').addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); run($('q').value); }
