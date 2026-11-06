@@ -161,6 +161,14 @@ function smallTalk(text) {
   const t = raw.replace(/[!،,.؟?]+$/g, '').trim();
   const greet = /^(السلام|سلام|صباح الخير|صباح النور|مساء الخير|مساء النور|أهلا|اهلا|مرحبا|هاي|hello|hi)/i.test(t);
   const askIntent = /(بغيت نسولك|بغيت نسألك|عندي سؤال|سولك|نسولك|سؤال)/i.test(t);
+  const stripped = t
+    .replace(/^(السلام عليكم|السلام|سلام|صباح الخير|صباح النور|مساء الخير|مساء النور|أهلا|اهلا|مرحبا|هاي)\s*/i, '')
+    .replace(/(بغيت نسولك|بغيت نسألك|عندي سؤال|نسولك|سولك|سؤال|على|عن|ف|في)/gi, ' ')
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+    .trim();
+  const topicWords = stripped.split(/\s+/).filter(w => w.length > 2);
+  const hasTopic = topicWords.length >= 2;
+  if (hasTopic) return null;
   if (greet && askIntent) return 'وعليكم السلام 🌿 تفضل، سول براحتك وكنسمع.';
   if (greet) {
     if (/صباح/.test(t)) return 'صباح النور 🌿 كيفاش نقدر نعاونك اليوم؟';
@@ -277,6 +285,8 @@ async function ask(text) {
     busy = false; sendBtn.disabled = false;
     return;
   }
+
+  if (/^(السلام|سلام)\b/.test(text.trim())) bubble('وعليكم السلام ورحمة الله 🌿', 'in');
 
   const t = typing();
   try {
