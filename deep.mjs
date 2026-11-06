@@ -2,7 +2,8 @@
    1) بحث واسع متعدد المحركات (1000+ مرجع)  2) بحث علمي للتركيب  3) صياغة نقاط وخلاصة */
 
 import { advancedResearch, instantAnswer, tokenize } from './research.mjs?v=6';
-import { wideResearch, englishQuery } from './wide.mjs?v=7';
+import { wideResearch, englishQuery } from './wide.mjs?v=8';
+import { depthTarget } from './identity.mjs?v=1';
 import { archiveAnswer } from './archive.mjs?v=1';
 import { recall, learn } from './brain.mjs?v=1';
 
@@ -216,7 +217,7 @@ export async function deepAnswer(question, { onStage = () => {}, onCount = () =>
 
   onStage('كنفكك السؤال ونحدد المحاور...');
   onStage('الجولة الأولى: كل المحركات والمستودعات...');
-  const wideP = wideResearch(q, { target: 3000, onProgress: onCount }).catch(() => ({ refs: [], stats: {}, total: 0 }));
+  const wideP = wideResearch(q, { target: depthTarget(), onProgress: onCount }).catch(() => ({ refs: [], stats: {}, total: 0 }));
   const timed = (p, ms) => Promise.race([p, new Promise(r => setTimeout(() => r(null), ms))]);
   const deepP = timed(advancedResearch({ question: q, deeper: true, variants: VARIANTS(q).slice(0, 2) }).catch(() => null), 22000);
   const [wide, deep] = await Promise.all([wideP, deepP]);
