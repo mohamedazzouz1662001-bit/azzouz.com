@@ -32,6 +32,15 @@ export function normalize(w) {
     .replace(/[^\p{L}\p{N}]/gu, '');
 }
 
+export function wordsRaw(text) {
+  const m = new Map();
+  for (const raw of String(text || '').split(/[^\p{L}\p{N}]+/u)) {
+    const w = normalize(raw);
+    if (w.length > 3 && w.length < 24 && !STOP.has(w) && !/^\d+$/.test(w) && !m.has(w)) m.set(w, raw.trim().slice(0, 26));
+  }
+  return m;
+}
+
 export function words(text) {
   const out = new Set();
   for (const raw of String(text || '').split(/[^\p{L}\p{N}]+/u)) {
@@ -53,7 +62,9 @@ export async function learn({ question, answer, refs = [], terms = [] }) {
   try {
     const db = await openDB();
     const q = normalize(question) || String(question || '').trim();
-    const ws = [...new Set([...words(question), ...words(answer), ...terms.flatMap(words)])].slice(0, 60);
+    const rawMap = new Map();
+    for (const src of [question, answer, ...terms]) for (const [w, d] of wordsRaw(src)) if (!rawMap.has(w)) rawMap.set(w, d);
+    const ws = [...rawMap.keys()].slice(0, 60);
     const now = Date.now();
 
     await new Promise((res, rej) => {
@@ -70,7 +81,8 @@ export async function learn({ question, answer, refs = [], terms = [] }) {
       ws.forEach((w, idx) => {
         const req = v.get(w);
         req.onsuccess = () => {
-          const rec = req.result || { w, c: 0, first: now, last: now, pairs: {} };
+          const rec = req.result || { w, d: rawMap.get(w) || w, c: 0, first: now, last: now, pairs: {} };
+          if (!rec.d) rec.d = rawMap.get(w) || w;
           rec.c = (rec.c || 0) + 1;
           rec.last = now;
           for (const other of ws.slice(0, 24)) {
@@ -126,7 +138,7 @@ export async function brainStats() {
       new Promise((res, rej) => { const r = tx(db, 'vocab').getAll(); r.onsuccess = () => res(r.result || []); r.onerror = () => rej(r.error); })
     ]);
     db.close();
-    const top = voc.sort((a, b) => b.c - a.c).slice(0, 24).map(v => ({ w: v.w, c: v.c }));
+    const top = voc.sort((a, b) => b.c - a.c).slice(0, 24).map(v => ({ w: v.d || v.w, k: v.w, c: v.c }));
     const links = voc.reduce((n, v) => n + Object.keys(v.pairs || {}).length, 0);
     return { memories: mem, concepts: voc.length, top, links };
   } catch (e) { return { memories: 0, concepts: 0, top: [], links: 0 }; }
