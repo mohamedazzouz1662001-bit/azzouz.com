@@ -130,14 +130,27 @@ export function compose(question, refs, engines = {}, confidence = 65, total = 0
   return { text: lines.join('\n'), used: sentences.length };
 }
 
+export function suggestionsFor(question) {
+  const bare = String(question || '')
+    .replace(/^(ما هو|ما هي|كيفاش|كيف|لماذا|علاش|واش|هل|شنو)\s+/i, '')
+    .replace(/[؟?]+\s*$/, '')
+    .trim();
+  const t = bare.length > 48 ? bare.slice(0, 48) : bare;
+  return [
+    'أحدث الأبحاث حول ' + t,
+    'التطبيقات العملية ديال ' + t,
+    'التحديات والانتقادات فـ ' + t
+  ];
+}
+
 export async function deepAnswer(question, { onStage = () => {}, onCount = () => {} } = {}) {
   const q = String(question || '').trim();
-  if (q.length < 3) return { type: 'article', text: 'كتب ليا سؤالك ونبحث ليك فكل المصادر.', refs: [], question: q, confidence: 0 };
+  if (q.length < 3) return { type: 'article', text: 'كتب ليا سؤالك ونبحث ليك فكل المصادر.', refs: [], question: q, confidence: 0, suggestions: [] };
   const started = Date.now();
 
   const cached = instantAnswer(q);
   if (cached && cached.answer) {
-    return { type: 'article', text: cached.answer, refs: cached.citations || [], question: q, confidence: 85, fromMemory: true, ms: Date.now() - started, engines: {} };
+    return { type: 'article', text: cached.answer, refs: cached.citations || [], question: q, confidence: 85, fromMemory: true, ms: Date.now() - started, engines: {}, suggestions: suggestionsFor(q) };
   }
 
   onStage('كنبحث فـ 20+ محرك ومستودع...');
@@ -172,6 +185,6 @@ export async function deepAnswer(question, { onStage = () => {}, onCount = () =>
   return {
     type: 'article', text, refs, question: q, confidence,
     words: text.split(/\s+/).length, ms: Date.now() - started, engines,
-    wide: { total: wide.total || 0 }
+    wide: { total: wide.total || 0 }, suggestions: suggestionsFor(q)
   };
 }
