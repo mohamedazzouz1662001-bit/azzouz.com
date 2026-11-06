@@ -142,7 +142,8 @@ export async function deepAnswer(question, { onStage = () => {}, onCount = () =>
 
   onStage('كنبحث فـ 20+ محرك ومستودع...');
   const wideP = wideResearch(q, { target: 1000, onProgress: onCount }).catch(() => ({ refs: [], stats: {}, total: 0 }));
-  const deepP = advancedResearch({ question: q, deeper: true, variants: VARIANTS(q) }).catch(() => null);
+  const timed = (p, ms) => Promise.race([p, new Promise(r => setTimeout(() => r(null), ms))]);
+  const deepP = timed(advancedResearch({ question: q, deeper: true, variants: VARIANTS(q).slice(0, 2) }).catch(() => null), 22000);
   const [wide, deep] = await Promise.all([wideP, deepP]);
 
   onStage('كنركّب الجواب...');
