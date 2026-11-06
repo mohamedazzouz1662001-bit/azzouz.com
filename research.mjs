@@ -246,7 +246,7 @@ export function synthesize(question, sources, previous = []) {
 
   const refs = sources.map(s => ({ n: s.n, title: s.title, url: s.url, engine: s.engines.join(' + '), snippet: s.snippet }));
   text += `\n*المراجع*\n` + refs.map(r => `${r.n}. ${r.title}\n${r.url}`).join('\n\n');
-  return { text, refs, used: [...used] };
+  return { text, refs, citations: refs, used: [...used] };
 }
 
 /* ---------- الواجهة ---------- */
