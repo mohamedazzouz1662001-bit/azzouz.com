@@ -127,10 +127,28 @@ export function hasScope(s, scope) {
   return !!sc && sc.includes(scope);
 }
 
+export class AuthError extends Error {
+  constructor(code) { super(code === 'NEED_LOGIN' ? 'خاصك تسجل الدخول' : 'الجلسة سالات، عاود الدخول'); this.code = code; this.name = 'AuthError'; }
+}
+
+export function markStale() {
+  const s = getSession();
+  if (s) saveSession({ ...s, stale: true });
+}
+
 export async function googleApi(url, needScope, opts = {}) {
-  const token = await getAccessToken(needScope);
-  if (!token) throw new Error('NOT_SIGNED_IN');
-  const r = await fetch(url, { ...opts, headers: { ...(opts.headers || {}), Authorization: 'Bearer ' + token } });
-  if (r.status === 401) throw new Error('TOKEN_EXPIRED');
+  let token = await getAccessToken(needScope);
+  if (!token) throw new AuthError('NEED_LOGIN');
+  const call = tk => fetch(url, { ...opts, headers: { ...(opts.headers || {}), Authorization: 'Bearer ' + tk } });
+  let r = await call(token);
+  if (r.status === 401) {
+    markStale();
+    token = await getAccessToken(needScope);
+    if (token) r = await call(token);
+  }
+  if (r.status === 401) {
+    signOut();
+    throw new AuthError('SESSION_ENDED');
+  }
   return r;
 }
