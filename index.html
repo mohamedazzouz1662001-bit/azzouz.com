@@ -51,6 +51,11 @@ footer{background:var(--panel);padding:8px 10px calc(8px + env(safe-area-inset-b
 .sugg button{background:#182229;border:1px solid #2a3942;color:#cfe4f0;font-size:12.5px;padding:8px 11px;border-radius:12px;text-align:right;font-family:inherit;cursor:pointer;line-height:1.5}
 .sugg button:active{background:#22323c;border-color:var(--acc)}
 .sugg .lbl{font-size:11px;color:#7d8f99;margin-bottom:2px}
+.vbar{display:none;align-items:center;gap:9px;background:#182229;border-top:1px solid #2a3942;padding:9px 12px;font-size:12.5px;color:#cfe4f0}
+.vbar.on{display:flex}
+.vbar .dot{width:9px;height:9px;border-radius:50%;background:#e74c3c;animation:micpulse 1.1s infinite;flex-shrink:0}
+.vbar .txt{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vbar .stp{background:#c0392b;border:none;color:#fff;font-size:12px;padding:5px 11px;border-radius:14px;cursor:pointer;font-family:inherit}
 .foot{text-align:center;font-size:10.5px;color:#44555e;padding:0 0 6px;background:var(--panel)}
 .foot a{color:#44555e;text-decoration:none}
 </style>
@@ -67,6 +72,12 @@ footer{background:var(--panel);padding:8px 10px calc(8px + env(safe-area-inset-b
 </header>
 
 <div id="log"></div>
+
+<div class="vbar" id="vbar">
+  <span class="dot"></span>
+  <span class="txt" id="vtxt">كنسمع... هضر</span>
+  <button class="stp" id="vstop">سالِي</button>
+</div>
 
 <footer>
   <textarea id="q" rows="1" placeholder="كتب سؤالك..."></textarea>
@@ -238,80 +249,132 @@ function spark() {
   } catch (e) {}
 }
 
-/* ===== البحث بالصوت: كيتحول لكلام وكتصيفط أوتوماتيكياً ===== */
+/* ===== البحث بالصوت ===== */
 const micBtn = document.getElementById('mic');
+const vbar = document.getElementById('vbar');
+const vtxt = document.getElementById('vtxt');
+const vstop = document.getElementById('vstop');
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-let recog = null, listening = false, voiced = '';
+const V = { on: false, final: '', interim: '', recog: null, timer: null, stopping: false, errShown: false };
 
-if (!SR) {
-  micBtn.title = 'المتصفح ما كيدعمش التعرف على الصوت';
-  micBtn.style.opacity = '.5';
+if (!SR) { micBtn.title = 'المتصفح ما كيدعمش التعرف على الصوت'; micBtn.style.opacity = '.55'; }
+
+function vStop(hard) {
+  V.stopping = true;
+  clearTimeout(V.timer);
+  try { V.recog && V.recog.stop(); } catch (e) {}
+  if (hard) V.on = false;
 }
 
-micBtn.onclick = () => {
+async function micPermission() {
+  try {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return true;
+    const s = await navigator.mediaDevices.getUserMedia({ audio: true });
+    s.getTracks().forEach(t => t.stop());
+    return true;
+  } catch (e) { return false; }
+}
+
+function vFinish() {
+  V.on = false; V.stopping = false;
+  micBtn.classList.remove('rec');
+  vbar.classList.remove('on');
+  qEl.placeholder = 'كتب سؤالك...';
+  statusEl.textContent = 'متصل · البحث الدائم خدام';
+  const said = (V.final || V.interim || qEl.value || '').trim();
+  V.final = ''; V.interim = '';
+  if (said.length > 2) {
+    qEl.value = said;
+    submit(said);
+  } else if (!V.errShown) {
+    bubble('ما سمعت حتى كلمة. تأكد أن الميكرو مفتوح وأن الإنترنت خدام، وعاود اضغط 🎙.', 'in');
+  }
+  V.errShown = false;
+}
+
+function vHint(msg, err) {
+  V.on = false; V.stopping = false;
+  micBtn.classList.remove('rec');
+  vbar.classList.remove('on');
+  qEl.placeholder = 'كتب سؤالك...';
+  statusEl.textContent = 'متصل · البحث الدائم خدام';
+  if (err) V.errShown = true;
+  bubble(msg, 'in');
+}
+
+micBtn.onclick = async () => {
   if (busy) return;
   if (!SR) {
-    bubble('المتصفح ديالك ما كيدعمش البحث بالصوت. جرب Chrome ولا Safari، ولا كتب سؤالك باليد.', 'in');
+    bubble('المتصفح ديالك ما كيدعمش التعرف على الصوت. حل الصفحة فـChrome، ولا كتب سؤالك باليد.', 'in');
     return;
   }
-  if (listening && recog) { try { recog.stop(); } catch (e) {} return; }
+  if (V.on) { vStop(true); return; }
 
-  recog = new SR();
-  recog.lang = 'ar-MA';
-  recog.continuous = false;
-  recog.interimResults = true;
-  recog.maxAlternatives = 1;
-  voiced = '';
-  listening = true;
+  V.on = true; V.stopping = false; V.final = ''; V.interim = ''; V.errShown = false;
   micBtn.classList.add('rec');
-  qEl.placeholder = 'كنسمع ليك... هضر عادياً';
+  vbar.classList.add('on');
+  vtxt.textContent = 'كنسمع... هضر عادياً';
+  qEl.placeholder = 'كنسمع ليك...';
   statusEl.textContent = '🎙 كنسمع...';
 
-  recog.onresult = e => {
-    let interim = '', final = '';
+  const ok = await micPermission();
+  if (!ok) {
+    vHint('خاصني إذن الميكرو. من إعدادات المتصفح سمح للميكرو لهاد الموقع وعاود جرب.', true);
+    return;
+  }
+
+  const rec = new SR();
+  V.recog = rec;
+  rec.lang = 'ar';
+  rec.continuous = true;
+  rec.interimResults = true;
+  rec.maxAlternatives = 1;
+
+  rec.onstart = () => { vtxt.textContent = 'كنسمع... هضر'; };
+
+  rec.onresult = e => {
+    let interim = '';
     for (let i = e.resultIndex; i < e.results.length; i++) {
       const r = e.results[i];
-      if (r.isFinal) final += r[0].transcript; else interim += r[0].transcript;
+      if (r.isFinal) V.final += r[0].transcript;
+      else interim += r[0].transcript;
     }
-    if (final) voiced += final;
-    qEl.value = (voiced + interim).trim();
-    qEl.style.height = 'auto';
-    qEl.style.height = Math.min(120, qEl.scrollHeight) + 'px';
+    V.interim = interim;
+    const shown = (V.final + ' ' + interim).trim();
+    vtxt.textContent = shown || 'كنسمع... هضر';
+    qEl.value = shown;
+    clearTimeout(V.timer);
+    V.timer = setTimeout(() => vStop(), 2400);
   };
 
-  recog.onerror = ev => {
-    listening = false;
-    micBtn.classList.remove('rec');
-    qEl.placeholder = 'كتب سؤالك...';
-    statusEl.textContent = 'متصل · البحث الدائم خدام';
-    if (ev.error === 'not-allowed' || ev.error === 'service-not-allowed') {
-      bubble('خاصني إذن الميكرو. من إعدادات المتصفح سمح بالميكرو لهاد الموقع وعاود.', 'in');
-    } else if (ev.error === 'no-speech') {
-      bubble('ما سمعت حتى كلام. عاود اضغط 🎙 وهضر قريب من الميكرو.', 'in');
-    } else if (ev.error === 'audio-capture') {
-      bubble('ما لقيتش ميكرو فهاد الجهاز.', 'in');
-    } else if (ev.error !== 'aborted') {
-      bubble('تعذر السمع (الخطأ: ' + ev.error + '). كتب سؤالك باليد ولا عاود جرب.', 'in');
-    }
-  };
-
-  recog.onend = () => {
-    listening = false;
-    micBtn.classList.remove('rec');
-    qEl.placeholder = 'كتب سؤالك...';
-    const said = (voiced || qEl.value).trim();
-    statusEl.textContent = 'متصل · البحث الدائم خدام';
-    if (said.length > 2) {
-      qEl.value = said;
-      setTimeout(() => submit(said), 250);
+  rec.onerror = ev => {
+    const e = ev.error;
+    if (e === 'aborted') return;
+    if (e === 'no-speech') { vStop(); return; }
+    if (e === 'not-allowed' || e === 'service-not-allowed') {
+      vHint('الإذن مرفوض. سمح بالميكرو لهاد الموقع من إعدادات المتصفح (🔒 فجنب العنوان) وعاود.', true);
+    } else if (e === 'audio-capture') {
+      vHint('ما لقيتش ميكرو. تأكد أن ميكرو الجهاز خدام.', true);
+    } else if (e === 'network') {
+      vHint('خدمة الصوت ما قدرتش تتصل بالإنترنت. تأكد من الشبكة ولا جرب Chrome.', true);
+    } else if (e === 'language-not-supported') {
+      vHint('المتصفح ما كيدعمش العربية فالصوت. جرب Chrome.', true);
+    } else {
+      vHint('تعذر السمع (الخطأ: ' + e + '). كتب سؤالك باليد ولا عاود جرب.', true);
     }
   };
 
-  try { recog.start(); } catch (e) {
-    listening = false;
-    micBtn.classList.remove('rec');
+  rec.onend = () => {
+    if (V.on && !V.stopping) { try { rec.start(); return; } catch (e) {} }
+    vFinish();
+  };
+
+  try { rec.start(); } catch (e) {
+    vHint('ما قدرتش نبدا التسجيل: ' + e.message, true);
   }
 };
+
+vstop.onclick = () => vStop();
 
 /* ===== البحث الدائم: خدام دايماً، حتى إلا كنتي خارج الصفحة ===== */
 setAuto(true);
