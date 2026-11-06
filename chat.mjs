@@ -1,5 +1,7 @@
 /* chat.mjs — مساعد يتعلم منك ويبحث فكل المصادر */
-import { advancedResearch, memory } from './research.mjs';
+import { advancedResearch, memory, readUrl, matchPage, instantAnswer, saveEntry, tokenize } from './research.mjs';
+
+const URL_RE = /https?:\/\/[^\s<>"']+/;
 
 const KB_KEY = 'azzouz-kb-v1';
 const ST_KEY = 'azzouz-chat-v1';
@@ -116,6 +118,25 @@ export async function chatTurn(text, { onSource, onStage } = {}) {
   const raw = String(text || '').trim();
   if (!raw) return { type: 'reply', text: 'كتب ليا سؤالك ولا المعلومة اللي بغيتي نتعلمها.' };
   const st = state();
+  const started = Date.now();
+
+  // 1) رابط؟ اقرا الصفحة مباشرة (محتوى عمومي)
+  const link = raw.match(URL_RE);
+  if (link) {
+    try {
+      const page = await readUrl(link[0]);
+      const sents = (page.sentences || []).slice(0, 6);
+      const text = '📄 ' + page.title + '\n\n' + sents.map(x => '• ' + x).join('\n') +
+        '\n\nالمصدر: ' + page.host;
+      const refs = [{ n: 1, title: page.title, url: page.url, engine: 'قراءة مباشرة', year: null }];
+      saveEntry({ question: 'قراءة: ' + page.title, answer: text, citations: refs, tokens: [...new Set(tokenize(page.title + ' ' + (page.sentences || []).slice(0, 3).join(' ')))], ts: Date.now() });
+      st.history = [...(st.history || []), { role: 'user', text: raw, ts: Date.now() }].slice(-40);
+      saveState(st);
+      return { type: 'article', text, refs, words: text.split(/\s+/).length, ms: Date.now() - started, crawled: page.url };
+    } catch (e) {
+      return { type: 'reply', text: '⚠️ ما قدرتش نقرا هاد الرابط (خاصو يكون عمومي و http/https).' };
+    }
+  }
 
   const learned = teach(raw);
   if (learned) {
@@ -137,6 +158,15 @@ export async function chatTurn(text, { onSource, onStage } = {}) {
     if (!res) return { type: 'reply', text: 'ما لقيتش مصادر إضافية. جرب صياغة أخرى للسؤال.' };
     const head = '🔎 وسّعت البحث (جولة ' + st.depth + ') على: ' + q + '\n\n';
     return { type: 'article', text: head + res.text, refs: res.refs, words: res.words, question: q, depth: st.depth };
+  }
+
+  if (isQuestion(raw) && !isRetry(raw)) {
+    const cached = instantAnswer(raw);
+    if (cached && cached.answer) {
+      st.lastQuestion = raw;
+      saveState(st);
+      return { type: 'article', text: cached.answer, refs: cached.citations || [], words: String(cached.answer).split(/\s+/).length, fromMemory: true, ms: Date.now() - started, question: raw };
+    }
   }
 
   if (isGreeting(raw)) return { type: 'reply', text: greetingReply(raw) };
