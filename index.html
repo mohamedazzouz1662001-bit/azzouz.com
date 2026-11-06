@@ -302,7 +302,10 @@ function openRefs(refs, question) {
   document.getElementById('msearch').value = '';
   const tabs = document.getElementById('mtabs');
   const counts = {};
-  refs.forEach(r => { counts[r.kind || 'article'] = (counts[r.kind || 'article'] || 0) + 1; });
+  refs.forEach(r => {
+    if (!KIND[r.kind]) r.kind = 'article';
+    counts[r.kind] = (counts[r.kind] || 0) + 1;
+  });
   const order = ['all', ...Object.keys(counts).sort((a, b) => counts[b] - counts[a])];
   tabs.innerHTML = order.map(k => {
     const label = k === 'all' ? 'الكل ' + refs.length : (KIND[k] ? KIND[k][0] + ' ' + KIND[k][1] : k) + ' ' + counts[k];
