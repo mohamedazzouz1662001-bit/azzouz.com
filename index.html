@@ -55,6 +55,9 @@ textarea:focus{outline:none;border-color:var(--acc)}
 border-radius:12px;font-size:17px;cursor:pointer;font-weight:800;flex:0 0 auto}
 #send:disabled{opacity:.5;cursor:default}
 .hint{font-size:10px;color:#4c5f78;text-align:center;margin-top:6px;font-family:'Courier New',monospace}
+.bgtog{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--dim);
+background:#0f1a28;border:1px solid var(--line);border-radius:20px;padding:6px 12px;cursor:pointer}
+.bgtog input{accent-color:var(--acc);width:14px;height:14px}
 </style>
 </head>
 <body>
@@ -75,6 +78,8 @@ border-radius:12px;font-size:17px;cursor:pointer;font-weight:800;flex:0 0 auto}
   <div class="chips">
     <div class="chip" data-q="عاود بحث">🔎 عاود بحث (توسيع)</div>
     <div class="chip" data-q="تعلم أن ">🧠 علّمني حاجة</div>
+    <div class="chip" id="bgBtn">🔎 بحث فالخلفية دابا</div>
+    <label class="bgtog"><input type="checkbox" id="bgToggle"> بحث دائم</label>
     <div class="chip" data-q="ما هو الذكاء الاصطناعي في التعليم؟">الذكاء الاصطناعي في التعليم</div>
     <div class="chip" data-q="كيفاش كيخدم التشفير المتماثل؟">التشفير المتماثل</div>
     <div class="chip" data-q="أحدث تقنيات ضغط البيانات">ضغط البيانات</div>
@@ -87,16 +92,22 @@ border-radius:12px;font-size:17px;cursor:pointer;font-weight:800;flex:0 0 auto}
 </footer>
 
 <script type="module">
-import { chatTurn, stats } from './chat.mjs';
+import { chatTurn, stats, backgroundTick, ensureSeeds, bgStats } from './chat.mjs';
 
 const $ = (id) => document.getElementById(id);
 const log = $('log');
 
 function meter() {
   const s = stats();
-  $('meter').textContent = 'قواعد: ' + s.rules + '\nمعلومات: ' + s.facts + '\nبحوث: ' + s.searches;
+  $('meter').textContent = 'قواعد: ' + s.rules + ' · معلومات: ' + s.facts + ' · بحوث: ' + s.searches;
 }
 meter();
+const updateMeter = () => {
+  const s = stats();
+  const b = bgStats();
+  $('meter').textContent = 'قواعد: ' + s.rules + ' · معلومات: ' + s.facts + ' · بحوث: ' + s.searches + ' · خلفية: ' + b.cycles;
+};
+let busy = false;
 
 function addUser(text) {
   const d = document.createElement('div');
@@ -115,6 +126,12 @@ function addSys(text) {
   return d;
 }
 
+function displayText(t) {
+  const cut = String(t || '').indexOf('*المراجع*');
+  let s = cut > 0 ? String(t).slice(0, cut) : String(t || '');
+  return s.replace(/\s*\[\d+\]/g, '').replace(/\n{3,}/g, '\n\n').trim();
+}
+
 function hostOf(u) { try { return new URL(u).hostname.replace('www.', ''); } catch { return u; } }
 
 function addBot(res) {
@@ -130,7 +147,7 @@ function addBot(res) {
   head.append(who, meta);
 
   const body = document.createElement('div');
-  body.textContent = res.text;
+  body.textContent = res.type === 'article' ? displayText(res.text) : res.text;
   wrap.append(head, body);
 
   if (res.type === 'article' && (res.refs || []).length) {
@@ -228,9 +245,47 @@ async function run(text) {
   }
   $('send').disabled = false;
   meter();
+const updateMeter = () => {
+  const s = stats();
+  const b = bgStats();
+  $('meter').textContent = 'قواعد: ' + s.rules + ' · معلومات: ' + s.facts + ' · بحوث: ' + s.searches + ' · خلفية: ' + b.cycles;
+};
+let busy = false;
 }
 
 $('send').onclick = () => run($('q').value);
+
+let bgTimer = null;
+async function bgOnce(manual) {
+  if (busy) return;
+  busy = true;
+  const line = addSys('🔎 كيبحث فالخلفية...');
+  try {
+    const r = await backgroundTick();
+    line.textContent = '🔎 بحث فالخلفية: ' + r.topic + ' — ' + r.refs + ' مرجع · ' + r.words + ' كلمة';
+  } catch (e) {
+    line.textContent = '⚠️ البحث فالخلفية توقف: ' + (e.message || e);
+  }
+  busy = false;
+  updateMeter();
+}
+
+function startBg() {
+  ensureSeeds();
+  if (bgTimer) return;
+  bgTimer = setInterval(() => bgOnce(false), 75000);
+  setTimeout(() => bgOnce(true), 6000);
+}
+
+function stopBg() {
+  if (bgTimer) { clearInterval(bgTimer); bgTimer = null; }
+}
+
+$('bgBtn').onclick = () => { bgOnce(true); };
+$('bgToggle').onchange = (e) => {
+  if (e.target.checked) { startBg(); addSys('✅ البحث الدائم تفعّل — كل 75 ثانية كيبحث فموضوع جديد.'); }
+  else { stopBg(); addSys('⏸️ البحث الدائم توقف.'); }
+};
 
 $('q').addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); run($('q').value); }
