@@ -156,6 +156,15 @@ function bubble(text, who = 'in') {
   return el;
 }
 
+function topicOf(text) {
+  const t = String(text || '')
+    .replace(/^(السلام عليكم|السلام|سلام|صباح الخير|صباح النور|مساء الخير|مساء النور|أهلا|اهلا|مرحبا|هاي)[،,.:\s]*/i, '')
+    .replace(/^(بغيت نسولك|بغيت نسألك|عندي سؤال|سولك|نسولك)\s*/i, '')
+    .replace(/^(على|عن|ف|في)\s+/i, '')
+    .trim();
+  return t.length > 2 ? t : String(text || '').trim();
+}
+
 function smallTalk(text) {
   const raw = String(text || '').trim();
   const t = raw.replace(/[!،,.؟?]+$/g, '').trim();
@@ -291,7 +300,8 @@ async function ask(text) {
 
   const t = typing();
   try {
-    const res = await deepAnswer(text, {
+    const query = topicOf(text);
+    const res = await deepAnswer(query, {
       onStage: s => t.stage(s),
       onCount: n => t.count(n)
     });
@@ -299,7 +309,7 @@ async function ask(text) {
     const el = bubble(res.text, 'in');
     addActions(el, res);
     addSuggestions(el, res.suggestions);
-    queueTopic(text);
+    queueTopic(topicOf(text));
   } catch (e) {
     t.done();
     bubble('⚠️ وقع مشكل فالبحث: ' + e.message + '\nعاود جرب من بعد شوية.', 'in');
