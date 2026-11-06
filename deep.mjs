@@ -27,6 +27,8 @@ function relevance(refs, q) {
     if (phraseAr && txt.includes(phraseAr)) sc += 8;
     if (phraseEn && phraseEn.length > 6 && txt.includes(phraseEn)) sc += 8;
     for (const w of terms) if (txt.includes(w)) sc += 2;
+    // عكس المعنى: «متماثل» مقابل «غير المتماثل / asymmetric»
+    if (/متماثل/.test(q) && !/غير\s*المتماثل/.test(q) && /غير\s*المتماثل|asymmetric/.test(txt)) sc -= 12;
     return { r, sc };
   });
 }
@@ -173,6 +175,10 @@ export async function deepAnswer(question, { onStage = () => {}, onCount = () =>
     const k = r.url || r.title;
     if (k && !seen.has(k)) { seen.add(k); refs.push({ title: r.title, url: r.url, engine: r.engine, year: r.year, snippet: '' }); }
   }
+  // ترتيب المراجع حسب الصلة: العبارة الكاملة أولا، ومن بعد الكلمات الأساسية
+  const scoredAll = relevance(refs, q);
+  const order = new Map(scoredAll.map(x => [x.r, x.sc]));
+  refs.sort((a, b) => (order.get(b) || 0) - (order.get(a) || 0));
   refs.forEach((r, i) => { r.n = i + 1; });
 
   const engines = wide.stats || {};
