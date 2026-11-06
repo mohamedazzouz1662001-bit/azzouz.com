@@ -287,7 +287,7 @@ async function ask(text) {
     return;
   }
 
-  if (/^(السلام|سلام)\b/.test(text.trim())) bubble('وعليكم السلام ورحمة الله 🌿', 'in');
+  if (/^(السلام|سلام)/.test(text.trim())) bubble('وعليكم السلام ورحمة الله 🌿', 'in');
 
   const t = typing();
   try {
