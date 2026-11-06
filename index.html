@@ -80,25 +80,25 @@ $('go').onclick = async () => {
   if (!res) { $('stat').textContent = '❌ ما وصلات حتى نتيجة — جرب كلمات أخرى ولا بالإنجليزية'; return; }
   $('out').style.display = 'block';
   $('art').textContent = res.text;
-  const refs = $('refs');
-  refs.textContent = '';
-  (res.citations || res.refs || []).forEach((c) => {
-    const d = document.createElement('div');
-    const a = document.createElement('a');
-    a.href = c.url; a.target = '_blank'; a.rel = 'noopener noreferrer';
-    a.textContent = '[' + c.n + '] ' + (c.title || c.url);
-    d.appendChild(a);
-    refs.appendChild(d);
-  });
-  $('copyBtn').style.display = 'inline-block';
+  const list = res.citations || res.refs || [];
   const eng = (res.engines || []).map(e => e.label + ':' + e.count).join(' · ');
-  $('stat').textContent = '✅ ' + ((res.citations || res.refs || []).length) + ' مرجع | ' + eng;
+  $('stat').textContent = '✅ ' + list.length + ' مرجع | ' + eng;
+  try {
+    const refs = $('refs');
+    if (refs) {
+      refs.textContent = '';
+      list.forEach((c) => {
+        const d = document.createElement('div');
+        const a = document.createElement('a');
+        a.href = c.url; a.target = '_blank'; a.rel = 'noopener noreferrer';
+        a.textContent = '[' + c.n + '] ' + (c.title || c.url);
+        d.appendChild(a);
+        refs.appendChild(d);
+      });
+    }
+    if ($('copyBtn')) $('copyBtn').style.display = 'inline-block';
+  } catch (e) { console.warn('refs render', e); }
   stats();
-};
-
-$('copyBtn').onclick = async () => {
-  try { await navigator.clipboard.writeText($('art').textContent); $('copyBtn').textContent = '✅ تنسخ'; setTimeout(()=>{$('copyBtn').textContent='📋 نسخ الجواب كرسالة واحدة';},1800); }
-  catch (e) { $('copyBtn').textContent = '⚠️ ما قدرتش ننسخ'; }
 };
 
 $('clear').onclick = () => {
