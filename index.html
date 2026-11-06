@@ -3,110 +3,278 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Azzouz Research — بحث شامل بمراجع</title>
+<title>Azzouz Research v3 — مقال واحد بمراجع من الويب كامل</title>
 <style>
-:root{--bg:#06090f;--card:#0c1420;--line:#1b2940;--txt:#e6eefb;--dim:#7f93ad;--acc:#3ddc97;--gold:#d4af37;--err:#f06a6a}
+:root{--bg:#05080e;--bg2:#0a1220;--card:#0c1524;--line:#182740;--line2:#243c5e;--txt:#e8f0fb;--dim:#7f95b2;--dim2:#546a86;--acc:#3ddc97;--gold:#d4af37;--err:#f06a6a;--warn:#e8b13f}
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:radial-gradient(900px 420px at 50% -10%,#0d1a2c,#06090f 65%);color:var(--txt);
-font-family:'Segoe UI',Tahoma,Arial,sans-serif;min-height:100vh;padding:18px}
-.wrap{max-width:820px;margin:0 auto}
-header{text-align:center;padding:22px 8px}
-h1{font-size:26px;letter-spacing:2px}h1 span{color:var(--acc)}
-.sub{color:var(--dim);font-size:12px;margin-top:8px}
-.box{background:linear-gradient(180deg,var(--card),#0a1119);border:1px solid var(--line);border-radius:14px;padding:18px;margin-top:16px}
-label{display:block;font-size:11px;color:var(--dim);margin-bottom:6px;letter-spacing:1px}
-input,textarea{width:100%;background:#08101a;border:1px solid var(--line);color:var(--txt);
-padding:12px 14px;border-radius:9px;font-size:14px;font-family:inherit}
-input:focus,textarea:focus{outline:none;border-color:var(--acc)}
-textarea{min-height:88px;resize:vertical}
-.row{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
-.btn{background:linear-gradient(180deg,#3ddc97,#2bb37b);color:#05271a;border:none;padding:12px 22px;
-border-radius:9px;font-weight:800;font-size:13px;cursor:pointer;transition:.2s}
-.btn.ghost{background:#0f1b2a;color:var(--txt);border:1px solid var(--line)}
-.btn:disabled{opacity:.5;cursor:wait}
-.art{white-space:pre-wrap;line-height:2;font-size:14.5px}
-.refs{margin-top:16px;border-top:1px dashed var(--line);padding-top:12px;font-size:12.5px;color:var(--dim);line-height:2}
-.refs a{color:var(--acc);text-decoration:none;word-break:break-all}
-.tag{display:inline-block;font-size:10px;border:1px solid var(--line);border-radius:12px;
-padding:2px 8px;margin:0 4px 4px 0;color:var(--dim)}
-.stat{font-size:11px;color:var(--dim);margin-top:10px}
-.err{border-color:rgba(240,106,106,.5);color:var(--err)}
-@media(max-width:600px){h1{font-size:20px}}
+html{scroll-behavior:smooth}
+body{background:radial-gradient(1000px 460px at 50% -12%,#0e1c30,#05080e 62%);color:var(--txt);
+ font-family:'Segoe UI',Tahoma,Arial,sans-serif;min-height:100vh;padding:16px 14px 60px}
+.wrap{max-width:860px;margin:0 auto}
+header{text-align:center;padding:16px 6px 8px}
+.logo{font-family:'Courier New',monospace;font-size:13px;letter-spacing:5px;color:var(--acc)}
+h1{font-size:25px;margin:8px 0 6px;letter-spacing:1px}
+h1 span{color:var(--acc)}
+.sub{color:var(--dim);font-size:12px;line-height:1.9}
+.box{background:linear-gradient(180deg,var(--card),#0a1119);border:1px solid var(--line);border-radius:16px;padding:16px;margin-top:14px}
+label{display:block;font-size:11px;color:var(--dim);margin-bottom:7px;letter-spacing:1px}
+textarea{width:100%;min-height:92px;background:#070d16;border:1px solid var(--line2);color:var(--txt);
+ padding:13px 14px;border-radius:11px;font-size:15px;font-family:inherit;resize:vertical;line-height:1.7}
+textarea:focus{outline:none;border-color:var(--acc);box-shadow:0 0 20px rgba(61,220,151,.12)}
+.row{display:flex;gap:9px;flex-wrap:wrap;margin-top:12px}
+.btn{background:linear-gradient(180deg,#3ddc97,#22a874);color:#04281a;border:none;padding:12px 22px;
+ border-radius:10px;font-weight:800;font-size:13px;cursor:pointer;transition:.2s;letter-spacing:.5px}
+.btn:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(61,220,151,.28)}
+.btn:disabled{opacity:.55;cursor:progress;transform:none;box-shadow:none}
+.btn.ghost{background:#0d1c2c;border:1px solid var(--line2);color:var(--txt)}
+.btn.ghost:hover{border-color:var(--acc);color:var(--acc);box-shadow:none}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+.chip{font-family:'Courier New',monospace;font-size:10.5px;color:var(--dim);background:#08111c;
+ border:1px solid var(--line);border-radius:14px;padding:5px 10px;transition:.25s;white-space:nowrap}
+.chip.load{border-color:var(--line2);color:var(--dim2);animation:pulse 1.1s infinite}
+.chip.ok{border-color:rgba(61,220,151,.45);color:var(--acc);background:rgba(61,220,151,.06)}
+.chip.err{border-color:rgba(240,106,106,.3);color:#a05f5f;text-decoration:line-through}
+@keyframes pulse{0%,100%{opacity:.45}50%{opacity:1}}
+.stat{font-size:11.5px;color:var(--dim);margin-top:10px;font-family:'Courier New',monospace;line-height:1.8}
+.art{white-space:pre-wrap;line-height:2.05;font-size:14.5px;margin-top:6px}
+.art b,.art strong{color:var(--acc)}
+.art .h{color:var(--acc);font-weight:800;display:block;margin-top:14px}
+.refs{margin-top:10px;display:flex;flex-direction:column;gap:7px}
+.ref{display:block;text-decoration:none;background:#08111c;border:1px solid var(--line);border-radius:10px;
+ padding:10px 12px;transition:.2s}
+.ref:hover{border-color:var(--acc);transform:translateX(-3px)}
+.ref .t{color:var(--txt);font-size:13px;line-height:1.6}
+.ref .m{color:var(--dim2);font-size:10.5px;font-family:'Courier New',monospace;margin-top:5px;display:flex;gap:8px;flex-wrap:wrap}
+.ref .d{color:var(--acc)}
+.hist{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+.hi{background:#08111c;border:1px solid var(--line);border-radius:9px;padding:10px 12px;font-size:12.5px;
+ color:var(--dim);cursor:pointer;transition:.2s}
+.hi:hover{border-color:var(--acc);color:var(--txt)}
+.cardhd{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.ttl{font-size:13px;color:var(--acc);letter-spacing:1px;font-weight:800}
+.mini{font-size:10.5px;color:var(--dim2);font-family:'Courier New',monospace}
+.sug{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.sug button{background:#0a1622;border:1px solid var(--line);color:var(--dim);font-size:11px;
+ border-radius:14px;padding:6px 11px;cursor:pointer;transition:.2s;font-family:inherit}
+.sug button:hover{border-color:var(--acc);color:var(--acc)}
+footer{text-align:center;color:var(--dim2);font-size:10.5px;margin-top:26px;font-family:'Courier New',monospace;line-height:2}
 </style>
 </head>
 <body>
 <div class="wrap">
   <header>
-    <h1>Azzouz <span>Research</span></h1>
-    <div class="sub">بحث مباشر من المتصفح في 8 مصادر · مقال واحد · مراجع فالأسفل · ذاكرة محلية وتعلّم</div>
+    <div class="logo">AZZOUZ RESEARCH v3</div>
+    <h1>مقال واحد. <span>مراجع من الويب كامل.</span></h1>
+    <div class="sub">12 مصدر فالوقت نفسه · تلخيص بمراجع مرقمة · ذاكرة محلية وتعلّم مستمر<br>كل جملة عندها مصدرها — بلا اختراع</div>
   </header>
 
   <div class="box">
     <label>سؤالك</label>
-    <textarea id="q" placeholder="مثال: ما هي أحدث تقنيات ضغط البيانات المستعملة في قواعد البيانات؟"></textarea>
+    <textarea id="q" placeholder="مثال: كيفاش كتخدم خوارزميات التشفير المتماثل؟"></textarea>
+    <div class="sug">
+      <button data-q="ما هو الذكاء الاصطناعي في التعليم؟">الذكاء الاصطناعي في التعليم</button>
+      <button data-q="how does LSB steganography work">LSB steganography</button>
+      <button data-q="أثر التضخم على الاقتصاد المغربي">التضخم والاقتصاد</button>
+      <button data-q="quantum computing cryptography">quantum + crypto</button>
+    </div>
     <div class="row">
       <button class="btn" id="go">ابحث ولخّص</button>
       <button class="btn ghost" id="clear">مسح الذاكرة</button>
+      <button class="btn ghost" id="export">تصدير الذاكرة</button>
     </div>
-    <div class="stat" id="stat"></div>
+    <div class="chips" id="chips"></div>
+    <div class="stat" id="stat">الذاكرة: 0 بحث محفوظ</div>
   </div>
 
   <div class="box" id="out" style="display:none">
+    <div class="cardhd">
+      <div class="ttl">📄 المقال</div>
+      <div class="mini" id="meta"></div>
+    </div>
     <div class="art" id="art"></div>
+    <div class="row">
+      <button class="btn ghost" id="copy">📋 نسخ</button>
+      <button class="btn ghost" id="dl">⬇️ تحميل .md</button>
+      <button class="btn ghost" id="wa">📲 مشاركة واتساب</button>
+    </div>
+  </div>
+
+  <div class="box" id="refbox" style="display:none">
+    <div class="cardhd"><div class="ttl">🔗 المراجع</div><div class="mini" id="refmeta"></div></div>
     <div class="refs" id="refs"></div>
   </div>
+
+  <div class="box">
+    <div class="cardhd"><div class="ttl">🕘 بحوثك السابقة</div><div class="mini">اضغط باش تعاود</div></div>
+    <div class="hist" id="hist"></div>
+  </div>
+
+  <footer>Azzouz Research v3 · بحث مباشر من المتصفح · بلا مفاتيح API وبلا تتبع<br>الذاكرة كتبقى فالجهاز ديالك فقط</footer>
 </div>
 
 <script type="module">
-import { advancedResearch, relatedLearning, topSources } from './research.mjs';
-
+import { advancedResearch, gather, memory, clearMemory, learn, topSources, SOURCES } from './research.mjs';
 const $ = (id) => document.getElementById(id);
 
-function stats() {
-  const mem = JSON.parse(localStorage.getItem('azzouz-memory-v2') || '[]');
-  const src = topSources(2).map(s => s.host).join(' · ');
-  $('stat').textContent = 'الذاكرة: ' + mem.length + ' بحث محفوظ' + (src ? ' | أفضل المصادر: ' + src : '');
+/* شرائح المصادر */
+const chips = $('chips');
+function buildChips() {
+  chips.textContent = '';
+  SOURCES.forEach(s => {
+    const c = document.createElement('span');
+    c.className = 'chip';
+    c.id = 'chip-' + s.id;
+    c.textContent = s.label;
+    chips.appendChild(c);
+  });
 }
-stats();
+buildChips();
 
-$('go').onclick = async () => {
-  const q = $('q').value.trim();
-  if (!q) return;
-  $('go').disabled = true; $('go').textContent = 'جاري البحث...';
-  $('stat').textContent = '⏳ كنجمع من 8 مصادر فالوقت نفسه...';
-  let res = null;
-  try { res = await advancedResearch({ question: q }); } catch (e) { console.warn(e); }
-  $('go').disabled = false; $('go').textContent = 'ابحث ولخّص';
-  if (!res) { $('stat').textContent = '❌ ما وصلات حتى نتيجة — جرب كلمات أخرى ولا بالإنجليزية'; return; }
-  $('out').style.display = 'block';
-  $('art').textContent = res.text;
-  const list = res.citations || res.refs || [];
-  const eng = (res.engines || []).map(e => e.label + ':' + e.count).join(' · ');
-  $('stat').textContent = '✅ ' + list.length + ' مرجع | ' + eng;
-  try {
-    const refs = $('refs');
-    if (refs) {
-      refs.textContent = '';
-      list.forEach((c) => {
-        const d = document.createElement('div');
-        const a = document.createElement('a');
-        a.href = c.url; a.target = '_blank'; a.rel = 'noopener noreferrer';
-        a.textContent = '[' + c.n + '] ' + (c.title || c.url);
-        d.appendChild(a);
-        refs.appendChild(d);
-      });
+function resetChips() {
+  SOURCES.forEach(s => {
+    const c = $('chip-' + s.id);
+    if (c) { c.className = 'chip load'; c.textContent = s.label; }
+  });
+}
+function onSource(id, status, count) {
+  const c = $('chip-' + id);
+  if (!c) return;
+  const label = (SOURCES.find(s => s.id === id) || {}).label || id;
+  if (status === 'ok') {
+    c.className = 'chip ' + (count ? 'ok' : 'err');
+    c.textContent = label + (count ? ' ✓' + count : '');
+  } else {
+    c.className = 'chip err';
+    c.textContent = label + ' ✕';
+  }
+}
+
+function stats() {
+  const m = memory();
+  const top = topSources(2).map(s => s.host).join(' · ');
+  $('stat').textContent = 'الذاكرة: ' + m.length + ' بحث' + (top ? ' | مصادر موثوقة عندك: ' + top : '');
+}
+function renderHist() {
+  const h = $('hist');
+  h.textContent = '';
+  const items = memory().slice(0, 8);
+  if (!items.length) {
+    const d = document.createElement('div');
+    d.className = 'hi';
+    d.style.cursor = 'default';
+    d.textContent = 'مازال ما درتي حتى بحث.';
+    h.appendChild(d);
+    return;
+  }
+  items.forEach(e => {
+    const d = document.createElement('div');
+    d.className = 'hi';
+    d.textContent = '↺ ' + e.question + ' — ' + (e.citations || []).length + ' مرجع';
+    d.onclick = () => { $('q').value = e.question; window.scrollTo({ top: 0, behavior: 'smooth' }); run(); };
+    h.appendChild(d);
+  });
+}
+function renderArticle(text) {
+  const art = $('art');
+  art.textContent = '';
+  text.split('\n').forEach(line => {
+    if (/^\*.*\*$/.test(line.trim())) {
+      const sp = document.createElement('span');
+      sp.className = 'h';
+      sp.textContent = line.replace(/\*/g, '');
+      art.appendChild(sp);
+    } else {
+      art.appendChild(document.createTextNode(line + '\n'));
     }
-    if ($('copyBtn')) $('copyBtn').style.display = 'inline-block';
-  } catch (e) { console.warn('refs render', e); }
-  stats();
+  });
+}
+function renderRefs(refs) {
+  const box = $('refs');
+  box.textContent = '';
+  refs.forEach(r => {
+    const a = document.createElement('a');
+    a.className = 'ref';
+    a.href = r.url;
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    const t = document.createElement('div');
+    t.className = 't';
+    t.textContent = '[' + r.n + '] ' + r.title;
+    const m = document.createElement('div');
+    m.className = 'm';
+    const d = document.createElement('span');
+    d.className = 'd';
+    d.textContent = (() => { try { return new URL(r.url).hostname.replace(/^www\./, ''); } catch (e) { return ''; } })();
+    m.appendChild(d);
+    if (r.year) { const y = document.createElement('span'); y.textContent = r.year; m.appendChild(y); }
+    if (r.engines && r.engines.length) { const e = document.createElement('span'); e.textContent = r.engines.join(' + '); m.appendChild(e); }
+    a.appendChild(t); a.appendChild(m);
+    box.appendChild(a);
+  });
+  $('refbox').style.display = 'block';
+  $('refmeta').textContent = refs.length + ' مرجع';
+}
+
+let lastText = '';
+async function run() {
+  const q = $('q').value.trim();
+  if (q.length < 3) { $('stat').textContent = '⚠️ كتب سؤال أطول شوية'; return; }
+  const btn = $('go');
+  btn.disabled = true; btn.textContent = 'جاري البحث...';
+  resetChips();
+  $('out').style.display = 'none'; $('refbox').style.display = 'none';
+  $('stat').textContent = '⏳ كنجمع من ' + SOURCES.length + ' مصدر فالوقت نفسه...';
+  let res = null;
+  try { res = await advancedResearch({ question: q, onSource }); } catch (e) { console.warn(e); }
+  btn.disabled = false; btn.textContent = 'ابحث ولخّص';
+  if (!res) { $('stat').textContent = '❌ ما لقيتش نتائج كافية — جرب كلمات أخرى أو بالإنجليزية'; return; }
+  lastText = res.text;
+  $('out').style.display = 'block';
+  renderArticle(res.text);
+  $('meta').textContent = res.words + ' كلمة · ~' + res.minutes + ' دقائق قراءة';
+  renderRefs(res.citations || res.refs || []);
+  const ok = res.engines.filter(e => e.count > 0).length;
+  $('stat').textContent = '✅ ' + res.refs.length + ' مصدر · ' + ok + '/' + res.engines.length + ' محرك رد · ' + res.used.length + ' مصدر فالمقال';
+  stats(); renderHist();
+}
+
+$('go').onclick = run;
+$('q').addEventListener('keydown', (e) => { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') run(); });
+document.querySelectorAll('.sug button').forEach(b => {
+  b.onclick = () => { $('q').value = b.dataset.q; run(); };
+});
+$('copy').onclick = async () => {
+  try {
+    await navigator.clipboard.writeText(lastText);
+    $('copy').textContent = '✅ تنسخ';
+    setTimeout(() => { $('copy').textContent = '📋 نسخ'; }, 1600);
+  } catch (e) { $('copy').textContent = '⚠️ فشل النسخ'; }
+};
+$('dl').onclick = () => {
+  const blob = new Blob([lastText], { type: 'text/markdown;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'azzouz-research-' + Date.now() + '.md';
+  a.click();
+};
+$('wa').onclick = () => {
+  window.open('https://wa.me/?text=' + encodeURIComponent(lastText.slice(0, 1800)), '_blank');
+};
+$('clear').onclick = () => {
+  if (!confirm('تمسح كل الذاكرة ديال البحوث؟')) return;
+  clearMemory();
+  stats(); renderHist();
+  $('stat').textContent = '🗑️ الذاكرة تمسحت';
+};
+$('export').onclick = () => {
+  const blob = new Blob([JSON.stringify({ memory: memory(), learn: learn() }, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'azzouz-memory-' + Date.now() + '.json';
+  a.click();
 };
 
-$('clear').onclick = () => {
-  localStorage.removeItem('azzouz-memory-v2');
-  localStorage.removeItem('azzouz-learn-v2');
-  $('out').style.display = 'none';
-  stats();
-};
+stats(); renderHist();
 </script>
 </body>
 </html>
