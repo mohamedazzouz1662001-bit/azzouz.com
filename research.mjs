@@ -1,3 +1,4 @@
+import { reasonAndWrite } from './reason.mjs';
 /* research.mjs v3 — محرك بحث شامل بمراجع، يعمل من المتصفح مباشرة.
    مصادر: ويكيبيديا ar/en · بحث ويب (Bing) · OpenAlex · Crossref · Europe PMC ·
            PubMed · GitHub · Stack Overflow · Hacker News · DEV · DuckDuckGo
@@ -224,7 +225,46 @@ const SOURCES = [
       });
       return out;
     }
-  }
+  },
+  {
+    id: 'stackexchange', label: 'Stack Exchange', kind: 'dev', ms: 11000,
+    run: async (q) => {
+      const d = await get(`https://api.stackexchange.com/2.3/search/advanced?order=desc&sort=relevance&q=${enc(q)}&site=stackoverflow&pagesize=4&filter=default`);
+      return (d.items || []).map(i => ({
+        title: i.title, url: i.link, snippet: trimText((i.tags || []).join(', ') + ' · ' + (i.is_answered ? 'عندو جواب' : 'بلا جواب'), 200), year: i.creation_date ? String(new Date(i.creation_date * 1000).getFullYear()) : null
+      }));
+    }
+  },
+  {
+    id: 'wikipedia-fr', label: 'Wikipédia (FR)', kind: 'general', ms: 9000,
+    run: async (q) => {
+      const d = await get(`https://fr.wikipedia.org/w/rest.php/v1/search/page?q=${enc(q)}&limit=3`);
+      return (d.pages || []).map(p => ({
+        title: p.title, url: `https://fr.wikipedia.org/wiki/${enc(p.key || p.title)}`,
+        snippet: trimText(p.description || p.excerpt || '', 260), year: null
+      }));
+    }
+  },
+  {
+    id: 'wikidata', label: 'Wikidata', kind: 'general', ms: 10000,
+    run: async (q) => {
+      const d = await get(`https://www.wikidata.org/w/api.php?action=wbsearchentities&search=${enc(q)}&language=ar&uselang=ar&format=json&limit=3&origin=*`);
+      return (d.search || []).map(i => ({
+        title: i.label || i.id, url: 'https://www.wikidata.org/wiki/' + i.id,
+        snippet: trimText(i.description || '', 200), year: null
+      }));
+    }
+  },
+  {
+    id: 'openlibrary', label: 'Open Library', kind: 'books', ms: 10000,
+    run: async (q) => {
+      const d = await get(`https://openlibrary.org/search.json?q=${enc(q)}&limit=4&fields=title,author_name,first_publish_year,key`);
+      return (d.docs || []).map(b => ({
+        title: b.title, url: 'https://openlibrary.org' + b.key,
+        snippet: trimText((b.author_name || []).join(', '), 160), year: b.first_publish_year ? String(b.first_publish_year) : null
+      }));
+    }
+  },
 ];
 
 /* ---------- جمع ---------- */
@@ -433,12 +473,25 @@ export function synthesize(question, sources) {
 }
 
 /* ---------- الواجهة ---------- */
+const QWORDS = /^(ما|ماذا|ماهو|هو|هي|شنو|أشنو|اشنو|شحال|كيف|كيفاش|لماذا|علاش|ليش|هل|واش|متى|فوقاش|أين|فين|من|شكون|أي|ايش|وش|عرف|اشرح|قل|قول|بغيت|أريد|معلومات|عن|حول|بالعربية|what|is|the|a|how|why|when|where|who|explain|tell|me|about|of|does|do)$/i;
+
+export function keywords(question) {
+  const words = String(question)
+    .replace(/[؟?.,،:;!]/g, ' ')
+    .split(/\s+/)
+    .filter(Boolean)
+    .filter(w => !QWORDS.test(w));
+  const out = words.join(' ').trim();
+  return out.length >= 3 ? out : String(question).replace(/[؟?]/g, '').trim();
+}
+
 export async function gather(question, { onSource, timeout = 0 } = {}) {
   FAST = timeout;
   const learned = learn();
+  const kq = keywords(question);
   const jobs = SOURCES.map(async (src) => {
     try {
-      const items = (await src.run(question)).filter(x => x && x.title && x.url);
+      const items = (await src.run(kq)).filter(x => x && x.title && x.url);
       if (onSource) onSource(src.id, 'ok', items.length);
       return { label: src.label, id: src.id, kind: src.kind, items };
     } catch (e) {
@@ -463,7 +516,8 @@ export async function gather(question, { onSource, timeout = 0 } = {}) {
 export async function advancedResearch({ question, onSource, variants = [], deeper = false, timeout = 0 } = {}) {
   if (!question || question.trim().length < 3) return null;
   const previous = relatedLearning(question);
-  const main = await gather(question, { onSource, timeout });
+  let main = await gather(question, { onSource, timeout });
+  if (!main.sources.length && timeout) main = await gather(question, { onSource, timeout: 0 });
   let sources = main.sources, engines = main.engines;
   if (deeper && variants.length) {
     const batches = await Promise.all(variants.slice(0, 3).map(v => gather(v, {}).catch(() => ({ sources: [], engines: [] }))));
@@ -476,9 +530,37 @@ export async function advancedResearch({ question, onSource, variants = [], deep
     engines = [...counts.values()];
   }
   if (!sources.length) return null;
-  const art = synthesize(question, sources);
+
+  // فلترة الصلة: غير المصادر اللي كتشارك كلمة مع السؤال
+  const qTok = [...new Set(tokenize(question))].filter(w => w.length > 3);
+  const overlap = (txt) => {
+    const st = new Set(tokenize(txt || ''));
+    let n = 0;
+    for (const w of qTok) if (st.has(w)) n++;
+    return n;
+  };
+  const rel = sources
+    .map(src => ({ src, score: overlap(src.title) * 3 + overlap(src.snippet) }))
+    .filter(x => x.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .map(x => x.src);
+  if (!rel.length) return null;
+
+  const reasoned = reasonAndWrite(question, rel);
+  let art = reasoned
+    ? { ...reasoned, refs: rel, citations: rel, minutes: Math.max(1, Math.round(reasoned.words / 200)), type: reasoned.type, confidence: reasoned.confidence }
+    : null;
+
+  if (!art || (art.words || 0) < 60) {
+    const syn = synthesize(question, rel);
+    if (syn && (!art || (syn.words || 0) > (art.words || 0))) {
+      art = { ...syn, type: reasoned ? reasoned.type : 'general', confidence: reasoned ? reasoned.confidence : 55 };
+    }
+  }
   if (!art) return null;
-  recordLearning(question, sources, new Set(art.used));
+  if (!Array.isArray(art.used) ? art.usedCount === 0 : art.used.length === 0) return null;
+  art.confidence = Math.min(90, Math.max(30, 40 + rel.length * 4));
+  recordLearning(question, rel, new Set(art.used || []));
   saveEntry({ question, answer: art.text, citations: art.refs, engines, ts: Date.now(), tokens: [...new Set(tokenize(question))] });
   return { ...art, engines, previous };
 }
