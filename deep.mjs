@@ -209,7 +209,7 @@ export async function deepAnswer(question, { onStage = () => {}, onCount = () =>
   const started = Date.now();
 
   const cached = instantAnswer(q);
-  if (cached && cached.answer) {
+  if (cached && cached.answer && (cached.citations || []).length >= 40) {
     return { type: 'article', text: cached.answer, refs: cached.citations || [], question: q, confidence: 85, fromMemory: true, ms: Date.now() - started, engines: {}, suggestions: suggestionsFor(q) };
   }
 
