@@ -619,7 +619,7 @@ export function matchPage(question) {
 export function instantAnswer(question, opts = {}) {
   const qt = new Set(tokenize(question));
   if (!qt.size) return null;
-  const min = opts.minScore ?? 0.78;
+  const min = opts.minScore ?? 0.72;
   const askYear = /\b20\d\d\b/.test(question);
   let best = null, bestScore = 0;
   for (const e of memory()) {
@@ -628,7 +628,8 @@ export function instantAnswer(question, opts = {}) {
     const et = new Set(e.tokens || []);
     let inter = 0;
     for (const t of qt) if (et.has(t)) inter++;
-    const score = inter / qt.size;
+    const union = qt.size + et.size - inter;
+    const score = union > 0 ? inter / union : 0;   // تشابه الاتجاهين، ماشي غير تغطية السؤال
     if (score > bestScore) { bestScore = score; best = e; }
   }
   if (bestScore < min) return null;
