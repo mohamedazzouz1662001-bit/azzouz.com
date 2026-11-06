@@ -34,19 +34,37 @@ export const SERVICES = [
   },
   {
     id: 'drive', name: 'Google Drive', icon: '📁', scope: SCOPES.drive,
-    desc: 'كيقلب فملفاتك ومستنداتك ويرجع العناوين',
+    desc: 'كيقلب فملفاتك، الملفات المشتركة معك، وDrive ديال الفريق',
     run: async (q) => {
-      const url = 'https://www.googleapis.com/drive/v3/files?pageSize=30&fields=files(id,name,description,webViewLink,thumbnailLink,mimeType,modifiedTime)&q=' +
-        encodeURIComponent("fullText contains '" + String(q).replace(/'/g, ' ') + "'");
-      const r = await googleApi(url, SCOPES.drive);
-      const d = await r.json();
-      return (d.files || []).map(f => ({
-        title: f.name,
-        url: f.webViewLink || ('https://drive.google.com/file/d/' + f.id),
-        snippet: clamp(f.description || (f.mimeType || '') + ' · ' + (f.modifiedTime || '').slice(0, 10)),
-        thumb: f.thumbnailLink || '',
-        kind: 'archive'
-      }));
+      const term = String(q).replace(/'/g, ' ').slice(0, 120);
+      const queries = [
+        "fullText contains '" + term + "'",
+        "name contains '" + term + "'",
+        "sharedWithMe = true and fullText contains '" + term + "'",
+        "mimeType contains 'pdf' and fullText contains '" + term + "'"
+      ];
+      const out = [], seen = new Set();
+      for (const qx of queries) {
+        if (out.length >= 40) break;
+        try {
+          const url = 'https://www.googleapis.com/drive/v3/files?pageSize=25&includeItemsFromAllDrives=true&supportsAllDrives=true&corpora=allDrives&fields=files(id,name,description,webViewLink,thumbnailLink,mimeType,modifiedTime)&q=' +
+            encodeURIComponent(qx);
+          const r = await googleApi(url, SCOPES.drive);
+          const d = await r.json();
+          for (const f of d.files || []) {
+            if (seen.has(f.id)) continue;
+            seen.add(f.id);
+            out.push({
+              title: f.name,
+              url: f.webViewLink || ('https://drive.google.com/file/d/' + f.id),
+              snippet: clamp((f.description || '') + ' · ' + (f.mimeType || '').split('.').pop() + ' · ' + (f.modifiedTime || '').slice(0, 10)),
+              thumb: f.thumbnailLink || '',
+              kind: 'archive'
+            });
+          }
+        } catch (e) {}
+      }
+      return out;
     }
   },
   {
