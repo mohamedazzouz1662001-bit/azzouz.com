@@ -79,6 +79,7 @@ background:#0f1a28;border:1px solid var(--line);border-radius:20px;padding:6px 1
     <div class="chip" data-q="عاود بحث">🔎 عاود بحث (توسيع)</div>
     <div class="chip" data-q="تعلم أن ">🧠 علّمني حاجة</div>
     <div class="chip" id="bgBtn">🔎 بحث فالخلفية دابا</div>
+    <div class="chip" data-fill="https://">📥 حلّل رابط</div>
     <label class="bgtog"><input type="checkbox" id="bgToggle"> بحث دائم</label>
     <div class="chip" data-q="ما هو الذكاء الاصطناعي في التعليم؟">الذكاء الاصطناعي في التعليم</div>
     <div class="chip" data-q="كيفاش كيخدم التشفير المتماثل؟">التشفير المتماثل</div>
@@ -143,7 +144,10 @@ function addBot(res) {
   const who = document.createElement('b');
   who.textContent = res.type === 'article' ? 'AZZOUZ · مقال بمراجع' : 'AZZOUZ';
   const meta = document.createElement('span');
-  meta.textContent = res.type === 'article' ? (res.words || 0) + ' كلمة · ' + ((res.refs || []).length) + ' مرجع' : '';
+  const speed = res.ms ? ' · ' + (res.ms / 1000).toFixed(1) + 'ث' : '';
+  meta.textContent = res.type === 'article'
+    ? (res.fromMemory ? '⚡ من الذاكرة' : '') + (res.words || 0) + ' كلمة · ' + ((res.refs || []).length) + ' مرجع' + speed
+    : speed.replace(/^ · /, '');
   head.append(who, meta);
 
   const body = document.createElement('div');
