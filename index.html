@@ -237,13 +237,13 @@ function addBot(res) {
   if (res.type === 'article' && res.question) {
     const wide = document.createElement('button');
     wide.className = 'act';
-    wide.textContent = '🌐 وسّع المصادر (1000)';
+    wide.textContent = '🌐 وسّع المصادر (2000)';
     wide.onclick = async () => {
       wide.disabled = true;
       wide.textContent = '⏳ كنوسّع...';
       try {
         const out = await wideResearch(res.question, {
-          target: 1000,
+          target: 2000,
           onProgress: (n) => { wide.textContent = '⏳ ' + n + ' مصدر...'; }
         });
         const merged = [...(res.refs || [])];
