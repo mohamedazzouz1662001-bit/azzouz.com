@@ -79,12 +79,23 @@ function render() {
   }).join('');
 }
 
+async function fetchLive() {
+  const res = await fetch('https://api.github.com/users/' + USER + '/repos?per_page=100&sort=updated', { headers: { Accept: 'application/vnd.github+json' } });
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  const data = await res.json();
+  if (!Array.isArray(data)) throw new Error(data.message || 'رد غير متوقع');
+  return data;
+}
+
 async function load() {
   try {
-    const res = await fetch('https://api.github.com/users/' + USER + '/repos?per_page=100&sort=updated', { headers: { Accept: 'application/vnd.github+json' } });
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    repos = await res.json();
-    if (!Array.isArray(repos)) throw new Error(repos.message || 'رد غير متوقع');
+    try { repos = await fetchLive(); }
+    catch (e) {
+      const snap = await fetch('repos.json', { cache: 'no-store' });
+      if (!snap.ok) throw e;
+      repos = await snap.json();
+      $('count').textContent = 'النسخة المحفوظة (' + repos.length + ' مستودع) — GitHub API ماشي متاح دابا.';
+    }
     const langs = [...new Set(repos.map(r => r.language).filter(Boolean))].sort();
     $('lang').innerHTML = '<option value="">كل اللغات</option>' + langs.map(l => '<option>' + l + '</option>').join('');
     render();
