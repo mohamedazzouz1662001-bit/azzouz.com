@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GitHub Integration — Azzouz</title>
+<style>
+:root{--bg:#05080e;--card:#0b1420;--line:#1b2b42;--txt:#e8f0fa;--dim:#7f93ad;--acc:#3ddc97;--err:#ff6b6b;--warn:#e8b13f}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:radial-gradient(800px 380px at 50% -8%,#0d1c2e,#05080e 70%);color:var(--txt);
+font-family:'Segoe UI',Tahoma,Arial,sans-serif;min-height:100vh;padding:18px}
+.wrap{max-width:640px;margin:0 auto}
+.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:22px}
+.top a{color:var(--dim);text-decoration:none;font-size:12px}
+.top a:hover{color:var(--acc)}
+h1{font-size:22px;letter-spacing:1px;margin-bottom:6px}
+.sub{color:var(--dim);font-size:13px;line-height:1.9}
+.card{background:linear-gradient(180deg,var(--card),#081220);border:1px solid var(--line);border-radius:16px;padding:22px;margin-top:18px}
+.btn{display:inline-flex;align-items:center;gap:8px;background:#fff;color:#0b1220;border:none;
+padding:13px 22px;border-radius:10px;font-weight:800;font-size:14px;cursor:pointer;transition:.2s}
+.btn:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(255,255,255,.12)}
+.btn.ghost{background:#0f1e2c;color:var(--txt);border:1px solid var(--line2);font-weight:700}
+.btn:disabled{opacity:.55;cursor:default;transform:none}
+.code{font-family:'Courier New',monospace;font-size:30px;letter-spacing:8px;color:var(--acc);
+text-align:center;background:#071019;border:1px dashed var(--line);border-radius:12px;padding:18px;margin:16px 0}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.stat{font-size:12px;color:var(--dim);margin-top:12px;line-height:1.9;font-family:'Courier New',monospace}
+.err{color:var(--err)}
+.ok{color:var(--acc)}
+.warn{color:var(--warn)}
+.prof{display:flex;gap:14px;align-items:center;margin-top:8px}
+.prof img{width:62px;height:62px;border-radius:50%;border:2px solid var(--acc);background:#0f1e2c}
+.prof b{display:block;font-size:16px}
+.prof a{color:var(--acc);font-size:13px;text-decoration:none}
+.steps{font-size:13px;color:var(--dim);line-height:2.1;padding-inline-start:20px}
+.steps b{color:var(--txt)}
+.pill{display:inline-block;font-size:11px;padding:3px 10px;border-radius:20px;border:1px solid var(--line);color:var(--dim);margin-inline-start:6px}
+.pill.ok{color:var(--acc);border-color:rgba(61,220,151,.4)}
+.pill.err{color:var(--err);border-color:rgba(255,107,107,.4)}
+details{margin-top:14px;font-size:12px;color:var(--dim)}
+summary{cursor:pointer;color:var(--dim)}
+code{background:#071019;border:1px solid var(--line);border-radius:6px;padding:2px 7px;font-size:11px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <a href="../">→ رجوع للمساعد</a>
+    <span class="pill" id="health">كنفحص الاتصال…</span>
+  </div>
+
+  <h1>تسجيل الدخول عبر GitHub</h1>
+  <p class="sub">جهازك هو اللي كيتصادق — الموقع ما كيشوفش كلمة السر ديالك. الكود كيتعرض هنا، ونتا كتدخلو فـ GitHub، والموقع كيتحقق تلقائياً.</p>
+
+  <div class="card">
+    <div id="stage-idle">
+      <button class="btn" id="loginBtn">🐙 تسجيل الدخول عبر GitHub</button>
+      <div class="stat" id="idleStat"></div>
+    </div>
+
+    <div id="stage-code" style="display:none">
+      <div class="stat">دخل هاد الكود فـ GitHub:</div>
+      <div class="code" id="userCode">————</div>
+      <div class="row">
+        <button class="btn" id="openGh">فتح صفحة GitHub ↗</button>
+        <button class="btn ghost" id="copyCode">📋 نسخ الكود</button>
+      </div>
+      <div class="stat" id="pollStat">كنتسناك تصادق…</div>
+      <div class="stat"><a href="https://github.com/login/device" target="_blank" rel="noopener" style="color:var(--acc)">github.com/login/device</a> — إلا ما تحلتش النافذة، حل الرابط بيدك.</div>
+    </div>
+
+    <div id="stage-done" style="display:none">
+      <div class="prof">
+        <img id="avatar" alt="avatar">
+        <div>
+          <b id="name">—</b>
+          <a id="profile" target="_blank" rel="noopener">—</a>
+        </div>
+      </div>
+      <div class="row">
+        <button class="btn ghost" id="logout">🚪 تسجيل الخروج</button>
+      </div>
+      <div class="stat ok">التوكن فذاكرة الصفحة فقط — ما كيتخزنش فـ localStorage، وكيتمسح ملي تسد التاب.</div>
+    </div>
+
+    <div id="stage-error" style="display:none">
+      <div class="stat err" id="errText"></div>
+      <div class="row"><button class="btn ghost" id="retry">🔄 عاود جرب</button></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div style="font-size:13px;margin-bottom:8px"><b>كيفاش كيخدم</b></div>
+    <ol class="steps">
+      <li>الموقع كيطلب <b>Device Code</b> من الوسيط الآمن (Worker).</li>
+      <li>كتدخل الكود فـ GitHub وتوافق على الأذونات.</li>
+      <li>الموقع كيسقسي تلقائياً (polling) حتى completion.</li>
+      <li>كيجيب <b>/user</b> ويعرض الحساب — بلا أي سر فالصفحة.</li>
+    </ol>
+    <details>
+      <summary>تشخيص تقني</summary>
+      <div class="stat" id="diag"></div>
+    </details>
+  </div>
+</div>
+
+<script type="module">
+const API_BASE = 'https://github-oauth-proxy.elazzouz4.workers.dev';
+const CLIENT_ID = 'Ov23liCSQUsIFcULd37T';
+const SCOPE = 'read:user user:email';
+
+const $ = (id) => document.getElementById(id);
+let token = null;          // الذاكرة فقط
+let device = null;
+let timer = null;
+let pollMs = 5000;
+
+function show(stage) {
+  ['idle', 'code', 'done', 'error'].forEach((s) => {
+    $('stage-' + s).style.display = s === stage ? 'block' : 'none';
+  });
+}
+
+function diag(msg) {
+  const box = $('diag');
+  box.textContent = 'API_BASE: ' + API_BASE + '\nOrigin: ' + location.origin + '\nClient ID: ' + CLIENT_ID + (msg ? '\n' + msg : '');
+}
+
+function fail(msg, hint) {
+  $('errText').textContent = msg + (hint ? '\n\n' + hint : '');
+  show('error');
+}
+
+async function health() {
+  const pill = $('health');
+  try {
+    const r = await fetch(API_BASE + '/health', { headers: { Accept: 'application/json' } });
+    const j = await r.json();
+    pill.className = 'pill ok';
+    pill.textContent = 'الوسيط شاد ' + (j.version || '');
+    diag('health: ' + r.status + ' · CORS من المتصفح: ' + (r.type === 'cors' ? 'نعم' : 'محدود'));
+  } catch (e) {
+    pill.className = 'pill err';
+    pill.textContent = 'الوسيط ما جاوبش';
+    diag('health فشل: ' + e.message);
+  }
+}
+
+async function readJson(res) {
+  const txt = await res.text();
+  try { return JSON.parse(txt); } catch { return { raw: txt }; }
+}
+
+async function start() {
+  $('loginBtn').disabled = true;
+  $('idleStat').textContent = 'كنطلب كود من GitHub…';
+  try {
+    const res = await fetch(API_BASE + '/device/code', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ client_id: CLIENT_ID, scope: SCOPE })
+    });
+    const j = await readJson(res);
+
+    if (res.status === 403 || j.error === 'origin_not_allowed') {
+      fail('هاد النطاق ماشي مسموح فالوسيط (origin_not_allowed).',
+        'خاص يتزاد ' + location.origin + ' فقائمة الأصول المسموحة ديال الـ Worker. حتى يتزاد، تسجيل الدخول ما غاديش يخدم من هنا.');
+      $('loginBtn').disabled = false;
+      return;
+    }
+    if (!res.ok || !j.device_code) {
+      fail('ما قدرناش نجيبو الكود من GitHub.',
+        j.error ? 'الخطأ: ' + j.error + (j.error_description ? ' — ' + j.error_description : '') : 'HTTP ' + res.status);
+      $('loginBtn').disabled = false;
+      return;
+    }
+
+    device = j;
+    pollMs = Math.max(5, Number(j.interval || 5)) * 1000;
+    $('userCode').textContent = j.user_code || '————';
+    $('pollStat').textContent = 'كنتسناك تصادق… (كل ' + (pollMs / 1000) + ' ثانية)';
+    show('code');
+    window.open(j.verification_uri || 'https://github.com/login/device', '_blank', 'noopener');
+    poll();
+  } catch (e) {
+    fail('ما وصلناش للوسيط (غالباً CORS ولا الشبكة).',
+      'الخطأ: ' + e.message + '\nتحقق من: API_BASE صحيح، والأصل ' + location.origin + ' مسموح.');
+    $('loginBtn').disabled = false;
+  }
+}
+
+async function poll() {
+  clearTimeout(timer);
+  if (!device) return;
+  try {
+    const res = await fetch(API_BASE + '/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({
+        client_id: CLIENT_ID,
+        device_code: device.device_code,
+        grant_type: 'urn:ietf:params:oauth:grant-type:device_code'
+      })
+    });
+    const j = await readJson(res);
+
+    if (j.access_token) {
+      token = j.access_token;
+      await loadUser();
+      return;
+    }
+    const err = j.error || ('http_' + res.status);
+    if (err === 'authorization_pending') {
+      timer = setTimeout(poll, pollMs);
+      return;
+    }
+    if (err === 'slow_down') {
+      pollMs += 5000;
+      $('pollStat').textContent = 'خفف السرعة… كنتسناك (' + (pollMs / 1000) + ' ثانية)';
+      timer = setTimeout(poll, pollMs);
+      return;
+    }
+    if (err === 'expired_token') return fail('انتهت صلاحية الكود. عاود جرب.');
+    if (err === 'access_denied') return fail('رفضت الإذن فـ GitHub. إلا بغيتي، عاود جرب وتقدر توافق.');
+    if (err === 'device_flow_disabled') return fail('Device Flow ماشي مفعّل فإعدادات OAuth App ديال GitHub.');
+    if (err === 'incorrect_client_id') return fail('Client ID ماشي صحيح.', 'القيمة الحالية: ' + CLIENT_ID);
+    fail('خطأ فالتصادق: ' + err, j.error_description || '');
+  } catch (e) {
+    fail('انقطع الاتصال بالوسيط.', 'الخطأ: ' + e.message);
+  }
+}
+
+async function loadUser() {
+  try {
+    const res = await fetch(API_BASE + '/user', {
+      headers: { Authorization: 'Bearer ' + token, Accept: 'application/json' }
+    });
+    const u = await readJson(res);
+    if (!res.ok || !u.login) {
+      return fail('التوكن توصل ولكن /user رفض.', 'HTTP ' + res.status + ' · ' + (u.message || ''));
+    }
+    $('avatar').src = u.avatar_url || '';
+    $('name').textContent = u.name || u.login;
+    $('profile').textContent = '@' + u.login;
+    $('profile').href = u.html_url || ('https://github.com/' + u.login);
+    show('done');
+    diag('user ok: @' + u.login);
+  } catch (e) {
+    fail('ما قدرناش نجيبو الحساب من /user.', 'الخطأ: ' + e.message);
+  }
+}
+
+function logout() {
+  token = null; device = null;
+  clearTimeout(timer);
+  $('loginBtn').disabled = false;
+  $('idleStat').textContent = 'تسجل الخروج — التوكن تمسح من الذاكرة.';
+  show('idle');
+}
+
+$('loginBtn').onclick = start;
+$('retry').onclick = () => { show('idle'); start(); };
+$('logout').onclick = logout;
+$('openGh').onclick = () => window.open('https://github.com/login/device', '_blank', 'noopener');
+$('copyCode').onclick = async () => {
+  try {
+    await navigator.clipboard.writeText($('userCode').textContent);
+    $('copyCode').textContent = '✅ تنسخ';
+  } catch { $('copyCode').textContent = '⚠️ نسخ يدوي'; }
+  setTimeout(() => { $('copyCode').textContent = '📋 نسخ الكود'; }, 1600);
+};
+
+health();
+diag();
+</script>
+</body>
+</html>
