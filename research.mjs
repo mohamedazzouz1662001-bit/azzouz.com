@@ -513,7 +513,7 @@ export async function gather(question, { onSource, timeout = 0 } = {}) {
   return { sources: ranked, engines };
 }
 
-export async function advancedResearch({ question, onSource, variants = [], deeper = false, timeout = 0 } = {}) {
+export async function advancedResearch({ question, onSource, variants = [], deeper = false, timeout = 0, noCache = false } = {}) {
   if (!question || question.trim().length < 3) return null;
   const previous = relatedLearning(question);
   let main = await gather(question, { onSource, timeout });
@@ -561,7 +561,7 @@ export async function advancedResearch({ question, onSource, variants = [], deep
   if (!Array.isArray(art.used) ? art.usedCount === 0 : art.used.length === 0) return null;
   art.confidence = Math.min(90, Math.max(30, 40 + rel.length * 4));
   recordLearning(question, rel, new Set(art.used || []));
-  saveEntry({ question, answer: art.text, citations: art.refs, engines, ts: Date.now(), tokens: [...new Set(tokenize(question))] });
+  if (!noCache) saveEntry({ question, answer: art.text, citations: art.refs, engines, ts: Date.now(), tokens: [...new Set(tokenize(question))] });
   return { ...art, engines, previous };
 }
 
@@ -616,17 +616,21 @@ export function matchPage(question) {
 }
 
 /* إجابة فورية من الذاكرة */
-export function instantAnswer(question) {
+export function instantAnswer(question, opts = {}) {
   const qt = new Set(tokenize(question));
   if (!qt.size) return null;
+  const min = opts.minScore ?? 0.78;
+  const askYear = /\b20\d\d\b/.test(question);
   let best = null, bestScore = 0;
   for (const e of memory()) {
+    // لا نجاوبو من حفظ البحث التلقائي (كي كون فيه السنة) على سؤال عادي
+    if (!askYear && /—\s*20\d\d\s*$/.test(String(e.question || ''))) continue;
     const et = new Set(e.tokens || []);
     let inter = 0;
     for (const t of qt) if (et.has(t)) inter++;
     const score = inter / qt.size;
     if (score > bestScore) { bestScore = score; best = e; }
   }
-  if (bestScore < 0.66) return null;
+  if (bestScore < min) return null;
   return { ...best, score: bestScore };
 }
