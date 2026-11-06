@@ -189,8 +189,9 @@ input{width:100%;background:#111b21;border:1px solid var(--line);color:#e9edef;b
 <div class="foot"><a href="./uw.html">بيانات السوق</a> · <a href="./github-studios.html">المستودعات</a></div>
 
 <script type="module">
-import { deepAnswer } from './deep.mjs?v=8';
+import { deepAnswer } from './deep.mjs?v=9';
 import { profile as idProfile, emailIdentity, signInEmail, signOutEmail } from './identity.mjs?v=2';
+import { loadGhMemory } from './ghmemory.mjs?v=1';
 import { getArchived } from './archive.mjs?v=1';
 import { SERVICES, KEY_CONNECTORS, anyOn, isOn as svcOn, setOn as svcSet, keyCfg, saveKeyCfg, keyOn, setKeyOn } from './connectors.mjs?v=3';
 import { getClientId, setClientId, getSession, signIn, signOut, hasScope, SCOPES, getBroker, setBroker, account, signOutAccount, brokerLogin } from './auth.mjs?v=3';
@@ -913,6 +914,7 @@ loopBackground();
 
 /* ترحيب قصير */
 bubble('سلام 👋 أنا Azzouz. سولني أي حاجة، وكنبحث ليك فـ20+ محرك ومستودع ف نفس الوقت، وكنعطيك جواب بالمراجع.\n\nجرب: ما هو الصيام المتقطع؟', 'in');
+loadGhMemory();
 </script>
 </body>
 </html>
