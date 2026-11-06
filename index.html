@@ -82,7 +82,7 @@ $('go').onclick = async () => {
   $('art').textContent = res.text;
   const refs = $('refs');
   refs.textContent = '';
-  res.citations.forEach((c) => {
+  (res.citations || res.refs || []).forEach((c) => {
     const d = document.createElement('div');
     const a = document.createElement('a');
     a.href = c.url; a.target = '_blank'; a.rel = 'noopener noreferrer';
@@ -92,7 +92,7 @@ $('go').onclick = async () => {
   });
   $('copyBtn').style.display = 'inline-block';
   const eng = (res.engines || []).map(e => e.label + ':' + e.count).join(' · ');
-  $('stat').textContent = '✅ ' + res.citations.length + ' مرجع | ' + eng;
+  $('stat').textContent = '✅ ' + ((res.citations || res.refs || []).length) + ' مرجع | ' + eng;
   stats();
 };
 
