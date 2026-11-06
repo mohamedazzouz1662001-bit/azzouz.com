@@ -189,9 +189,10 @@ input{width:100%;background:#111b21;border:1px solid var(--line);color:#e9edef;b
 <div class="foot"><a href="./uw.html">بيانات السوق</a> · <a href="./github-studios.html">المستودعات</a></div>
 
 <script type="module">
-import { deepAnswer } from './deep.mjs?v=7';
+import { deepAnswer } from './deep.mjs?v=8';
+import { profile as idProfile } from './identity.mjs?v=1';
 import { getArchived } from './archive.mjs?v=1';
-import { SERVICES, KEY_CONNECTORS, anyOn, isOn as svcOn, setOn as svcSet, keyCfg, saveKeyCfg, keyOn, setKeyOn } from './connectors.mjs?v=2';
+import { SERVICES, KEY_CONNECTORS, anyOn, isOn as svcOn, setOn as svcSet, keyCfg, saveKeyCfg, keyOn, setKeyOn } from './connectors.mjs?v=3';
 import { getClientId, setClientId, getSession, signIn, signOut, hasScope, SCOPES, getBroker, setBroker, account, signOutAccount, brokerLogin } from './auth.mjs?v=3';
 import { brainStats, related } from './brain.mjs?v=1';
 import { stats, backgroundTick, ensureSeeds, bgStats, setAuto, queueTopic } from './chat.mjs?v=7';
@@ -511,6 +512,7 @@ function accountCard() {
         <div class="crow2"><button class="pri" id="cidsave">💾 حفظ المعرف</button>
         <a class="mini" href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener">فتح Google Cloud</a></div>
         <div class="cnote" id="cidres">زيد فـ Authorized JavaScript origins: <code>${location.origin}</code></div>`}
+      <div class="cnote">🆔 ${idProfile().id} · بحث قياسي. بالحساب كيتوسع لـ4000 مصدر + ملفات Drive والعامة + شبكات اجتماعية.</div>
       <div class="cnote">🔒 الجلسة كتبقى فهاد الجهاز بوحدو، ما كتخرجش لأي سيرفر.</div>
     </div>`;
   }
@@ -521,6 +523,7 @@ function accountCard() {
       <button class="mini" id="gout">خروج</button>
     </div>
     <div class="cnote">${s.stale ? 'الجلسة قديمة، غادي تتجدد أوتوماتيكيا فالاستعمال.' : 'الجلسة نشيطة.'}</div>
+    <div class="cnote">🆔 ${idProfile().id} · ${idProfile().label}</div>
   </div>`;
 }
 
