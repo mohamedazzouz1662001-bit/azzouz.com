@@ -530,7 +530,7 @@ paneConn.addEventListener('click', async e => {
 async function renderBrain() {
   paneBrain.innerHTML = '<div class="cnote">كنقرا العقل...</div>';
   const s = await brainStats();
-  const chips = (s.top || []).map(t => `<span class="chip" data-w="${t.w}">${t.w} · ${t.c}</span>`).join('') || '<span class="cnote">باقي ما تعلمت حتى حاجة. سولني شي سؤال.</span>';
+  const chips = (s.top || []).map(t => `<span class="chip" data-w="${t.k || t.w}">${t.w} · ${t.c}</span>`).join('') || '<span class="cnote">باقي ما تعلمت حتى حاجة. سولني شي سؤال.</span>';
   paneBrain.innerHTML = `
     <div class="bstat">
       <div><b>${s.concepts}</b><span>مفهوم</span></div>
