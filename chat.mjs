@@ -1,5 +1,6 @@
 /* chat.mjs — مساعد يتعلم منك ويبحث فكل المصادر */
 import { advancedResearch, memory, readUrl, matchPage, instantAnswer, saveEntry, tokenize } from './research.mjs';
+import { analyzeCode, readRepo, readCodeUrl, writeCode } from './code.mjs';
 
 const URL_RE = /https?:\/\/[^\s<>"']+/;
 
@@ -122,6 +123,37 @@ export async function chatTurn(text, { onSource, onStage } = {}) {
 
   // 1) رابط؟ اقرا الصفحة مباشرة (محتوى عمومي)
   const link = raw.match(URL_RE);
+  if (link && /github\.com\/[^/\s]+\/[^/\s]+/.test(link[0]) && !/\/blob\//.test(link[0])) {
+    try {
+      const repo = await readRepo(link[0]);
+      const exts = Object.entries(repo.byExt).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([k, v]) => k + ':' + v).join(' · ');
+      const text = '📂 ' + repo.full + '\n\n' +
+        (repo.description ? 'الوصف: ' + repo.description + '\n' : '') +
+        'اللغة الأساسية: ' + (repo.language || '—') + ' · ⭐ ' + repo.stars + '\n' +
+        'الملفات: ' + repo.totalFiles + ' (' + exts + ')\n\n' +
+        'أهم الملفات:\n' + repo.files.slice(0, 12).map(f => '• ' + f).join('\n') +
+        (repo.readme ? '\n\nمن README:\n' + repo.readme.slice(0, 700) : '');
+      const refs = [{ n: 1, title: repo.full, url: 'https://github.com/' + repo.full, engine: 'GitHub API' }];
+      return { type: 'article', text, refs, words: text.split(/\s+/).length, ms: Date.now() - started };
+    } catch (e) {
+      return { type: 'reply', text: '⚠️ ما قدرتش نقرا المستودع: ' + e.message };
+    }
+  }
+
+  if (link && /\.(js|mjs|ts|jsx|tsx|py|html|css|json|sh|java|php|go|rs|c|cpp)(\?|$)/.test(link[0])) {
+    try {
+      const { text: src, analysis } = await readCodeUrl(link[0]);
+      const text = '💻 ' + analysis.summary + '\n\n' +
+        (analysis.functions.length ? 'الدوال/الكلاسات: ' + analysis.functions.join(', ') + '\n' : '') +
+        (analysis.imports.length ? 'الاستيرادات: ' + analysis.imports.length + '\n' : '') +
+        (analysis.issues.length ? '\nملاحظات:\n' + analysis.issues.map(i => '• ' + i).join('\n') : '\nما لقيتش ملاحظات خطيرة.') +
+        '\n\nأول الأسطر:\n' + src.split('\n').slice(0, 18).join('\n');
+      return { type: 'article', text, code: { lang: analysis.lang, code: src }, refs: [{ n: 1, title: analysis.name, url: link[0], engine: 'ملف كود' }], ms: Date.now() - started };
+    } catch (e) {
+      return { type: 'reply', text: '⚠️ ما قدرتش نقرا الملف: ' + e.message };
+    }
+  }
+
   if (link) {
     try {
       const page = await readUrl(link[0]);
@@ -136,6 +168,26 @@ export async function chatTurn(text, { onSource, onStage } = {}) {
     } catch (e) {
       return { type: 'reply', text: '⚠️ ما قدرتش نقرا هاد الرابط (خاصو يكون عمومي و http/https).' };
     }
+  }
+
+  // كتابة كود
+  if (/(اكتب|كتب لي|صاوب|دير لي|write|generate).{0,40}(كود|code|سكربت|script|صفحة|فورم|form|api)/i.test(raw)) {
+    const w = writeCode(raw);
+    if (w) {
+      const text = '💻 كود جاهز: ' + w.filename + '\n' + w.note;
+      st.history = [...(st.history || []), { role: 'user', text: raw, ts: Date.now() }].slice(-40);
+      saveState(st);
+      return { type: 'article', text, code: { lang: w.lang, code: w.code, filename: w.filename }, refs: [], ms: Date.now() - started };
+    }
+    return { type: 'reply', text: 'شنو نوع الكود اللي بغيتي؟ قول مثلا: «اكتب لي صفحة landing» ولا «اكتب لي فورم اتصال» ولا «اكتب لي سكربت Python».' };
+  }
+
+  // كود ملصق مباشرة
+  if (raw.split('\n').length >= 2 && /(function |const |let |def |class |import |<html|=>|;\s*$)/m.test(raw)) {
+    const a = analyzeCode(raw, 'code');
+    const text = '💻 تحليل الكود: ' + a.summary + '\n\n' +
+      (a.issues.length ? 'ملاحظات:\n' + a.issues.map(i => '• ' + i).join('\n') : 'ما لقيتش ملاحظات واضحة.');
+    return { type: 'article', text, refs: [], ms: Date.now() - started };
   }
 
   const learned = teach(raw);
