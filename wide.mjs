@@ -1,5 +1,7 @@
 /* wide.mjs v2 — سلسلة بحث واسعة: 30+ محرك ومستودع، مع مقتطفات وصور وفيديو */
 
+import { connectorSearch } from './connectors.mjs?v=1';
+
 const enc = encodeURIComponent;
 
 async function jget(url, ms = 13000) {
@@ -447,7 +449,7 @@ export async function wideResearch(question, { target = 3000, onProgress = () =>
   const refs = [];
   const stats = {};
 
-  const add = (kind, items) => {
+  const add = (kind, items, engineName) => {
     let n = 0;
     for (const it of items || []) {
       if (!it || !it.url || !it.title) continue;
@@ -465,8 +467,16 @@ export async function wideResearch(question, { target = 3000, onProgress = () =>
       });
       n++;
     }
+    if (engineName) stats[engineName] = n;
     return n;
   };
+
+  // الوصلات اللي ربطها المستخدم (Google / YouTube / ...) كتخدم قبل كلشي
+  try {
+    const conn = await connectorSearch(q);
+    for (const [name, items] of Object.entries(conn)) add(items[0]?.kind || 'article', items, name);
+    onProgress(refs.length, 'connectors', stats);
+  } catch (e) {}
 
   let cursor = 0;
   const limit = 6;
