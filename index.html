@@ -44,6 +44,13 @@ footer{background:var(--panel);padding:8px 10px calc(8px + env(safe-area-inset-b
 #q::placeholder{color:#5f7078}
 #send{width:44px;height:44px;border-radius:50%;border:none;background:var(--acc);color:#04241c;font-size:19px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center}
 #send:disabled{opacity:.45}
+#mic{width:44px;height:44px;border-radius:50%;border:none;background:#2a3942;color:#e9edef;font-size:18px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center}
+#mic.rec{background:#c0392b;animation:micpulse 1.1s infinite}
+@keyframes micpulse{0%,100%{box-shadow:0 0 0 0 rgba(192,57,43,.55)}50%{box-shadow:0 0 0 9px rgba(192,57,43,0)}}
+.sugg{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+.sugg button{background:#182229;border:1px solid #2a3942;color:#cfe4f0;font-size:12.5px;padding:8px 11px;border-radius:12px;text-align:right;font-family:inherit;cursor:pointer;line-height:1.5}
+.sugg button:active{background:#22323c;border-color:var(--acc)}
+.sugg .lbl{font-size:11px;color:#7d8f99;margin-bottom:2px}
 .foot{text-align:center;font-size:10.5px;color:#44555e;padding:0 0 6px;background:var(--panel)}
 .foot a{color:#44555e;text-decoration:none}
 </style>
@@ -63,6 +70,7 @@ footer{background:var(--panel);padding:8px 10px calc(8px + env(safe-area-inset-b
 
 <footer>
   <textarea id="q" rows="1" placeholder="كتب سؤالك..."></textarea>
+  <button id="mic" aria-label="بحث بالصوت">🎙</button>
   <button id="send" aria-label="إرسال">➤</button>
 </footer>
 <div class="foot"><a href="./uw.html">بيانات السوق</a> · <a href="./github-studios.html">المستودعات</a></div>
@@ -141,6 +149,28 @@ function addActions(el, res) {
   el.append(acts);
 }
 
+function addSuggestions(el, list) {
+  if (!list || !list.length) return;
+  const box = document.createElement('div');
+  box.className = 'sugg';
+  const lbl = document.createElement('div');
+  lbl.className = 'lbl';
+  lbl.textContent = 'اقتراحات للمتابعة:';
+  box.append(lbl);
+  list.slice(0, 3).forEach(text => {
+    const b = document.createElement('button');
+    b.textContent = text;
+    b.onclick = () => {
+      if (busy) return;
+      qEl.value = text;
+      qEl.focus();
+      setTimeout(() => { submit(text); }, 180);
+    };
+    box.append(b);
+  });
+  el.append(box);
+}
+
 function typing() {
   const el = document.createElement('div');
   el.className = 'typing';
@@ -167,6 +197,7 @@ async function ask(text) {
     t.done();
     const el = bubble(res.text, 'in');
     addActions(el, res);
+    addSuggestions(el, res.suggestions);
     queueTopic(text);
   } catch (e) {
     t.done();
@@ -176,11 +207,12 @@ async function ask(text) {
   log.scrollTop = log.scrollHeight;
 }
 
-sendBtn.onclick = () => {
-  const v = qEl.value.trim();
+function submit(text) {
+  const v = String(text == null ? qEl.value : text).trim();
   qEl.value = ''; qEl.style.height = 'auto';
-  ask(v);
-};
+  if (v) ask(v);
+}
+sendBtn.onclick = () => submit();
 qEl.addEventListener('keydown', e => {
   if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendBtn.click(); }
 });
@@ -205,6 +237,77 @@ function spark() {
     });
   } catch (e) {}
 }
+
+/* ===== البحث بالصوت: كيتحول لكلام وكتصيفط أوتوماتيكياً ===== */
+const micBtn = document.getElementById('mic');
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let recog = null, listening = false, voiced = '';
+
+if (!SR) {
+  micBtn.title = 'المتصفح ما كيدعمش التعرف على الصوت';
+  micBtn.style.opacity = '.5';
+}
+
+micBtn.onclick = () => {
+  if (busy) return;
+  if (!SR) {
+    bubble('المتصفح ديالك ما كيدعمش البحث بالصوت. جرب Chrome ولا Safari، ولا كتب سؤالك باليد.', 'in');
+    return;
+  }
+  if (listening && recog) { try { recog.stop(); } catch (e) {} return; }
+
+  recog = new SR();
+  recog.lang = 'ar-MA';
+  recog.continuous = false;
+  recog.interimResults = true;
+  recog.maxAlternatives = 1;
+  voiced = '';
+  listening = true;
+  micBtn.classList.add('rec');
+  qEl.placeholder = 'كنسمع ليك... هضر عادياً';
+  statusEl.textContent = '🎙 كنسمع...';
+
+  recog.onresult = e => {
+    let interim = '', final = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const r = e.results[i];
+      if (r.isFinal) final += r[0].transcript; else interim += r[0].transcript;
+    }
+    if (final) voiced += final;
+    qEl.value = (voiced + interim).trim();
+    qEl.style.height = 'auto';
+    qEl.style.height = Math.min(120, qEl.scrollHeight) + 'px';
+  };
+
+  recog.onerror = ev => {
+    listening = false;
+    micBtn.classList.remove('rec');
+    qEl.placeholder = 'كتب سؤالك...';
+    statusEl.textContent = 'متصل · البحث الدائم خدام';
+    if (ev.error === 'not-allowed' || ev.error === 'service-not-allowed') {
+      bubble('خاصني إذن الميكرو. من إعدادات المتصفح سمح بالميكرو لهاد الموقع وعاود.', 'in');
+    } else if (ev.error === 'no-speech') {
+      bubble('ما سمعت حتى كلام. عاود اضغط 🎙 وهضر قريب من الميكرو.', 'in');
+    }
+  };
+
+  recog.onend = () => {
+    listening = false;
+    micBtn.classList.remove('rec');
+    qEl.placeholder = 'كتب سؤالك...';
+    const said = (voiced || qEl.value).trim();
+    statusEl.textContent = 'متصل · البحث الدائم خدام';
+    if (said.length > 2) {
+      qEl.value = said;
+      setTimeout(() => submit(said), 250);
+    }
+  };
+
+  try { recog.start(); } catch (e) {
+    listening = false;
+    micBtn.classList.remove('rec');
+  }
+};
 
 /* ===== البحث الدائم: خدام دايماً، حتى إلا كنتي خارج الصفحة ===== */
 setAuto(true);
