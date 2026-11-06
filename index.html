@@ -173,6 +173,18 @@ function smallTalk(text) {
   if (/^(بسلامة|سلام|إلى اللقاء|باي|bye)/i.test(t) && t.length < 14) return 'بسلامة الله 👋 إلا بغيتي شي حاجة أنا هنا.';
   if (/(شكون نتا|سميتك|من نتا|who are you)/i.test(t)) return 'أنا Azzouz 🌿 مساعد كيقرا فـ20+ محرك ومستودع، وكيعطيك الجواب أولا ومن بعد المراجع.';
   if (/^(واش كتفهمني|فهمتني|سمعتني)/i.test(t)) return 'واخا، فهمتك 🌿 كمل.';
+  if (/(شحال|شحال من|عدد).*(بحث|بحوث|مصادر)/i.test(t)) {
+    try {
+      const s = stats();
+      return 'دابا عندي ' + s.searches + ' بحث محفوظ و' + s.rules + ' قاعدة تعلمتها 🌿 وكنبحث فالخلفية بلا ما نوقف.';
+    } catch (e) { return 'كنبحث دايماً فالخلفية 🌿'; }
+  }
+  if (/(شنو تعلمتي|شنو عرفتي|شنو قريتي|آخر بحث)/i.test(t)) {
+    try {
+      const d = (bgStats().done || []).slice(0, 3).map(x => x.topic);
+      return d.length ? 'آخر اللي بحثت فيه: ' + d.join(' · ') + ' 🌿' : 'باقي كنبدا، سولني أي حاجة ونبحث.';
+    } catch (e) { return 'كنبحث دايماً، سولني أي حاجة.'; }
+  }
   return null;
 }
 
@@ -181,7 +193,7 @@ function addActions(el, res) {
   acts.className = 'acts';
 
   if (res.refs && res.refs.length) {
-    const refs = res.refs;
+    const refs = res.refs.slice().sort((a, b) => (a.n || 0) - (b.n || 0)).map((r, i) => ({ ...r, n: i + 1 }));
     const box = document.createElement('div');
     box.className = 'refs';
     const render = n => '<div class="rhead">المراجع:</div>' + refs.slice(0, n).map(r =>
