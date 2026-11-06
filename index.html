@@ -192,7 +192,7 @@ input{width:100%;background:#111b21;border:1px solid var(--line);color:#e9edef;b
 import { deepAnswer } from './deep.mjs?v=7';
 import { getArchived } from './archive.mjs?v=1';
 import { SERVICES, KEY_CONNECTORS, anyOn, isOn as svcOn, setOn as svcSet, keyCfg, saveKeyCfg, keyOn, setKeyOn } from './connectors.mjs?v=2';
-import { getClientId, setClientId, getSession, signIn, signOut, hasScope, SCOPES } from './auth.mjs?v=1';
+import { getClientId, setClientId, getSession, signIn, signOut, hasScope, SCOPES, getBroker, setBroker, account, signOutAccount, brokerLogin } from './auth.mjs?v=3';
 import { brainStats, related } from './brain.mjs?v=1';
 import { stats, backgroundTick, ensureSeeds, bgStats, setAuto, queueTopic } from './chat.mjs?v=7';
 
