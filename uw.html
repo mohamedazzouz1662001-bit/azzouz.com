@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Unusual Whales — لوحة البيانات الحية</title>
+<style>
+:root{--bg:#05080e;--card:#0b131f;--line:rgba(255,255,255,.1);--txt:#e9eff7;--dim:#8fa3bd;--acc:#3ddc97;--red:#ff6b6b;--grn:#3ddc97}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--txt);font-family:'Segoe UI',Tahoma,sans-serif;line-height:1.7;padding:18px}
+.shell{max-width:1050px;margin:auto}
+h1{font-size:23px;margin-bottom:4px}
+.sub{color:var(--dim);font-size:13px;margin-bottom:16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:13px;padding:14px;margin-bottom:14px}
+.row{display:flex;gap:9px;flex-wrap:wrap;align-items:center}
+input,button,select{background:#0e1826;border:1px solid var(--line);color:var(--txt);padding:10px 12px;border-radius:9px;font-size:14px;font-family:inherit}
+input{flex:1;min-width:200px}
+button{cursor:pointer}
+button:hover{border-color:var(--acc);color:var(--acc)}
+button.primary{background:var(--acc);color:#04221a;border:none;font-weight:700}
+.tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.tabs button.active{background:var(--acc);color:#04221a;border:none;font-weight:700}
+.hint{font-size:12px;color:var(--dim);margin-top:8px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{text-align:right;padding:8px 6px;border-bottom:1px solid var(--line);vertical-align:top}
+th{color:var(--dim);font-weight:600;font-size:12px}
+.pill{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px}
+.pill.call{background:rgba(61,220,151,.15);color:var(--grn)}
+.pill.put{background:rgba(255,107,107,.15);color:var(--red)}
+.status{font-size:13px;color:var(--dim);margin:8px 0}
+.err{color:var(--red)}
+a{color:#7cc4ff}
+</style>
+</head>
+<body>
+<main class="shell">
+<h1>Unusual Whales — لوحة البيانات الحية</h1>
+<p class="sub">تدفق الخيارات، الدارك بول، تداولات الكونغرس، والمد والجزر. المفتاح كيتخزن فالمتصفح ديالك فقط (localStorage) وما كيتصيفطش لأي حد.</p>
+
+<div class="card">
+  <div class="row">
+    <input id="key" type="password" placeholder="API token (من unusualwhales.com/dashboard/api)">
+    <button id="save">حفظ المفتاح</button>
+    <button id="forget">حذف</button>
+  </div>
+  <div id="keystat" class="hint">ما كاين حتى مفتاح محفوظ.</div>
+</div>
+
+<div class="card">
+  <div class="row" style="margin-bottom:12px">
+    <input id="ticker" placeholder="Ticker (مثال: AAPL)" value="AAPL" style="max-width:160px">
+    <button class="primary" id="run">جيب البيانات</button>
+  </div>
+  <div class="tabs">
+    <button data-ep="flow" class="active">تدفق الخيارات</button>
+    <button data-ep="darkpool">الدارك بول</button>
+    <button data-ep="congress">تداولات الكونغرس</button>
+    <button data-ep="tide">المد والجزر</button>
+    <button data-ep="insider">المطلعون</button>
+    <button data-ep="info">معلومات السهم</button>
+  </div>
+  <div id="status" class="status">اختار نوع البيانات واضغط «جيب البيانات».</div>
+  <div id="out" style="overflow-x:auto"></div>
+</div>
+
+<div class="card">
+  <div style="font-size:13px;color:var(--dim)">
+    بدائل: MCP للذكاء الاصطناعي https://unusualwhales.com/public-api/mcp · المهارات https://unusualwhales.com/skill.md · الوثائق https://api.unusualwhales.com/docs/llms.txt
+  </div>
+</div>
+</main>
+<script>
+const KEY = 'azzouz-uw-key';
+let ep = 'flow';
+const $ = id => document.getElementById(id);
+
+function keyStat() {
+  const k = localStorage.getItem(KEY);
+  $('keystat').textContent = k ? '✅ مفتاح محفوظ (...' + k.slice(-4) + ')' : 'ما كاين حتى مفتاح محفوظ.';
+}
+keyStat();
+
+$('save').onclick = () => {
+  const v = $('key').value.trim();
+  if (v.length < 10) return ($('keystat').textContent = '⚠️ المفتاح قصير بزاف.');
+  localStorage.setItem(KEY, v);
+  $('key').value = '';
+  keyStat();
+};
+$('forget').onclick = () => { localStorage.removeItem(KEY); keyStat(); };
+
+document.querySelectorAll('.tabs button').forEach(b => {
+  b.onclick = () => {
+    document.querySelectorAll('.tabs button').forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+    ep = b.dataset.ep;
+  };
+});
+
+const PATHS = {
+  flow: t => `option-trades/flow-alerts?limit=50${t ? '&ticker_symbol=' + encodeURIComponent(t) : ''}`,
+  darkpool: t => `darkpool/${encodeURIComponent(t || 'AAPL')}?limit=50`,
+  congress: () => 'congress/recent-trades?limit=50',
+  tide: () => 'market/market-tide',
+  insider: () => 'insider/transactions?limit=50',
+  info: t => `stock/${encodeURIComponent(t || 'AAPL')}/info`
+};
+
+function money(v) {
+  const n = Number(v);
+  return isFinite(n) ? n.toLocaleString('en-US', { maximumFractionDigits: 2 }) : (v ?? '');
+}
+
+function table(headers, rows) {
+  if (!rows.length) return '<div class="status">ما كاين حتى نتيجة.</div>';
+  return '<table><thead><tr>' + headers.map(h => '<th>' + h + '</th>').join('') +
+    '</tr></thead><tbody>' + rows.map(r => '<tr>' + r.map(c => '<td>' + c + '</td>').join('') + '</tr>').join('') +
+    '</tbody></table>';
+}
+
+function render(kind, data) {
+  const d = Array.isArray(data) ? data : (data.data || data.results || []);
+  if (kind === 'info') {
+    return table(['الحقل', 'القيمة'], Object.entries(data).slice(0, 25).map(([k, v]) =>
+      [k, typeof v === 'object' ? JSON.stringify(v).slice(0, 90) : String(v)]));
+  }
+  if (!Array.isArray(d) || !d.length) return '<pre style="font-size:12px;overflow:auto">' + JSON.stringify(data, null, 1).slice(0, 3000) + '</pre>';
+  if (kind === 'congress') {
+    return table(['السياسي', 'Ticker', 'النوع', 'المبلغ', 'التاريخ', 'التقرير'], d.slice(0, 50).map(x =>
+      [x.reporter || x.politician || x.name || '', x.ticker || x.symbol || '', x.transaction_type || x.type || '',
+       x.amount || x.value || '', x.transaction_date || x.date || '', x.filed_at_date || x.report_date || '']));
+  }
+  if (kind === 'tide') {
+    return table(['الوقت', 'Call', 'Put', 'الصافي'], d.slice(0, 50).map(x =>
+      [x.date || x.time || '', money(x.net_call_premium ?? x.call_premium), money(x.net_put_premium ?? x.put_premium), money(x.net_volume ?? x.net_premium)]));
+  }
+  if (kind === 'darkpool') {
+    return table(['Ticker', 'السعر', 'الحجم', 'القيمة', 'الوقت'], d.slice(0, 50).map(x =>
+      [x.ticker || '', money(x.price), money(x.size), money(x.premium ?? (Number(x.price) * Number(x.size))), x.executed_at || x.trf_executed_at || '']));
+  }
+  if (kind === 'insider') {
+    return table(['الشخص', 'Ticker', 'النوع', 'الأسهم', 'السعر', 'التاريخ'], d.slice(0, 50).map(x =>
+      [x.owner_name || x.name || '', x.ticker || '', x.transaction_type || '', money(x.securities_transacted ?? x.amount), money(x.price ?? x.transaction_price), x.transaction_date || '']));
+  }
+  // flow
+  return table(['Ticker', 'النوع', 'Strike', 'الانتهاء', 'Premium', 'الحجم', 'السعر'], d.slice(0, 50).map(x => {
+    const t = String(x.type || x.option_type || '').toLowerCase();
+    const cls = t.includes('call') ? 'call' : (t.includes('put') ? 'put' : '');
+    return [x.ticker || x.ticker_symbol || '', '<span class="pill ' + cls + '">' + (x.type || x.option_type || '') + '</span>',
+      money(x.strike), x.expiry || x.expires || '', money(x.premium ?? x.total_premium), money(x.size ?? x.volume), money(x.price)];
+  }));
+}
+
+$('run').onclick = async () => {
+  const key = localStorage.getItem(KEY);
+  if (!key) { $('status').innerHTML = '<span class="err">ما كاين مفتاح. حط واحد من dashboard/api.</span>'; return; }
+  const t = $('ticker').value.trim().toUpperCase();
+  $('status').textContent = '⏳ كنجيب...';
+  $('out').innerHTML = '';
+  try {
+    const res = await fetch('https://api.unusualwhales.com/api/' + PATHS[ep](t), {
+      headers: { Authorization: 'Bearer ' + key, Accept: 'application/json' }
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error((body.message || body.error || 'HTTP ' + res.status) + (res.status === 401 ? ' — المفتاح ماشي صالح' : ''));
+    $('status').textContent = '✅ ' + new Date().toLocaleTimeString('ar-MA');
+    $('out').innerHTML = render(ep, body);
+  } catch (e) {
+    $('status').innerHTML = '<span class="err">⚠️ ' + e.message + '</span>';
+  }
+};
+</script>
+</body>
+</html>
