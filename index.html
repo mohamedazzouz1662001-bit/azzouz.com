@@ -119,6 +119,24 @@ footer{background:var(--panel);padding:8px 10px calc(8px + env(safe-area-inset-b
 .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
 .chip{background:#20323c;color:#cfe4f0;font-size:11.5px;padding:5px 10px;border-radius:12px;cursor:pointer}
 .bt{font-size:12px;color:#9fb3bd;margin:10px 0 4px}
+
+.acct{background:#111b21;border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:10px}
+.ahead{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.ahead>div{flex:1;min-width:0}
+.ahead b{font-size:14px;display:block}
+.ahead span{font-size:11.5px;color:var(--dim);display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.aico{width:34px;height:34px;border-radius:50%;background:#fff;color:#4285f4;display:flex;align-items:center;justify-content:center;font-weight:800}
+.apic{width:34px;height:34px;border-radius:50%;object-fit:cover}
+.big{width:100%;padding:11px;font-size:13.5px;margin-bottom:6px}
+.mini{background:#2a3942;color:#e9edef;border:none;border-radius:8px;padding:7px 10px;font-size:11.5px;cursor:pointer;text-decoration:none;display:inline-block}
+.sw{width:44px;height:24px;border-radius:20px;background:#2a3942;border:none;position:relative;cursor:pointer;flex:0 0 auto}
+.sw i{position:absolute;top:3px;right:3px;width:18px;height:18px;border-radius:50%;background:#8696a0;transition:.16s}
+.sw.on{background:var(--acc)}
+.sw.on i{right:23px;background:#fff}
+.adv{margin-top:10px;border-top:1px solid var(--line);padding-top:8px}
+.adv summary{font-size:12px;color:var(--dim);cursor:pointer;padding:6px 0}
+input{width:100%;background:#111b21;border:1px solid var(--line);color:#e9edef;border-radius:8px;padding:9px;font-size:12.5px;margin-top:6px;font-family:inherit}
+
 .foot{text-align:center;font-size:10.5px;color:#44555e;padding:0 0 6px;background:var(--panel)}
 .foot a{color:#44555e;text-decoration:none}
 </style>
@@ -172,7 +190,8 @@ footer{background:var(--panel);padding:8px 10px calc(8px + env(safe-area-inset-b
 <script type="module">
 import { deepAnswer } from './deep.mjs?v=7';
 import { getArchived } from './archive.mjs?v=1';
-import { CONNECTORS, loadAll, saveOne, toggle, statusOf, testConnector } from './connectors.mjs?v=1';
+import { SERVICES, KEY_CONNECTORS, anyOn, isOn as svcOn, setOn as svcSet, keyCfg, saveKeyCfg, keyOn, setKeyOn } from './connectors.mjs?v=2';
+import { getClientId, setClientId, getSession, signIn, signOut, hasScope, SCOPES } from './auth.mjs?v=1';
 import { brainStats, related } from './brain.mjs?v=1';
 import { stats, backgroundTick, ensureSeeds, bgStats, setAuto, queueTopic } from './chat.mjs?v=7';
 
@@ -469,64 +488,121 @@ function typing() {
 }
 
 
-/* ===== الوصلات والعقل ===== */
+/* ===== الحساب والوصلات والعقل ===== */
 const sheet = document.getElementById('sheet');
 const paneConn = document.getElementById('paneConn');
 const paneBrain = document.getElementById('paneBrain');
 const plug = document.getElementById('plug');
 
 function refreshPlug() {
-  const any = CONNECTORS.some(c => statusOf(c.id) === 'on');
-  plug.classList.toggle('on', any);
+  plug.classList.toggle('on', anyOn());
+}
+
+function accountCard() {
+  const s = getSession();
+  if (!s) {
+    const cid = getClientId();
+    return `<div class="acct">
+      <div class="ahead"><div class="aico">G</div><div><b>تسجيل الدخول بجوجل</b><span>مرة وحدة، ومن بعد كل الوصلات كتخدم بالجلسة بلا مفاتيح</span></div></div>
+      ${cid ? `<button class="pri big" id="glogin">🔐 تسجيل الدخول بجوجل</button>` : `
+        <div class="cnote">باش يخدم تسجيل الدخول، خاصك Client ID ديال تطبيق ويب (مرة وحدة، وهو معرف عام ماشي سر):</div>
+        <input id="cid" placeholder="1234567890-xxxx.apps.googleusercontent.com">
+        <div class="crow2"><button class="pri" id="cidsave">💾 حفظ المعرف</button>
+        <a class="mini" href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener">فتح Google Cloud</a></div>
+        <div class="cnote" id="cidres">زيد فـ Authorized JavaScript origins: <code>${location.origin}</code></div>`}
+      <div class="cnote">🔒 الجلسة كتبقى فهاد الجهاز بوحدو، ما كتخرجش لأي سيرفر.</div>
+    </div>`;
+  }
+  return `<div class="acct">
+    <div class="ahead">
+      ${s.pic ? `<img class="apic" src="${s.pic}" alt="">` : '<div class="aico">G</div>'}
+      <div><b>${s.name || 'حساب جوجل'}</b><span>${s.email || ''}</span></div>
+      <button class="mini" id="gout">خروج</button>
+    </div>
+    <div class="cnote">${s.stale ? 'الجلسة قديمة، غادي تتجدد أوتوماتيكيا فالاستعمال.' : 'الجلسة نشيطة.'}</div>
+  </div>`;
+}
+
+function svcRow(s) {
+  const sess = getSession();
+  const allowed = sess && hasScope(sess, s.scope);
+  const on = allowed && svcOn(s.id);
+  return `<div class="conn">
+    <div class="ctop">
+      <div class="cico">${s.icon}</div>
+      <div class="cname"><b>${s.name}</b><span>${s.desc}</span></div>
+      ${allowed ? `<button class="sw ${on ? 'on' : ''}" data-svc="${s.id}"><i></i></button>` : `<button class="mini" data-allow="${s.id}">سمح</button>`}
+    </div>
+    <div class="cnote">${allowed ? (on ? 'خدام فالبحث' : 'مطفي') : 'خاصك إذن هاد الخدمة'}</div>
+  </div>`;
 }
 
 function renderConnectors() {
-  const all = loadAll();
-  paneConn.innerHTML = CONNECTORS.map(c => {
-    const cfg = all[c.id] || {};
-    const f = cfg.fields || {};
-    const st = statusOf(c.id) === 'on';
-    const fields = c.fields.map(x =>
-      `<input type="password" data-cid="${c.id}" data-fk="${x.k}" placeholder="${x.label}${x.ph ? ' — ' + x.ph : ''}" value="${String(f[x.k] || '').replace(/"/g, '&quot;')}">`
-    ).join('');
-    return `<div class="conn" data-box="${c.id}">
-      <div class="ctop">
-        <div class="cico">${c.icon}</div>
-        <div class="cname"><b>${c.name}</b><span>${c.note || ''}</span></div>
-        <span class="pill ${st ? 'on' : ''}" data-pill="${c.id}">${st ? 'مربوط' : 'مطفي'}</span>
-      </div>
-      <div class="cf">${fields}</div>
-      <div class="crow2">
-        <button class="pri" data-save="${c.id}">💾 حفظ وتشغيل</button>
-        <button data-test="${c.id}">اختبار</button>
-      </div>
-      <div class="cnote" data-res="${c.id}">المفتاح كيتخزن غير فالجهاز، وما كيتصيفطش لأي حد.</div>
-    </div>`;
-  }).join('') + `<div class="cnote">🔒 المفاتيح كتبقى فهاد الجهاز بوحدو. Google وYouTube كيستعملو API Key من Google Cloud، وSerpAPI وTavily كيعطيو مفتاح خاص بيهم.</div>`;
+  const sess = getSession();
+  const adv = KEY_CONNECTORS.map(k => {
+    const v = keyCfg(k.id) || {};
+    const on = keyOn(k.id);
+    const inputs = k.fields.map(([fk, lbl]) =>
+      `<input type="password" data-kid="${k.id}" data-kf="${fk}" placeholder="${lbl}" value="${String(v[fk] || '').replace(/"/g, '&quot;')}">`).join('');
+    return `<div class="conn"><div class="ctop"><div class="cico">${k.icon}</div><div class="cname"><b>${k.name}</b><span>مفتاح خاص بهاد المزود</span></div>
+      <span class="pill ${on ? 'on' : ''}">${on ? 'مربوط' : 'مطفي'}</span></div>
+      <div class="cf">${inputs}</div>
+      <div class="crow2"><button class="pri" data-ksave="${k.id}">💾 حفظ وتشغيل</button></div></div>`;
+  }).join('');
+
+  paneConn.innerHTML = accountCard() + '<div class="bt">الوصلات</div>' + SERVICES.map(svcRow).join('') +
+    `<details class="adv"><summary>متقدم: وصلات بمفاتيح API (اختياري)</summary>${adv}</details>`;
+
+  bindConn();
 }
 
-paneConn.addEventListener('click', async e => {
-  const saveId = e.target.dataset.save;
-  const testId = e.target.dataset.test;
-  if (saveId) {
-    const fields = {};
-    paneConn.querySelectorAll(`input[data-cid="${saveId}"]`).forEach(i => { fields[i.dataset.fk] = i.value.trim(); });
-    saveOne(saveId, { fields, on: true });
-    refreshPlug();
+function bindConn() {
+  const gl = document.getElementById('glogin');
+  if (gl) gl.onclick = async () => {
+    gl.disabled = true; gl.textContent = 'كنحل نافذة جوجل...';
+    try {
+      await signIn([SCOPES.youtube, SCOPES.drive]);
+      refreshPlug(); renderConnectors();
+    } catch (e) {
+      gl.disabled = false; gl.textContent = '🔐 تسجيل الدخول بجوجل';
+      const r = document.getElementById('cidres');
+      if (r) r.textContent = e.message === 'access_denied' ? '⚠️ تسجيل الدخول تلغى.' :
+        e.message === 'NO_CLIENT_ID' ? '⚠️ خاصك تحط Client ID أول.' :
+        '⚠️ ما قدرتش نحل تسجيل الدخول: ' + e.message;
+    }
+  };
+  const cs = document.getElementById('cidsave');
+  if (cs) cs.onclick = () => {
+    const v = document.getElementById('cid').value.trim();
+    if (!v) return;
+    setClientId(v);
     renderConnectors();
-  }
-  if (testId) {
-    const box = paneConn.querySelector(`[data-res="${testId}"]`);
-    const fields = {};
-    paneConn.querySelectorAll(`input[data-cid="${testId}"]`).forEach(i => { fields[i.dataset.fk] = i.value.trim(); });
-    saveOne(testId, { fields, on: true });
-    box.textContent = 'كنجرب...';
-    const r = await testConnector(testId);
-    box.textContent = r.ok ? `✅ خدام: رجع ${r.n} نتيجة` : `⚠️ ما خدمش: ${r.error || 'تحقق من المفتاح'}`;
-    refreshPlug();
-  }
-});
+  };
+  const go = document.getElementById('gout');
+  if (go) go.onclick = () => { signOut(); refreshPlug(); renderConnectors(); };
 
+  paneConn.querySelectorAll('[data-allow]').forEach(b => {
+    b.onclick = async () => {
+      const id = b.dataset.allow;
+      const svc = SERVICES.find(s => s.id === id);
+      b.textContent = '...';
+      try { await signIn([svc.scope]); svcSet(id, true); } catch (e) {}
+      refreshPlug(); renderConnectors();
+    };
+  });
+  paneConn.querySelectorAll('[data-svc]').forEach(b => {
+    b.onclick = () => { svcSet(b.dataset.svc, !svcOn(b.dataset.svc)); refreshPlug(); renderConnectors(); };
+  });
+  paneConn.querySelectorAll('[data-ksave]').forEach(b => {
+    b.onclick = () => {
+      const id = b.dataset.ksave;
+      const v = {};
+      paneConn.querySelectorAll(`input[data-kid="${id}"]`).forEach(i => v[i.dataset.kf] = i.value.trim());
+      saveKeyCfg(id, v); setKeyOn(id, !!v.key);
+      refreshPlug(); renderConnectors();
+    };
+  });
+}
 async function renderBrain() {
   paneBrain.innerHTML = '<div class="cnote">كنقرا العقل...</div>';
   const s = await brainStats();
@@ -545,18 +621,13 @@ async function renderBrain() {
   paneBrain.querySelectorAll('.chip').forEach(ch => {
     ch.onclick = async () => {
       const rel = await related(ch.dataset.w);
-      const box = document.getElementById('relBox');
-      box.innerHTML = '<div class="bt">مرتبط بـ«' + ch.dataset.w + '»</div><div class="chips">' +
+      document.getElementById('relBox').innerHTML = '<div class="bt">مرتبط بـ«' + ch.dataset.w + '»</div><div class="chips">' +
         (rel.length ? rel.map(r => `<span class="chip">${r.w} · ${r.c}</span>`).join('') : '<span class="cnote">ما لقيتش ترابطات.</span>') + '</div>';
     };
   });
 }
 
-plug.onclick = () => {
-  sheet.classList.add('on');
-  renderConnectors();
-  refreshPlug();
-};
+plug.onclick = () => { sheet.classList.add('on'); renderConnectors(); refreshPlug(); };
 document.getElementById('shclose').onclick = () => sheet.classList.remove('on');
 document.querySelectorAll('.shtabs button').forEach(b => {
   b.onclick = () => {
