@@ -122,6 +122,38 @@ export async function getAccessToken(needScope) {
   } catch (e) { return null; }
 }
 
+const BROKER_KEY = 'azzouz-broker-v1';
+const ACC_KEY = 'azzouz-accounts-v1';
+
+export function getBroker() { try { return localStorage.getItem(BROKER_KEY) || ''; } catch (e) { return ''; } }
+export function setBroker(u) { try { localStorage.setItem(BROKER_KEY, String(u || '').trim().replace(/\/+$/, '')); } catch (e) {} }
+export function accounts() { try { return JSON.parse(localStorage.getItem(ACC_KEY) || '{}'); } catch (e) { return {}; } }
+export function account(p) { return accounts()[p] || null; }
+export function saveAccount(p, d) { const x = accounts(); x[p] = d; try { localStorage.setItem(ACC_KEY, JSON.stringify(x)); } catch (e) {} }
+export function signOutAccount(p) { const x = accounts(); delete x[p]; try { localStorage.setItem(ACC_KEY, JSON.stringify(x)); } catch (e) {} }
+
+export async function brokerLogin(provider) {
+  const base = getBroker();
+  if (!base) throw new Error('NO_BROKER');
+  const w = window.open(base + '/auth/' + provider, 'azzouz-' + provider, 'width=520,height=680');
+  if (!w) throw new Error('POPUP_BLOCKED');
+  const origin = new URL(base).origin;
+  return await new Promise((res, rej) => {
+    const to = setTimeout(() => { cleanup(); rej(new Error('TIMEOUT')); }, 180000);
+    function onMsg(e) {
+      if (e.origin !== origin) return;
+      const d = e.data || {};
+      if (d.source !== 'azzouz-oauth' || d.provider !== provider) return;
+      cleanup();
+      if (d.error) return rej(new Error(d.error));
+      saveAccount(provider, { token: d.token, name: d.name || d.login || '', login: d.login || '', pic: d.pic || '', at: Date.now() });
+      res(d);
+    }
+    function cleanup() { clearTimeout(to); window.removeEventListener('message', onMsg); }
+    window.addEventListener('message', onMsg);
+  });
+}
+
 export function hasScope(s, scope) {
   const sc = String(s?.scope || '');
   return !!sc && sc.includes(scope);
