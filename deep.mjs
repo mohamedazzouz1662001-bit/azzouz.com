@@ -2,7 +2,8 @@
    1) بحث واسع متعدد المحركات (1000+ مرجع)  2) بحث علمي للتركيب  3) صياغة نقاط وخلاصة */
 
 import { advancedResearch, instantAnswer, tokenize } from './research.mjs?v=6';
-import { wideResearch, englishQuery } from './wide.mjs?v=6';
+import { wideResearch, englishQuery } from './wide.mjs?v=7';
+import { archiveAnswer } from './archive.mjs?v=1';
 
 const VARIANTS = q => {
   const bare = q.replace(/^(ما هو|ما هي|كيفاش|كيف|لماذا|علاش|واش|هل)\s+/i, '').trim();
@@ -134,6 +135,61 @@ export function compose(question, refs, engines = {}, confidence = 65, total = 0
   return { text: lines.join('\n'), used: sentences.length };
 }
 
+/* مقتطف مختصر من داخل الرابط، بحال اللي كيبان فجوجل */
+const PREV_KEY = 'azzouz-prev-v1';
+function prevStore() {
+  try { return JSON.parse(localStorage.getItem(PREV_KEY) || '{}'); } catch (e) { return {}; }
+}
+function prevSave(map) {
+  try {
+    const keys = Object.keys(map);
+    if (keys.length > 400) for (const k of keys.slice(0, keys.length - 400)) delete map[k];
+    localStorage.setItem(PREV_KEY, JSON.stringify(map));
+  } catch (e) {}
+}
+
+const JUNK = /(cookie|accept all|subscribe|sign in|log in|تسجيل الدخول|اشترك|القائمة الرئيسية|من نحن|اتصل بنا)/i;
+
+function pickExtract(text) {
+  const lines = String(text || '')
+    .split('\n')
+    .map(l => l.replace(/^[#>*\-\s]+/, '').replace(/\[([^\]]*)\]\([^)]*\)/g, '$1').trim())
+    .filter(l => l.length > 60 && l.length < 400 && !JUNK.test(l) && !/^https?:/.test(l) && !/^(URL Source|Title|Markdown Content|Published Time|Warning|Description):/i.test(l));
+  const pick = lines.slice(0, 3).join(' ');
+  return pick.slice(0, 300);
+}
+
+async function previewFor(url) {
+  const c = new AbortController();
+  const t = setTimeout(() => c.abort(), 11000);
+  try {
+    const r = await fetch('https://r.jina.ai/' + url, { signal: c.signal, headers: { Accept: 'text/plain' } });
+    if (!r.ok) return '';
+    return pickExtract(await r.text());
+  } catch (e) { return ''; } finally { clearTimeout(t); }
+}
+
+async function fillPreviews(refs, n = 12, onStage = () => {}) {
+  const store = prevStore();
+  const need = refs.filter(r => r.url && !r.snippet && !store[r.url]).slice(0, n);
+  if (!need.length) {
+    for (const r of refs) if (!r.snippet && store[r.url]) r.snippet = store[r.url];
+    return;
+  }
+  onStage('كنقرا داخل المراجع وناخد عينة من كل واحد...');
+  let i = 0;
+  const worker = async () => {
+    while (i < need.length) {
+      const r = need[i++];
+      const ex = await previewFor(r.url);
+      if (ex) { r.snippet = ex; store[r.url] = ex; }
+    }
+  };
+  await Promise.all(Array.from({ length: 4 }, worker));
+  prevSave(store);
+  for (const r of refs) if (!r.snippet && store[r.url]) r.snippet = store[r.url];
+}
+
 export function suggestionsFor(question) {
   const bare = String(question || '')
     .replace(/^(ما هو|ما هي|كيفاش|كيف|لماذا|علاش|واش|هل|شنو)\s+/i, '')
@@ -157,13 +213,14 @@ export async function deepAnswer(question, { onStage = () => {}, onCount = () =>
     return { type: 'article', text: cached.answer, refs: cached.citations || [], question: q, confidence: 85, fromMemory: true, ms: Date.now() - started, engines: {}, suggestions: suggestionsFor(q) };
   }
 
-  onStage('كنبحث فـ 20+ محرك ومستودع...');
-  const wideP = wideResearch(q, { target: 1000, onProgress: onCount }).catch(() => ({ refs: [], stats: {}, total: 0 }));
+  onStage('كنفكك السؤال ونحدد المحاور...');
+  onStage('الجولة الأولى: كل المحركات والمستودعات...');
+  const wideP = wideResearch(q, { target: 3000, onProgress: onCount }).catch(() => ({ refs: [], stats: {}, total: 0 }));
   const timed = (p, ms) => Promise.race([p, new Promise(r => setTimeout(() => r(null), ms))]);
   const deepP = timed(advancedResearch({ question: q, deeper: true, variants: VARIANTS(q).slice(0, 2) }).catch(() => null), 22000);
   const [wide, deep] = await Promise.all([wideP, deepP]);
 
-  onStage('كنركّب الجواب...');
+  onStage('الجولة الثانية: البحث العلمي المتخصص...');
 
   const seen = new Set();
   const refs = [];
@@ -173,7 +230,7 @@ export async function deepAnswer(question, { onStage = () => {}, onCount = () =>
   }
   for (const r of (wide.refs || [])) {
     const k = r.url || r.title;
-    if (k && !seen.has(k)) { seen.add(k); refs.push({ title: r.title, url: r.url, engine: r.engine, year: r.year, snippet: '' }); }
+    if (k && !seen.has(k)) { seen.add(k); refs.push({ title: r.title, url: r.url, engine: r.engine, year: r.year, snippet: r.snippet || '', thumb: r.thumb || '', kind: r.kind || 'article' }); }
   }
   // ترتيب المراجع حسب الصلة: العبارة الكاملة أولا، ومن بعد الكلمات الأساسية
   const scoredAll = relevance(refs, q);
@@ -181,6 +238,10 @@ export async function deepAnswer(question, { onStage = () => {}, onCount = () =>
   refs.sort((a, b) => (order.get(b) || 0) - (order.get(a) || 0));
   refs.forEach((r, i) => { r.n = i + 1; });
 
+  onStage('كنستخرج العينة من داخل المراجع...');
+  await fillPreviews(refs, 12, onStage);
+
+  onStage('كنحلل ونقارن بين المصادر...');
   const engines = wide.stats || {};
   const scored = relevance(refs, q);
   const core = scored.filter(x => x.sc >= 4).map(x => x.r);
@@ -189,6 +250,7 @@ export async function deepAnswer(question, { onStage = () => {}, onCount = () =>
   const built = compose(q, forCompose, engines, confidence, refs.length);
 
   const text = built.text;
+  archiveAnswer(q, refs.slice(0, 400), { confidence, engines, total: refs.length });
 
   return {
     type: 'article', text, refs, question: q, confidence,
