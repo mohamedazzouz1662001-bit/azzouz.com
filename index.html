@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Azzouz Research — بحث شامل بمراجع</title>
+<style>
+:root{--bg:#06090f;--card:#0c1420;--line:#1b2940;--txt:#e6eefb;--dim:#7f93ad;--acc:#3ddc97;--gold:#d4af37;--err:#f06a6a}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:radial-gradient(900px 420px at 50% -10%,#0d1a2c,#06090f 65%);color:var(--txt);
+font-family:'Segoe UI',Tahoma,Arial,sans-serif;min-height:100vh;padding:18px}
+.wrap{max-width:820px;margin:0 auto}
+header{text-align:center;padding:22px 8px}
+h1{font-size:26px;letter-spacing:2px}h1 span{color:var(--acc)}
+.sub{color:var(--dim);font-size:12px;margin-top:8px}
+.box{background:linear-gradient(180deg,var(--card),#0a1119);border:1px solid var(--line);border-radius:14px;padding:18px;margin-top:16px}
+label{display:block;font-size:11px;color:var(--dim);margin-bottom:6px;letter-spacing:1px}
+input,textarea{width:100%;background:#08101a;border:1px solid var(--line);color:var(--txt);
+padding:12px 14px;border-radius:9px;font-size:14px;font-family:inherit}
+input:focus,textarea:focus{outline:none;border-color:var(--acc)}
+textarea{min-height:88px;resize:vertical}
+.row{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+.btn{background:linear-gradient(180deg,#3ddc97,#2bb37b);color:#05271a;border:none;padding:12px 22px;
+border-radius:9px;font-weight:800;font-size:13px;cursor:pointer;transition:.2s}
+.btn.ghost{background:#0f1b2a;color:var(--txt);border:1px solid var(--line)}
+.btn:disabled{opacity:.5;cursor:wait}
+.art{white-space:pre-wrap;line-height:2;font-size:14.5px}
+.refs{margin-top:16px;border-top:1px dashed var(--line);padding-top:12px;font-size:12.5px;color:var(--dim);line-height:2}
+.refs a{color:var(--acc);text-decoration:none;word-break:break-all}
+.tag{display:inline-block;font-size:10px;border:1px solid var(--line);border-radius:12px;
+padding:2px 8px;margin:0 4px 4px 0;color:var(--dim)}
+.stat{font-size:11px;color:var(--dim);margin-top:10px}
+.err{border-color:rgba(240,106,106,.5);color:var(--err)}
+@media(max-width:600px){h1{font-size:20px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Azzouz <span>Research</span></h1>
+    <div class="sub">بحث في الويب كامل · مقال واحد · مراجع فالأسفل · ذاكرة محلية · تعلم مستمر</div>
+  </header>
+
+  <div class="box">
+    <label>رابط الـ Worker (Cloudflare)</label>
+    <input id="worker" placeholder="https://azzouz-research.xxx.workers.dev">
+    <label style="margin-top:12px">سؤالك</label>
+    <textarea id="q" placeholder="مثال: ما هي أحدث تقنيات ضغط البيانات المستعملة في قواعد البيانات؟"></textarea>
+    <div class="row">
+      <button class="btn" id="go">ابحث ولخّص</button>
+      <button class="btn ghost" id="clear">مسح الذاكرة</button>
+    </div>
+    <div class="stat" id="stat"></div>
+  </div>
+
+  <div class="box" id="out" style="display:none">
+    <div class="art" id="art"></div>
+    <div class="refs" id="refs"></div>
+  </div>
+</div>
+
+<script type="module">
+import { advancedResearch, learn, relatedLearning, clearLearn } from './research.mjs';
+
+const $ = (id) => document.getElementById(id);
+const WKEY = 'azzouz_worker_url';
+$('worker').value = localStorage.getItem(WKEY) || '';
+$('worker').onchange = () => localStorage.setItem(WKEY, $('worker').value.trim());
+
+function stats() {
+  const rel = relatedLearning('');
+  $('stat').textContent = 'الذاكرة المحلية: ' + rel.length + ' بحث محفوظ';
+}
+stats();
+
+$('go').onclick = async () => {
+  const base = $('worker').value.trim().replace(/\/$/, '');
+  const q = $('q').value.trim();
+  if (!base) { $('q').className = ''; $('stat').textContent = '⚠️ دخل رابط الـ Worker أولا'; return; }
+  if (!q) return;
+  $('go').disabled = true; $('go').textContent = 'جاري البحث...';
+  $('stat').textContent = '⏳ كنجمع من 12 مصدر...';
+  const res = await advancedResearch({ question: q, workerBase: base });
+  $('go').disabled = false; $('go').textContent = 'ابحث ولخّص';
+  if (!res) { $('stat').textContent = '❌ فشل الاتصال بالـ Worker — تحقق من الرابط'; return; }
+  $('out').style.display = 'block';
+  $('art').textContent = res.text;
+  const refs = $('refs');
+  refs.textContent = '';
+  res.citations.forEach((c) => {
+    const d = document.createElement('div');
+    const a = document.createElement('a');
+    a.href = c.url; a.target = '_blank'; a.rel = 'noopener noreferrer';
+    a.textContent = '[' + c.n + '] ' + (c.title || c.url);
+    d.appendChild(a);
+    refs.appendChild(d);
+  });
+  $('stat').textContent = '✅ ' + res.citations.length + ' مرجع · ' + (res.meta ? res.meta.sources : 0) + ' نتيجة من ' + (res.meta ? res.meta.engines : 0) + ' محرك';
+  stats();
+};
+
+$('clear').onclick = () => { clearLearn(); stats(); };
+</script>
+</body>
+</html>
