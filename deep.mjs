@@ -4,6 +4,7 @@
 import { advancedResearch, instantAnswer, tokenize } from './research.mjs?v=6';
 import { wideResearch, englishQuery } from './wide.mjs?v=8';
 import { depthTarget } from './identity.mjs?v=1';
+import { ghLookup } from './ghmemory.mjs?v=1';
 import { archiveAnswer } from './archive.mjs?v=1';
 import { recall, learn } from './brain.mjs?v=1';
 
@@ -207,6 +208,17 @@ export function suggestionsFor(question) {
 
 export async function deepAnswer(question, { onStage = () => {}, onCount = () => {} } = {}) {
   const q = String(question || '').trim();
+  const gh = ghLookup(q);
+  if (gh && Array.isArray(gh.refs) && gh.refs.length) {
+    return {
+      type: 'article',
+      text: gh.summary + '\n\n(هاد الجواب من البحث التلقائي فGitHub، آخر تحديث: ' + String(gh.at || '').slice(0, 10) + ')',
+      refs: gh.refs.map((r, k) => ({ ...r, n: k + 1 })),
+      question: q, confidence: 82, fromMemory: true, ms: 1,
+      engines: gh.stats || {}, suggestions: suggestionsFor(q)
+    };
+  }
+
   if (q.length < 3) return { type: 'article', text: 'كتب ليا سؤالك ونبحث ليك فكل المصادر.', refs: [], question: q, confidence: 0, suggestions: [] };
   const started = Date.now();
 
