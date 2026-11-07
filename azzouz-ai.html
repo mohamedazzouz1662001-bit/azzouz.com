@@ -610,6 +610,7 @@ async function ask(text) {
   $('send').disabled = true;
   addMsg(esc(q), 'out');
   qEl.value = '';
+  if (!GH.cache) { try { await loadGH(); } catch (e) {} }
   const hit = cacheHit(q);
   if (hit && Array.isArray(hit.refs) && hit.refs.length) {
     busy = true; $('send').disabled = true;
