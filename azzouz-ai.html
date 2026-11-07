@@ -399,13 +399,18 @@ function synthesize(q, sources, prior) {
   if (ex) example = clause(ex.text, 130);
   else if (points.length) example = points[0].text.slice(0, 120);
   if (!found) example = 'جرب صياغة بحال: «' + q + ' بالتفصيل» ولا بالإنجليزية، وأنا كنعاود البحث فكل المصادر.';
+  if (!example) example = 'ما لقيتش مثال فالمصادر، ولكن نقدر نشرح ليك بمثال من الحياة اليومية إلا بغيتي.';
+  const next = found
+    ? 'قول ليا «زيد عمّق» ونقرا ليك الصفحات كاملة، ولا سولني على جزئية صغيرة فهاد الموضوع.'
+    : 'عطيني كلمة وحدة مفتاحية من الموضوع، ونعاود البحث بيه فكل المصادر.';
 
   let fresh = [];
   if (prior) {
     const old = new Set(prior.urls || []);
     fresh = sorted.filter(s => s.url && !old.has(s.url)).slice(0, 6);
   }
-  return { short, points, example, found, sorted, fresh, verse: getVerse(q) };
+  const sure = !found ? false : (matchScore(rich[0], terms) >= 2 || (rich[0].weight || 0) >= 9);
+  return { short, points, example, next, found, sure, sorted, fresh, verse: getVerse(q) };
 }
 
 
@@ -418,6 +423,12 @@ function hi() {
   return h < 5 ? 'مبروك عليك الليل' : h < 12 ? 'صباح الخير' : h < 18 ? 'مساء الخير' : 'مسا الخير';
 }
 function pick(a) { return a[Math.floor(Math.random() * a.length)]; }
+
+function correction(q) {
+  const t = String(q || '').trim();
+  if (!/^(غلط|ماشي صحيح|ما صحيحش|خطأ|ماشي هكاك|غير صحيح|wrong)/i.test(t)) return '';
+  return 'سمح ليا، فهمت الغلط. قول ليا آش بالضبط اللي ماشي صحيح، ونصححو ونحفظو باش ما نعاودوش.';
+}
 
 function smallTalk(q) {
   const t = String(q).trim();
@@ -467,15 +478,18 @@ function renderAnswer(q, data, prior) {
   let h = '';
   if (prior) h += '<div class="h">🧠 من الذاكرة</div>سولتني على «' + esc(prior.q) + '» من قبل، وها اللي عرفت من ديك المرة.<br><br>';
 
-  h += '<div class="h">' + (data.found ? 'الجواب' : 'النتيجة') + '</div><b>' + esc(data.short) + '</b><br><br>';
+  h += '<div class="h">1. الخلاصة</div><b>' + esc(data.short) + '</b>';
+  if (!data.sure) h += '<br><span class="srctag">ما متأكدش 100%، ولكن هاد اللي لقيت.</span>';
+  h += '<br><br>';
 
   if (data.points.length) {
-    h += '<div class="h">الشرح</div>';
+    h += '<div class="h">2. الشرح</div>';
     data.points.forEach((p, i) => { h += (i + 1) + '. ' + esc(p.text) + ' <span class="srctag">' + esc(String(p.src).replace(/^\S+\s/, '')) + '</span><br>'; });
     h += '<br>';
   }
 
-  h += '<div class="h">' + (data.found ? 'مثال' : 'بديل') + '</div>' + esc(data.example) + '<br>';
+  h += '<div class="h">' + (data.found ? '3. مثال' : '3. بديل') + '</div>' + esc(data.example) + '<br>';
+  h += '<div class="h">4. شنو ندير دابا</div>' + esc(data.next || '') + '<br>';
 
   if (prior && data.fresh.length) h += '<br>🆕 زدت ' + data.fresh.length + ' مصدر جديد هاد المرة.<br>';
 
@@ -513,6 +527,8 @@ function renderAnswer(q, data, prior) {
 async function ask(text) {
   const q = String(text || '').trim();
   if (!q || busy) return;
+  const fix = correction(q);
+  if (fix) { addMsg(esc(q), 'out'); addMsg('<div class="h">تصحيح</div><b>سمح ليا، فهمت الغلط.</b><br><br>قول ليا آش بالضبط اللي ماشي صحيح، ونصححو ونحفظو باش ما نعاودوش.<br><br><b>واش بغيتي نكمل؟</b>', 'in'); return; }
   const quick = smallTalk(q);
   if (quick) { addMsg(q, 'out'); addMsg(esc(quick), 'in'); return; }
   busy = true;
@@ -754,7 +770,7 @@ $('shclose').onclick = () => sheet.classList.remove('on');
 document.querySelectorAll('.stabs button').forEach(b => b.onclick = () => openTools(b.dataset.p));
 initDB();
 
-addMsg('<div class="h">سلام 👋</div>أنا Azzouz. كنبحث فكل الويب والأبحاث والملفات، وكنجاوبك بالدارجة: سطر واحد، شرح بالنقط، مثال، وسؤال فالأخير. وإلا عاودت سؤال، كنفكر الجواب القديم ونزيد عليه الجديد.<br><br>جرب: <b>ما هو النحل؟</b> ولا <b>الصيام المتقطع</b>.', 'in');
+addMsg('<div class="h">سلام 👋</div>أنا Azzouz AI PRO. كنبحث فكل الويب والأبحاث والملفات، وكنقرا الصور والكود، وكنتذكر كلشي. كن جاوبك بالدارجة: الخلاصة، الشرح، مثال، وشنو ندير دابا. وإلا عاودت سؤال، كنفكر الجواب القديم ونزيد عليه الجديد.<br><br>جرب: <b>ما هو النحل؟</b> ولا <b>الصيام المتقطع</b>.', 'in');
 statusEl.textContent = 'متصل · كنقرا من كل الويب';
 
 
