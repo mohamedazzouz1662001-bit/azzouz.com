@@ -58,6 +58,7 @@ footer{background:var(--panel);padding:8px 9px;display:flex;gap:7px;align-items:
 .hread{display:none;font-size:10.5px;color:#7d929c;text-align:center;padding:3px 0}
 .hread.on{display:block}
 .hread b{color:var(--acc)}
+.srctag{background:rgba(0,168,132,.12);border:1px solid rgba(0,168,132,.25);border-radius:999px;padding:1px 7px;font-size:10px;color:#8ff0d6}
 .lg{display:block;width:100%;margin-top:6px;background:var(--acc);color:#04241c;border:none;border-radius:10px;padding:10px;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer}
 .sb{font-size:11px;color:#8aa0aa}
 .vbar{display:none;align-items:center;gap:8px;background:#182229;border-top:1px solid var(--line);padding:8px 12px;font-size:12.5px;color:#cfe6de}
@@ -416,10 +417,40 @@ function getVerse(q) {
   if (/سماء|كون|space|black/.test(t)) return '﴿ والسماء بنيناها بأيد وإنا لموسعون ﴾ الذاريات 47';
   return '﴿ وفي الأرض آيات للموقنين ﴾ الذاريات 20';
 }
+
+/* ===== جودة المصادر ===== */
+const TRUST = ['wikipedia.org', 'arxiv.org', 'doi.org', 'ncbi.nlm.nih.gov', 'europepmc.org', 'who.int', 'un.org', 'worldbank.org', '.gov', '.edu', 'github.com', 'openlibrary.org', 'archive.org', 'hal.science', 'zenodo.org', 'openalex.org', 'crossref.org', 'semanticscholar.org', 'stackoverflow.com', 'nature.com', 'sciencedirect.com', 'springer.com', 'mdpi.com', 'quran.com', 'alquran.cloud'];
+const SPAM = ['pinterest', 'quora', 'tiktok', 'facebook.com', 'instagram.com', 'casino', 'betting', 'escort', 'porn', 'crack', 'download-free'];
+function hostOf(u) { try { return new URL(u).hostname.replace(/^www\./, ''); } catch (e) { return ''; } }
+function trustScore(s) {
+  const h = hostOf(s.url || '');
+  const t = String(s.title || '').toLowerCase();
+  if (SPAM.some(x => h.includes(x) || t.includes(x))) return -14;
+  if (TRUST.some(x => h.endsWith(x) || h.includes(x))) return 10;
+  return 0;
+}
+function dedupeSources(list) {
+  const out = [], seen = [];
+  const sig = s => new Set(String(s.title || '').toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(w => w.length > 3));
+  for (const s of list) {
+    const a = sig(s);
+    if (!a.size) { out.push(s); continue; }
+    let dup = false;
+    for (const b of seen) {
+      let inter = 0;
+      a.forEach(w => { if (b.has(w)) inter++; });
+      if (inter / Math.max(1, Math.min(a.size, b.size)) > 0.8) { dup = true; break; }
+    }
+    if (!dup) { out.push(s); seen.push(a); }
+    if (seen.length > 400) seen.shift();
+  }
+  return out;
+}
+
 function synthesize(q, sources, prior) {
   const terms = termsOf(q, englishOf(q));
-  const score = s => (s.weight || 0) + 6 * matchScore(s, terms) + (String(s.title || '').includes(q) ? 12 : 0);
-  const sorted = sources.slice().sort((a, b) => score(b) - score(a));
+  const score = s => (s.weight || 0) + 6 * matchScore(s, terms) + trustScore(s) + (String(s.title || '').includes(q) ? 12 : 0);
+  const sorted = dedupeSources(sources.slice().sort((a, b) => score(b) - score(a)));
   const rich = sorted.filter(s => (s.text || '').length > 40 && matchScore(s, terms) > 0);
 
   const shortOf = s => {
@@ -459,7 +490,9 @@ function synthesize(q, sources, prior) {
     fresh = sorted.filter(s => s.url && !old.has(s.url)).slice(0, 6);
   }
   const sure = !found ? false : (matchScore(rich[0], terms) >= 2 || (rich[0].weight || 0) >= 9);
-  return { short, points, example, next, found, sure, sorted, fresh, verse: getVerse(q) };
+  const trustCount = sorted.filter(s => trustScore(s) > 0).length;
+  const conf = !found ? 0 : Math.min(99, 38 + Math.min(38, trustCount * 2) + Math.min(18, matchScore(rich[0], terms) * 6));
+  return { short, points, example, next, found, sure, conf, trustCount, sorted, fresh, verse: getVerse(q) };
 }
 
 
@@ -581,6 +614,10 @@ function renderAnswer(q, data, prior) {
   if (prior) h += '<div class="h">🧠 من الذاكرة</div>سولتني على «' + esc(prior.q) + '» من قبل، وها اللي عرفت من ديك المرة.<br><br>';
 
   h += '<div class="h">1. الخلاصة</div><b>' + esc(data.short) + '</b>';
+  if (data.found) {
+    const lvl = data.conf >= 70 ? 'ثقة عالية' : data.conf >= 45 ? 'ثقة متوسطة' : 'ثقة ضعيفة';
+    h += ' <span class="srctag">' + lvl + ' ' + data.conf + '% · موثوق ' + data.trustCount + '</span>';
+  }
   if (!data.sure) h += '<br><span class="srctag">ما متأكدش 100%، ولكن هاد اللي لقيت.</span>';
   h += '<br><br>';
 
