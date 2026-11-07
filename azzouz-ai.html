@@ -314,6 +314,24 @@ async function gather(q, tickFn) {
       (d.search || []).forEach(e => push({ name: '🧩 Wikidata', title: e.label || e.id, text: clean(e.description), url: 'https://www.wikidata.org/wiki/' + e.id, weight: 5 })); },
     async () => { const d = await jget('https://api.duckduckgo.com/?q=' + enc(en) + '&format=json&no_html=1&skip_disambig=1');
       if (d.AbstractText) push({ name: '🌐 DuckDuckGo', title: d.Heading || en, text: d.AbstractText.slice(0, 350), url: d.AbstractURL || ('https://duckduckgo.com/?q=' + enc(en)), weight: 7 }); },
+    async () => { const d = await jget('https://itunes.apple.com/search?term=' + enc(en || q) + '&entity=software&limit=15&country=ma');
+      (d.results || []).forEach(a => push({ name: '📱 متجر التطبيقات', title: a.trackName, text: clean(a.description).slice(0, 260) || (a.primaryGenreName + ' · ' + (a.sellerName || '')), url: a.trackViewUrl, weight: 7 })); },
+    async () => { const d = await jget('https://itunes.apple.com/search?term=' + enc(en || q) + '&entity=podcast&limit=10');
+      (d.results || []).forEach(a => push({ name: '🎧 بودكاست', title: a.collectionName, text: clean(a.collectionName + ' — ' + (a.artistName || '')), url: a.collectionViewUrl, weight: 6 })); },
+    async () => { const md = await jtxt('https://r.jina.ai/https://play.google.com/store/search?q=' + enc(en || q) + '&c=apps', 16000);
+      parseLinks(md, 'Play Store').slice(0, 12).forEach(push); },
+    async () => { const md = await jtxt('https://r.jina.ai/https://scholar.google.com/scholar?hl=' + (/[\u0600-\u06FF]/.test(q) ? 'ar' : 'en') + '&q=' + enc(en || q), 16000);
+      parseLinks(md, 'Scholar').slice(0, 15).forEach(push); },
+    async () => { const md = await jtxt('https://r.jina.ai/https://babel.hathitrust.org/cgi/ls?q1=' + enc(en || q) + ';a=srchls;anyall1=all;lmt=ft', 16000);
+      parseLinks(md, 'HathiTrust').slice(0, 10).forEach(push); },
+    async () => { const md = await jtxt('https://r.jina.ai/https://openverse.org/search/?q=' + enc(en || q), 14000);
+      parseLinks(md, 'Openverse').slice(0, 10).forEach(push); },
+    async () => { const md = await jtxt('https://r.jina.ai/https://www.google.com/search?q=' + enc((en || q) + ' site:drive.google.com OR site:docs.google.com'), 16000);
+      parseLinks(md, 'ملفات Google').slice(0, 12).forEach(push); },
+    async () => { const cdx = await jtxt('https://web.archive.org/cdx/search/cdx?url=*.' + enc((en || q).split(/\s+/)[0]) + '*&limit=25&output=json&filter=statuscode:200&collapse=urlkey', 12000);
+      let rows = [];
+      try { rows = JSON.parse(cdx); } catch (e) { rows = []; }
+      rows.slice(1, 18).forEach(r => { if (r && r[2]) push({ name: '🗄️ أرشيف مخفي', title: String(r[2]).replace(/^https?:\/\//, '').slice(0, 90), text: 'صفحة مؤرشفة · ' + String(r[1] || '').slice(0, 40), url: 'https://web.archive.org/web/' + r[1] + '/' + r[2], weight: 5 }); }); },
     async () => { const d = await jget('https://www.googleapis.com/books/v1/volumes?q=' + enc(q) + '&maxResults=15');
       (d.items || []).forEach(b => { const v = b.volumeInfo || {}; push({ name: '📗 Google Books', title: v.title, text: (v.description || '').slice(0, 300), url: v.infoLink, year: (v.publishedDate || '').slice(0, 4), weight: 7 }); }); },
     async () => { const d = await jget('https://zenodo.org/api/records?q=' + enc(en) + '&size=20');
