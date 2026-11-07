@@ -143,10 +143,11 @@ textarea#q{max-height:130px;overflow-y:auto;line-height:1.6}
 <div class="sheet" id="sheet">
   <div class="sh"><b>الأدوات</b><button class="icon" id="clearChat" title="مسح المحادثة">🗑️</button>
     <button class="icon" id="expChat" title="تصدير المحادثة">📤</button><button class="icon" id="shclose">✕</button></div>
-  <div class="stabs"><button data-p="report" class="on">آخر جواب</button><button data-p="threads">المحادثات</button><button data-p="memory">الذاكرة</button></div>
+  <div class="stabs"><button data-p="report" class="on">آخر جواب</button><button data-p="threads">المحادثات</button><button data-p="pc">الحاسوب</button><button data-p="memory">الذاكرة</button></div>
   <div class="vkey"><input id="vkey" placeholder="مفتاح الرؤية (اختياري)"><button class="mini2" id="vsave">حفظ</button></div>
   <div class="sbody" id="paneReport"></div>
   <div class="sbody" id="paneThreads" hidden></div>
+  <div class="sbody" id="panePC" hidden></div>
   <div class="sbody" id="paneMemory" hidden></div>
 </div>
 <script>
@@ -855,6 +856,67 @@ function renderAnswer(q, data, prior) {
 }
 
 
+
+/* ===== الحاسوب: Azzouz كيكتب وينفذ على الجهاز ديالك ===== */
+const PC_RELAY = 'https://superagent-1906c8e6.base44.app/functions/azzouzComputer';
+const PC_KEY = 'AZZOUZ-PC-2026';
+let PCMODE = localStorage.getItem('azzouz-pc-mode') === '1';
+
+function pcIntent(q) {
+  const t = String(q).trim();
+  return /^(اكتب|كتب|نفذ|نفّذ|شغل|حوسب|دير فالحاسوب|عطيني ملف|وريني الملفات|run |write )/i.test(t) || PCMODE;
+}
+
+async function pcCall(payload) {
+  try {
+    const r = await fetch(PC_RELAY, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: PC_KEY, ...payload }) });
+    return await r.json();
+  } catch (e) { return { ok: false, error: 'ما وصلتش للحاسوب: ' + e.message }; }
+}
+
+function pcInstruction(text) {
+  const t = String(text).trim();
+  const code = t.match(/```[\s\S]*?```/);
+  if (code) return JSON.stringify({ op: 'write', path: 'azzouz-' + Date.now() + '.txt', content: code[0].replace(/```[a-zA-Z]*\n?|```$/g, '') });
+  const cmd = t.match(/^\/run\s+([\s\S]+)/i);
+  if (cmd) return JSON.stringify({ op: 'run', cmd: cmd[1].trim() });
+  if (/وريني الملفات|قائمة الملفات|list/i.test(t)) return JSON.stringify({ op: 'list' });
+  return JSON.stringify({ op: 'write', path: 'azzouz-' + Date.now() + '.txt', content: t });
+}
+
+async function pcAsk(text) {
+  const kind = /^\/run/i.test(text.trim()) ? 'run' : (/قائمة الملفات|وريني الملفات/.test(text) ? 'list' : 'write');
+  const r = await pcCall({ op: 'push', kind, instruction: pcInstruction(text) });
+  if (!r.ok) return { ok: false, msg: r.error || 'فشل الإرسال' };
+  return { ok: true, id: r.job_id };
+}
+
+async function pcLog() {
+  const r = await pcCall({ op: 'log' });
+  return (r && r.jobs) || [];
+}
+
+async function renderPC() {
+  const p = $('panePC'); if (!p) return;
+  p.innerHTML = '<div class="card">كنجيب آخر المهام...</div>';
+  const jobs = await pcLog();
+  let h = '<div class="card" style="margin-bottom:8px"><b>حاسوبك</b><br><span style="font-size:11px;color:#8aa">' +
+    (PCMODE ? 'الوضع شغال: كل رسالة كتتصيفط للحاسوب.' : 'الوضع مطفي: اضغط الزر باش تشعلو.') + '</span></div>';
+  h += '<button class="lg" id="pcToggle">' + (PCMODE ? '🔴 طفي وضع الحاسوب' : '🟢 شعل وضع الحاسوب') + '</button>';
+  h += '<div style="font-size:11px;color:#8aa;margin:8px 0">تشغيل العامل فالحاسوب: <code>node azzouz-computer.mjs</code></div>';
+  if (!jobs.length) h += '<div class="card">ما كاين حتى مهمة بعد.</div>';
+  jobs.forEach(j => {
+    h += '<div class="scroll" style="border-bottom:1px solid #22303a;padding:7px 0">'
+      + '<b>' + esc(j.kind) + '</b> <span class="srctag">' + esc(j.status) + '</span><br>'
+      + '<span style="font-size:12px;color:#cfe">' + esc(String(j.instruction || '').slice(0, 90)) + '</span>'
+      + (j.result ? '<br><span style="font-size:11px;color:#8aa">' + esc(String(j.result).slice(0, 200)) + '</span>' : '')
+      + '</div>';
+  });
+  p.innerHTML = h;
+  const b = $('pcToggle');
+  if (b) b.onclick = () => { PCMODE = !PCMODE; localStorage.setItem('azzouz-pc-mode', PCMODE ? '1' : '0'); renderPC(); };
+}
+
 /* ===== السؤال ===== */
 async function ask(text) {
   const q = String(text || '').trim();
@@ -871,6 +933,14 @@ async function ask(text) {
   if (fix) { addMsg(esc(q), 'out'); PENDING_FIX = LAST ? topicOf(LAST.q) : topicOf(q); addMsg('<div class="h">تصحيح</div><b>سمح ليا، فهمت الغلط.</b><br><br>قول ليا آش بالضبط اللي ماشي صحيح، ونصححو ونحفظو باش ما نعاودوش.<br><br><b>واش بغيتي نكمل؟</b>', 'in'); return; }
   const quick = smallTalk(q);
   if (quick) { addMsg(q, 'out'); addMsg(esc(quick), 'in'); return; }
+  if (pcIntent(q)) {
+    addMsg(esc(q), 'out');
+    const out = await pcAsk(q);
+    addMsg(out.ok
+      ? '<div class="h">1. الخلاصة</div><b>صيفطت المهمة لحاسوبك.</b><br><br><div class="h">2. الشرح</div>1. المهمة واصلة للجسر فـ Base44.<br>2. العامل المحلي غادي ياخدها فثواني وينفذها.<br>3. تقدر تشوف النتيجة فـ ☰ ← الحاسوب.<br><br><div class="h">3. مثال</div>«اكتب لي كود Python كيحسب المعدل» ← كيتكتب ملف فمجلد azzouz-work.<br><br><div class="h">4. شنو ندير دابا</div>تأكد بلي <code>node azzouz-computer.mjs</code> شغال فالحاسوب.<br><br><b>واش بغيتي نكمل؟</b>'
+      : '<div class="h">1. الخلاصة</div><b>ما قدرتش نرسل.</b><br><br>' + esc(out.msg || '') + '<br><br><b>واش بغيتي نكمل؟</b>', 'in');
+    return;
+  }
   busy = true;
   $('send').disabled = true;
   noteThread(q);
@@ -995,9 +1065,11 @@ function openTools(which) {
   $('paneReport').hidden = which !== 'report';
   $('paneMemory').hidden = which !== 'memory';
   const pt = $('paneThreads'); if (pt) pt.hidden = which !== 'threads';
+  const ppc = $('panePC'); if (ppc) ppc.hidden = which !== 'pc';
   document.querySelectorAll('.stabs button').forEach(b => b.classList.toggle('on', b.dataset.p === which));
   if (which === 'memory') renderMemory();
   else if (which === 'threads') renderThreads();
+  else if (which === 'pc') renderPC();
   else renderReport();
 }
 function keywordsOf(sources) {
