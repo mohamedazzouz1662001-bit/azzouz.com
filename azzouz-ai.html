@@ -876,6 +876,9 @@ async function pcCall(payload) {
 
 function pcInstruction(text) {
   const t = String(text).trim();
+  if (/^(اكتب فالنافذة|اكتب في التطبيق)/.test(t)) return JSON.stringify({ op: 'type', text: t.replace(/^(اكتب فالنافذة|اكتب في التطبيق)\s*/, '') });
+  if (/^(حل الرابط|حل الموقع)/.test(t)) return JSON.stringify({ op: 'open', url: (t.match(/https?:\/\/\S+/) || ['https://google.com'])[0] });
+  if (/(تصويرة|سكرين|screenshot)/i.test(t)) return JSON.stringify({ op: 'shot' });
   const code = t.match(/```[\s\S]*?```/);
   if (code) return JSON.stringify({ op: 'write', path: 'azzouz-' + Date.now() + '.txt', content: code[0].replace(/```[a-zA-Z]*\n?|```$/g, '') });
   const cmd = t.match(/^\/run\s+([\s\S]+)/i);
@@ -885,10 +888,20 @@ function pcInstruction(text) {
 }
 
 async function pcAsk(text) {
-  const kind = /^\/run/i.test(text.trim()) ? 'run' : (/قائمة الملفات|وريني الملفات/.test(text) ? 'list' : 'write');
+  let kind = 'write';
+  if (/^\/run/i.test(text.trim())) kind = 'run';
+  else if (/قائمة الملفات|وريني الملفات/.test(text)) kind = 'list';
+  else if (/^(اكتب فالنافذة|اكتب في التطبيق)/.test(text.trim())) kind = 'type';
+  else if (/^(حل الرابط|حل الموقع)/.test(text.trim())) kind = 'open';
+  else if (/(تصويرة|سكرين|screenshot)/i.test(text)) kind = 'shot';
   const r = await pcCall({ op: 'push', kind, instruction: pcInstruction(text) });
   if (!r.ok) return { ok: false, msg: r.error || 'فشل الإرسال' };
   return { ok: true, id: r.job_id };
+}
+
+async function pcState() {
+  const r = await pcCall({ op: 'state' });
+  return { online: !!(r && r.online), machine: (r && r.machine) || '', last: (r && r.last_seen) || '' };
 }
 
 async function pcLog() {
@@ -900,7 +913,10 @@ async function renderPC() {
   const p = $('panePC'); if (!p) return;
   p.innerHTML = '<div class="card">كنجيب آخر المهام...</div>';
   const jobs = await pcLog();
-  let h = '<div class="card" style="margin-bottom:8px"><b>حاسوبك</b><br><span style="font-size:11px;color:#8aa">' +
+  const st = await pcState();
+  let h = '<div class="card" style="margin-bottom:8px"><b>حاسوبك</b><br><span style="font-size:11px;color:' + (st.online ? '#00e5a0' : '#ff8a80') + '">' +
+    (st.online ? '🟢 متصل: ' + esc(st.machine) + ' · آخر نبضة ' + esc(String(st.last).slice(11, 19)) : '🔴 ماشي متصل — شغل node azzouz-computer.mjs فالحاسوب') +
+    '</span><br><span style="font-size:11px;color:#8aa">' +
     (PCMODE ? 'الوضع شغال: كل رسالة كتتصيفط للحاسوب.' : 'الوضع مطفي: اضغط الزر باش تشعلو.') + '</span></div>';
   h += '<button class="lg" id="pcToggle">' + (PCMODE ? '🔴 طفي وضع الحاسوب' : '🟢 شعل وضع الحاسوب') + '</button>';
   h += '<div style="font-size:11px;color:#8aa;margin:8px 0">تشغيل العامل فالحاسوب: <code>node azzouz-computer.mjs</code></div>';
@@ -1612,6 +1628,15 @@ function renderCached(q, hit) {
 }
 loadGH();
 
+
+async function pcHeaderHint() {
+  try {
+    const st = await pcState();
+    const el = document.querySelector('.status') || document.querySelector('header .sub');
+    if (el && st.online) el.textContent = '🖥️ حاسوبك متصل · ' + st.machine;
+  } catch (e) {}
+}
+setTimeout(pcHeaderHint, 2500);
 </script>
 </body>
 </html>
