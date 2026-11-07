@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl"><head><meta charset="UTF-8">
+<title>Azzouz AI - ذكاء اصطناعي عالمي 🧠</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#0a0a0f;color:#fff;font-family:system-ui,Consolas}
+#top{position:fixed;top:0;left:0;right:0;background:rgba(10,10,15,.98);padding:10px;border-bottom:1px solid #00ff88;z-index:10}
+#brain{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+#orb{width:44px;height:44px;border-radius:50%;background:radial-gradient(circle,#00ff88,#004d2e);display:flex;align-items:center;justify-content:center;font-size:22px;cursor:pointer;box-shadow:0 0 25px #00ff88;flex-shrink:0}
+#orb.thinking{animation:spin 1s infinite;background:radial-gradient(circle,#ffaa00,#4d2e00);box-shadow:0 0 30px #ffaa00}
+@keyframes spin{0%{transform:rotate(0)}100%{transform:rotate(360deg)}}
+#orb.listening{background:radial-gradient(circle,#ff0044,#4d0000);box-shadow:0 0 30px #ff0044}
+.chip{border:1px solid #222;padding:3px 9px;border-radius:8px;font-size:11px;text-align:center}
+.chip b{display:block;color:#00ff88;font-size:12px}
+#chat{padding:120px 12px 130px;max-width:900px;margin:0 auto}
+.msg{padding:13px;border-radius:14px;margin:12px 0;line-height:1.9;font-size:14px;word-break:break-word}
+.me{background:#004d2e;margin-left:15%}
+.ai{background:#14141d;border:1px solid #00ff88}
+.ref{background:#0a1a2e;border:1px solid #00aaff;padding:8px;border-radius:8px;margin:6px 0;font-size:12px}
+.ref a{color:#7fd6ff;text-decoration:none;word-break:break-all}
+.summary{background:linear-gradient(135deg,#0a1a0f,#1a0f00);border:1px solid #ffaa00;padding:10px;border-radius:10px;margin:8px 0}
+.sourceTag{display:inline-block;background:#222;padding:2px 7px;border-radius:12px;font-size:10px;margin:2px}
+.sugg{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.sugg button{background:#0f2a1c;color:#9dffd0;border:1px solid #00ff88;padding:8px 10px;border-radius:10px;font-size:12px;font-weight:normal;cursor:pointer}
+#bottom{position:fixed;bottom:0;left:0;right:0;background:rgba(10,10,15,.98);padding:10px;display:flex;gap:6px}
+input{flex:1;background:#111;border:1px solid #333;color:#fff;padding:12px;border-radius:10px;font-size:14px}
+button{background:#00ff88;border:none;padding:12px 13px;border-radius:10px;cursor:pointer;font-weight:bold;color:#04150d}
+#progress{height:3px;background:#222;margin-top:6px;border-radius:3px;overflow:hidden;display:none}
+#progressBar{height:100%;background:#00ff88;width:0%;transition:0.3s}
+</style></head><body>
+<div id="top">
+<div id="brain">
+<div id="orb" onclick="toggleVoice()">🧠</div>
+<div><b>Azzouz AI - ذكاء اصطناعي عالمي</b><div id="status" style="font-size:11px;color:#888">جاهز - سول أي سؤال - كنجيب من 12 مصدر وكنلخص فجواب واحد</div></div>
+<div style="margin-right:auto;display:flex;gap:5px;flex-wrap:wrap">
+<div class="chip">الأسئلة<b id="qCount">0</b></div>
+<div class="chip">المصادر<b id="refCount">0</b></div>
+<div class="chip">الذاكرة<b id="memCount">0</b></div>
+<div class="chip">الذكاء<b id="intel">0%</b></div>
+<div class="chip">التعلم<b id="learn">مبتدئ</b></div>
+</div>
+</div>
+<div id="progress"><div id="progressBar"></div></div>
+<div style="font-size:11px;margin-top:4px">اللغة: <select id="lang" style="background:#111;color:#fff;border:1px solid #333;padding:4px;border-radius:6px"><option value="ar-MA">الدارجة المغربية</option><option value="ar-SA">العربية</option><option value="fr-FR">Français</option><option value="en-US">English</option></select> <button onclick="exportMemory()" style="padding:4px 8px;font-size:11px">💾 تصدير الذاكرة</button> <button onclick="clearMemory()" style="padding:4px 8px;font-size:11px;background:#333;color:#fff">🗑️ مسح الذاكرة</button></div>
+</div>
+<div id="chat"><div class="msg ai">🕋 <b>بسم الله - أنا Azzouz AI:</b><br>ذكاء اصطناعي عالمي - كنجيب من <b>12 مصدر</b> وكنلخصهم فـ <b>جواب واحد</b>.<br>وكنتعلم بحال البشر - كل سؤال كيزيدني ذكاء، وكل جواب كنحفظو فالذاكرة ديالي.<br><br>جرب: <b>شنو هو الثقب الأسود؟</b> ولا <b>ما هو النحل؟</b> ولا <b>114*6236</b><br><br>اهضر معايا بالصوت 🎙️ ولا كتب ✍️ - أنا كنسمع وكندوي.</div></div>
+<div id="bottom">
+<input id="q" placeholder="سول أي سؤال..." onkeypress="if(event.key==='Enter') askAI()">
+<button onclick="askAI()">اسأل ➤</button>
+<button onclick="toggleVoice()">🎙️</button>
+</div>
+<script>
+// ===== الذاكرة الدائمة - IndexedDB + localStorage =====
+let DB=null, memory=[], qCount=0, refTotal=0, intel=0;
+const DB_NAME='azzouz-brain';
+function initDB(){
+  try{
+    let req=indexedDB.open(DB_NAME,1);
+    req.onupgradeneeded=(e)=>{ let db=e.target.result; if(!db.objectStoreNames.contains('memories')) db.createObjectStore('memories',{keyPath:'id', autoIncrement:true}); if(!db.objectStoreNames.contains('knowledge')) db.createObjectStore('knowledge',{keyPath:'topic'}); };
+    req.onsuccess=(e)=>{ DB=e.target.result; loadMemory(); };
+    req.onerror=()=>{ loadMemoryFallback(); };
+  }catch(e){ loadMemoryFallback(); }
+}
+function loadMemoryFallback(){ try{ memory=JSON.parse(localStorage.getItem('azzouz-global-memory')||'[]'); }catch(e){ memory=[]; } updateStats(); }
+function loadMemory(){
+  try{
+    let tx=DB.transaction('memories','readonly'); let store=tx.objectStore('memories'); let req=store.getAll();
+    req.onsuccess=()=>{ memory=req.result||[]; updateStats(); };
+    req.onerror=()=>{ loadMemoryFallback(); };
+  }catch(e){ loadMemoryFallback(); }
+}
+function saveMemory(q, answer, sources, summary){
+  let item={q, a:answer, sources, summary, time:Date.now(), topic:extractTopic(q), titles:(window.__lastTitles||[])};
+  memory.push(item); if(memory.length>500) memory=memory.slice(-500);
+  try{ localStorage.setItem('azzouz-global-memory', JSON.stringify(memory.slice(-100))); }catch(e){}
+  try{
+    if(DB){ let tx=DB.transaction('memories','readwrite'); tx.objectStore('memories').add(item);
+      let tx2=DB.transaction('knowledge','readwrite'); let st=tx2.objectStore('knowledge');
+      let get=st.get(item.topic); get.onsuccess=()=>{ let k=get.result||{topic:item.topic, count:0, answers:[]}; k.count++; k.answers.push(answer.slice(0,300)); if(k.answers.length>10) k.answers=k.answers.slice(-10); st.put(k); };
+    }
+  }catch(e){}
+  updateStats();
+}
+function updateStats(){
+  document.getElementById('memCount').textContent=memory.length;
+  document.getElementById('qCount').textContent=qCount;
+  document.getElementById('refCount').textContent=refTotal;
+  intel=Math.min(100, memory.length*0.8 + qCount*1.5 + refTotal*0.3);
+  document.getElementById('intel').textContent=intel.toFixed(0)+'%';
+  let level = intel<10?'مبتدئ': intel<30?'متعلم': intel<60?'ذكي': intel<85?'خبير':'عالم';
+  document.getElementById('learn').textContent=level;
+}
+initDB();
+
+function addMsg(html, cls='ai'){ let c=document.getElementById('chat'); let d=document.createElement('div'); d.className='msg '+cls; d.innerHTML=html; c.appendChild(d); window.scrollTo(0, document.body.scrollHeight); return d; }
+function setStatus(t){ document.getElementById('status').textContent=t; }
+function setProgress(p){ let pr=document.getElementById('progress'); pr.style.display=p>0?'block':'none'; document.getElementById('progressBar').style.width=p+'%'; }
+
+// ===== الصوت =====
+let recognition=null, isListening=false;
+function toggleVoice(){
+  let SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){ setStatus('المتصفح ما كيدعمش الصوت - استعمل Chrome ولا كتب السؤال'); return; }
+  if(isListening){ recognition.stop(); return; }
+  recognition=new SR(); recognition.lang=document.getElementById('lang').value; recognition.interimResults=true; recognition.continuous=false;
+  recognition.onstart=()=>{ isListening=true; document.getElementById('orb').className='listening'; document.getElementById('orb').textContent='🔴'; setStatus('🎙️ كنسمعك... اهضر دابا...'); };
+  recognition.onend=()=>{ isListening=false; document.getElementById('orb').className=''; document.getElementById('orb').textContent='🧠'; setStatus('جاهز...'); };
+  recognition.onresult=(e)=>{
+    let text='';
+    for(let i=0;i<e.results.length;i++) text+=e.results[i][0].transcript;
+    text=text.trim();
+    if(!text) return;
+    document.getElementById('q').value=text;
+    if(e.results[e.results.length-1].isFinal!==false){ addMsg(text,'me'); document.getElementById('q').value=''; askAIWithText(text); }
+  };
+  recognition.onerror=()=>{ isListening=false; document.getElementById('orb').className=''; document.getElementById('orb').textContent='🧠'; setStatus('ما سمعتكش - عاود ولا كتب'); };
+  recognition.start();
+}
+function speak(text){
+  if(!('speechSynthesis' in window)) return;
+  speechSynthesis.cancel();
+  let clean=text.replace(/<[^>]*>/g,'').replace(/[🧠🐝📖📚🔬💻🌐✨﴿﴾📋]/g,'').replace(/\s+/g,' ').slice(0,600);
+  if(!clean.trim()) return;
+  let u=new SpeechSynthesisUtterance(clean); u.lang=document.getElementById('lang').value; u.rate=1; u.pitch=1;
+  let voices=speechSynthesis.getVoices(); let ar=voices.find(v=>v.lang.startsWith('ar')); if(ar) u.voice=ar;
+  u.onstart=()=>{ document.getElementById('orb').className='thinking'; };
+  u.onend=()=>{ document.getElementById('orb').className=''; };
+  speechSynthesis.speak(u);
+}
+if('speechSynthesis' in window){ speechSynthesis.onvoiceschanged=()=>{ speechSynthesis.getVoices(); }; }
+
+// ===== جمع المصادر =====
+async function fetchWithTimeout(url, ms=6000){
+  let ctrl=new AbortController(); let t=setTimeout(()=>ctrl.abort(), ms);
+  try{ let r=await fetch(url,{signal:ctrl.signal}); clearTimeout(t); return r; }catch(e){ clearTimeout(t); throw e; }
+}
+const strip = s => String(s||'').replace(/<[^>]*>/g,' ').replace(/\s+/g,' ').trim();
+
+async function gatherSources(q){
+  let sources=[];
+  let jobs=[];
+  // 1. القرآن
+  jobs.push((async()=>{ try{ let kw=extractKeyword(q); if(!kw) return; let r=await fetchWithTimeout(`https://api.alquran.cloud/v1/search/${encodeURIComponent(kw)}/all/quran-uthmani`); let d=await r.json(); if(d.data&&d.data.count>0){ d.data.matches.slice(0,2).forEach(a=> sources.push({name:'📖 القرآن الكريم', title:`${a.surah.englishName} - آية ${a.numberInSurah}`, text:a.text, url:'https://quran.com/'+a.surah.number+'/'+a.numberInSurah, weight:10})); } }catch(e){} })());
+  // 2. ويكيبيديا
+  jobs.push((async()=>{ try{ let r=await fetchWithTimeout(`https://ar.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(q)}&format=json&origin=*`); let d=await r.json(); if(d.query&&d.query.search&&d.query.search.length){ let p=d.query.search[0]; sources.push({name:'📚 ويكيبيديا العربية', title:p.title, text:strip(p.snippet), url:'https://ar.wikipedia.org/wiki/'+encodeURIComponent(p.title), weight:8}); } }catch(e){} })());
+  jobs.push((async()=>{ try{ let r=await fetchWithTimeout(`https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(q)}&format=json&origin=*`); let d=await r.json(); if(d.query&&d.query.search&&d.query.search.length){ let p=d.query.search[0]; sources.push({name:'📚 Wikipedia English', title:p.title, text:strip(p.snippet), url:'https://en.wikipedia.org/wiki/'+encodeURIComponent(p.title), weight:8}); } }catch(e){} })());
+  // 3. OpenAlex
+  jobs.push((async()=>{ try{ let r=await fetchWithTimeout(`https://api.openalex.org/works?search=${encodeURIComponent(q)}&per_page=3`); let d=await r.json(); (d.results||[]).forEach(w=> sources.push({name:'🔬 OpenAlex - بحث علمي', title:w.display_name||'بحث', text:strip(w.display_name), url:w.doi?String(w.doi):w.id, weight:7, year:w.publication_year})); }catch(e){} })());
+  // 4. Crossref
+  jobs.push((async()=>{ try{ let r=await fetchWithTimeout(`https://api.crossref.org/works?query=${encodeURIComponent(q)}&rows=2&select=title,URL,abstract,issued`); let d=await r.json(); (d.message&&d.message.items||[]).forEach(w=> sources.push({name:'🎓 Crossref - بحث أكاديمي', title:(w.title||['بحث'])[0], text:strip(w.abstract)||'بحث أكاديمي محكم', url:w.URL, weight:7})); }catch(e){} })());
+  // 5. GitHub
+  jobs.push((async()=>{ try{ let r=await fetchWithTimeout(`https://api.github.com/search/repositories?q=${encodeURIComponent(q)}&per_page=3`); let d=await r.json(); (d.items||[]).forEach(i=> sources.push({name:'💻 GitHub - كود', title:i.full_name, text:strip(i.description), url:i.html_url, weight:5})); }catch(e){} })());
+  // 6. DuckDuckGo
+  jobs.push((async()=>{ try{ let r=await fetchWithTimeout(`https://api.duckduckgo.com/?q=${encodeURIComponent(q)}&format=json&no_html=1`); let d=await r.json(); if(d.Abstract) sources.push({name:'🌐 DuckDuckGo - ملخص', title:d.Heading||q, text:strip(d.Abstract), url:d.AbstractURL||'', weight:6}); }catch(e){} })());
+  // 7. Open Library
+  jobs.push((async()=>{ try{ let r=await fetchWithTimeout(`https://openlibrary.org/search.json?q=${encodeURIComponent(q)}&limit=2`); let d=await r.json(); (d.docs||[]).forEach(b=> sources.push({name:'📕 Open Library - كتاب', title:b.title, text:`كتاب لـ ${(b.author_name||[]).join(', ')||'مؤلف غير معروف'} - سنة ${b.first_publish_year||'غير معروفة'}`, url:'https://openlibrary.org'+(b.key||''), weight:6})); }catch(e){} })());
+  // 8. حكمة
+  jobs.push((async()=>{ try{ let r=await fetchWithTimeout(`https://api.quotable.io/quotes/random?tags=wisdom`,4000); let d=await r.json(); if(d&&d[0]) sources.push({name:'💡 حكمة', title:d[0].author, text:d[0].content, url:'', weight:3}); }catch(e){} })());
+  // 9. Numbers API
+  if(/\d/.test(q)){ jobs.push((async()=>{ try{ let num=q.match(/\d+/)[0]; let r=await fetchWithTimeout(`https://numbersapi.com/${num}/math?json`,4000); let d=await r.json(); if(d.text) sources.push({name:'🔢 حقيقة رياضية', title:`العدد ${num}`, text:d.text, url:'', weight:4}); }catch(e){} })()); }
+  // 11. arXiv
+  jobs.push((async()=>{ try{ const r=await fetchWithTimeout(`https://export.arxiv.org/api/query?search_query=all:${encodeURIComponent(q)}&max_results=3`); const t=await r.text(); const doc=new DOMParser().parseFromString(t,'text/xml'); [...doc.querySelectorAll('entry')].forEach(en=>{ const title=en.querySelector('title')?.textContent||''; const sum=en.querySelector('summary')?.textContent||''; const link=en.querySelector('id')?.textContent||''; if(title) sources.push({name:'📄 arXiv - ورقة بحثية', title:title.trim(), text:strip(sum), url:link.trim(), weight:7}); }); }catch(e){} })());
+  // 12. PubMed
+  jobs.push((async()=>{ try{ const r=await fetchWithTimeout(`https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&retmode=json&retmax=3&term=${encodeURIComponent(q)}`); const d=await r.json(); const ids=(d.esearchresult&&d.esearchresult.idlist)||[]; if(ids.length){ const s=await fetchWithTimeout(`https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=pubmed&retmode=json&id=${ids.join(',')}`); const sd=await s.json(); ids.forEach(id=>{ const it=sd.result&&sd.result[id]; if(it) sources.push({name:'🩺 PubMed - طب', title:it.title, text:(it.source||'')+' · '+(it.pubdate||''), url:'https://pubmed.ncbi.nlm.nih.gov/'+id+'/', weight:7}); }); } }catch(e){} })());
+  // 13. Europe PMC
+  jobs.push((async()=>{ try{ const r=await fetchWithTimeout(`https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=${encodeURIComponent(q)}&format=json&pageSize=3`); const d=await r.json(); ((d.resultList&&d.resultList.result)||[]).forEach(p=> sources.push({name:'🔬 Europe PMC', title:p.title, text:strip(p.abstractText||p.journalTitle||''), url:p.doi?'https://doi.org/'+p.doi:'https://europepmc.org/article/'+p.id, weight:7})); }catch(e){} })());
+  // 14. Internet Archive
+  jobs.push((async()=>{ try{ const r=await fetchWithTimeout(`https://archive.org/advancedsearch.php?q=${encodeURIComponent(q)}&fl[]=title&fl[]=identifier&rows=3&output=json`); const d=await r.json(); ((d.response&&d.response.docs)||[]).forEach(x=> sources.push({name:'🗄️ أرشيف الإنترنت', title:x.title, text:'نسخة محفوظة فالأرشيف', url:'https://archive.org/details/'+x.identifier, weight:5})); }catch(e){} })());
+  // 15. Hacker News
+  jobs.push((async()=>{ try{ const r=await fetchWithTimeout(`https://hn.algolia.com/api/v1/search?query=${encodeURIComponent(q)}&hitsPerPage=4`); const d=await r.json(); (d.hits||[]).forEach(x=> sources.push({name:'💬 Hacker News', title:x.title||x.story_title, text:strip(x.story_text||x.comment_text), url:x.url||('https://news.ycombinator.com/item?id='+x.objectID), weight:5})); }catch(e){} })());
+  // 16. Stack Overflow
+  jobs.push((async()=>{ try{ const r=await fetchWithTimeout(`https://api.stackexchange.com/2.3/search/advanced?order=desc&sort=relevance&q=${encodeURIComponent(q)}&site=stackoverflow&pagesize=3`); const d=await r.json(); (d.items||[]).forEach(x=> sources.push({name:'💻 Stack Overflow', title:x.title, text:strip(x.title), url:x.link, weight:4})); }catch(e){} })());
+
+  // 10. الذاكرة
+  let topic=extractTopic(q);
+  let related=memory.filter(m=> m.topic===topic || m.q.toLowerCase().includes(topic.toLowerCase())).slice(-3);
+  related.forEach(m=> sources.push({name:'💾 ذاكرتي - تعلمت من قبل', title:`سؤال سابق: ${m.q}`, text:strip(m.summary||m.a).slice(0,250), url:'', weight:9}));
+
+  for(let i=0;i<jobs.length;i++){ setProgress(((i+1)/jobs.length)*100); await jobs[i].catch(()=>{}); }
+  setProgress(100); setTimeout(function(){setProgress(0);},500);
+  return sources;
+}
+
+// ===== التلخيص: تجميع المصادر ف فكرة وحدة =====
+function firstClause(s, n) {
+  const t = strip(s);
+  const cut = t.split(/[.!؟?،]/)[0] || t;
+  return cut.slice(0, n || 150).trim();
+}
+
+function unifyIdea(q, points) {
+  const p = points.slice(0, 3).map(x => firstClause(x.text, 130)).filter(Boolean);
+  if (!p.length) return '';
+  let idea = p[0];
+  if (p[1]) idea += '، وهاد الطرح كيتدعم من مصدر آخر كيقول ' + p[1];
+  if (p[2]) idea += '، ومن زاوية أخرى ' + p[2];
+  return idea;
+}
+
+function summarize(q, sources) {
+  if (!sources.length) return { summary: 'ما لقيتش مصادر كافية. جرب سؤال آخر بكلمات أبسط.', keyPoints: [], verse: getVerse(q), sorted: [], idea: '' };
+  const sorted = [...sources].sort((a, b) => b.weight - a.weight);
+  const keyPoints = [];
+  const seenSentence = new Set();
+  for (const s of sorted) {
+    const sentence = strip(s.text).slice(0, 190);
+    if (!sentence) continue;
+    const sig = sentence.slice(0, 45).toLowerCase();
+    if (seenSentence.has(sig)) continue;
+    seenSentence.add(sig);
+    keyPoints.push({ source: s.name, text: sentence, url: s.url || '' });
+    if (keyPoints.length >= 6) break;
+  }
+  const idea = unifyIdea(q, keyPoints);
+  const summary = 'الفكرة الوحدة: ' + idea;
+  return { summary, keyPoints, verse: getVerse(q), sorted, idea };
+}
+
+// ===== الذاكرة: كيتفكر القديم وكيزيد الجديد =====
+function findPrior(q) {
+  const topic = extractTopic(q);
+  let best = null, bestScore = 0;
+  for (const m of memory) {
+    const mt = extractTopic(m.q);
+    let s = 0;
+    if (mt === topic) s = 100;
+    else {
+      const w = mt.split(' ').filter(x => x.length > 2);
+      const hit = w.filter(x => q.includes(x)).length;
+      if (w.length) s = (hit / w.length) * 70;
+    }
+    if (s > bestScore) { bestScore = s; best = m; }
+  }
+  return bestScore >= 60 ? best : null;
+}
+
+// ===== ثلاثة اقتراحات - كتطيح فخانة البحث وكتبدا من جديد =====
+function addSuggestions(q){
+  const t=String(q).replace(/^(ما هو|ما هي|شنو هو|شنو هي|كيفاش|كيف|لماذا|علاش)\s+/i,'').replace(/[؟?]/g,'').trim();
+  const list=[
+    'أحدث الأبحاث حول '+t,
+    'التطبيقات العملية ديال '+t,
+    'التحديات والانتقادات فـ '+t
+  ];
+  let box=document.createElement('div'); box.className='sugg';
+  list.forEach(s=>{
+    let b=document.createElement('button'); b.textContent='💡 '+s;
+    b.onclick=()=>{
+      const input=document.getElementById('q');
+      input.value=s; input.focus();
+      setTimeout(()=>{ addMsg(s,'me'); input.value=''; askAIWithText(s); },250);
+    };
+    box.appendChild(b);
+  });
+  document.getElementById('chat').appendChild(box);
+  window.scrollTo(0, document.body.scrollHeight);
+}
+
+async function askAI(){ let input=document.getElementById('q'); let q=input.value.trim(); if(!q) return; input.value=''; addMsg(q.replace(/</g,'&lt;'),'me'); askAIWithText(q); }
+
+async function askAIWithText(q){
+  qCount++; updateStats();
+  document.getElementById('orb').className='thinking'; document.getElementById('orb').textContent='⏳';
+  setStatus('🧠 كنفكر... كنجيب من المصادر وكنلخص...');
+
+  if(/^[0-9+\-*/(). ]+$/.test(q)){
+    try{
+      let res=Function('"use strict"; return ('+q+')')();
+      let ans=`${q} = ${res}`;
+      addMsg(`🧮 <b>حسبت:</b> ${q} = <b style="color:#00ff88;font-size:20px">${res}</b><br>📚 المرجع: الجبر - الخوارزمي`, 'ai');
+      speak(ans); saveMemory(q, ans, ['رياضيات'], ans);
+      addSuggestions(q);
+      document.getElementById('orb').className=''; document.getElementById('orb').textContent='🧠'; setStatus('جاهز...'); return;
+    }catch(e){}
+  }
+
+  const prior=findPrior(q);
+  if(prior){
+    addMsg('🧠 <b>من الذاكرة:</b> سولتني على «'+escapeHtml(prior.q)+'» من قبل.<br>'+escapeHtml(String(prior.summary||prior.a||'').replace(/<[^>]*>/g,'').slice(0,420))+'<br><br><span style="color:#888">دابا غادي نعاود نقرا المصادر ونشوف واش كاين شي جديد باش نزيدو على اللي عرفت.</span>','ai');
+  }
+
+  let sources=await gatherSources(q);
+  refTotal+=sources.length; updateStats();
+  window.__lastTitles=sources.map(s=>String(s.title||'').slice(0,80));
+
+  let {summary, keyPoints, verse, sorted, idea}=summarize(q, sources);
+
+  // شنو زاد على اللي كان فالذاكرة
+  let fresh=[];
+  if(prior && Array.isArray(prior.titles)){
+    const had=new Set(prior.titles.map(t=>String(t).toLowerCase()));
+    fresh=sorted.filter(s=>!had.has(String(s.title||'').slice(0,80).toLowerCase()));
+  }
+
+  let html=`🧠 <b>Azzouz AI — قرأت ${sources.length} مصدر، ولخصتهم ف فكرة وحدة:</b><br>`;
+  html+=`<div class="summary"><b style="color:#ffaa00">📋 ${prior?'الفكرة الوحدة (محدّثة)':'الفكرة الوحدة'}:</b><br>${escapeHtml(idea||summary)}<br><br><b>الآية المناسبة:</b> ${escapeHtml(verse)}</div>`;
+  if(prior){
+    html+=`<div class="ref" style="border-color:#00ff88"><b>🧠 تفكرت القديم:</b> ${escapeHtml(String(prior.summary||'').replace(/<[^>]*>/g,'').slice(0,200))}<br><b>🆕 زدت الجديد:</b> `+(fresh.length? escapeHtml(fresh.slice(0,3).map(f=>f.title).join(' · '))+' ('+fresh.length+' مصدر جديد)' : 'ما لقيتش جديد هاد الدورة، غير صياغة أوضح')+`</div>`;
+  }
+  html+=`<b>🔑 النقاط الأساسية:</b><br>`;
+  keyPoints.forEach(p=>{
+    html+=`<div class="ref"><b>${escapeHtml(p.source)}:</b> ${escapeHtml(p.text)}...`+(p.url?`<br><a href="${p.url}" target="_blank" rel="noopener">${p.url.slice(0,70)}</a>`:'')+`</div>`;
+  });
+  html+=`<div style="margin-top:8px"><b>📚 جميع المصادر (${sources.length}):</b> `;
+  sorted.forEach(s=>{ html+=`<span class="sourceTag">${escapeHtml(s.name)}</span> `; });
+  html+=`</div>`;
+  html+=`<div style="font-size:11px;color:#888;margin-top:6px">💾 حفظت هاد الجواب فالذاكرة - إلا سولتي نفس السؤال غدا، غادي نتفكرو ونزيد عليه الجديد.</div>`;
+
+  addMsg(html, 'ai');
+  speak(summary.slice(0,600));
+  saveMemory(q, summary, sources.map(s=>s.name), summary);
+  addSuggestions(q);
+  document.getElementById('orb').className=''; document.getElementById('orb').textContent='🧠';
+  setStatus('جاهز - تعلمت شي حاجة جديدة - سولني شي سؤال آخر...');
+}
+
+function escapeHtml(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function extractTopic(q){
+  let t=q.toLowerCase().replace(/[?؟!.,]/g,'').trim();
+  let words=t.split(/\s+/).filter(w=>w.length>2);
+  return words.slice(0,2).join(' ')||t.slice(0,15);
+}
+function extractKeyword(q){
+  let map={'ثقب':'السماء','أسود':'السماء','نحل':'النحل','نمل':'النمل','نور':'النور','سماء':'السماء','حديد':'الحديد','كرسي':'الكرسي','رحمة':'الرحمة','علم':'العلم','قلب':'القلب','قرآن':'القرآن','الله':'الله','طاقة':'الطاقة','ماء':'الماء','أرض':'الأرض'};
+  for(let k in map){ if(q.includes(k)) return map[k]; }
+  let words=q.split(/\s+/).filter(w=>w.length>2 && /[\u0600-\u06FF]/.test(w));
+  return words[0]||null;
+}
+function getVerse(q){
+  let t=q.toLowerCase();
+  if(t.includes('ثقب')||t.includes('black')||t.includes('كون')||t.includes('space')) return '﴿ والسماء بنيناها بأيد وإنا لموسعون ﴾ الذاريات 47';
+  if(t.includes('نحل')||t.includes('bee')) return '﴿ وأوحى ربك إلى النحل ﴾ النحل 68';
+  if(t.includes('نمل')||t.includes('ant')) return '﴿ قالت نملة يا أيها النمل ﴾ النمل 18';
+  if(t.includes('نور')||t.includes('light')) return '﴿ الله نور السماوات والأرض ﴾ النور 35';
+  if(t.includes('طاقة')||t.includes('energy')) return '﴿ وجعلنا من الماء كل شيء حي ﴾ الأنبياء 30';
+  if(t.includes('علم')||t.includes('science')) return '﴿ وقل رب زدني علما ﴾ طه 114';
+  return '﴿ وفي الأرض آيات للموقنين ﴾ الذاريات 20';
+}
+function exportMemory(){
+  let data=JSON.stringify(memory,null,2);
+  let blob=new Blob([data],{type:'application/json'}); let url=URL.createObjectURL(blob);
+  let a=document.createElement('a'); a.href=url; a.download='azzouz-brain.json'; a.click();
+  addMsg('💾 <b>صدرت الذاكرة:</b> '+memory.length+' سؤال وجواب - تقدر تحفظ الملف وتسترجعو فأي جهاز.', 'ai');
+}
+function clearMemory(){
+  if(!confirm('واش بغيتي تمسح الذاكرة كاملة؟ Azzouz غادي ينسى كلشي اللي تعلمو معاك.')) return;
+  memory=[]; try{ localStorage.removeItem('azzouz-global-memory'); }catch(e){}
+  try{ if(DB){ let tx=DB.transaction('memories','readwrite'); tx.objectStore('memories').clear(); } }catch(e){}
+  updateStats(); addMsg('🗑️ <b>مسحت الذاكرة:</b> Azzouz نسى كلشي - وغادي يبدا يتعلم من جديد معاك.', 'ai');
+}
+</script></body></html>
