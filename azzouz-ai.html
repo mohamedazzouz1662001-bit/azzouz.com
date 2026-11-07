@@ -887,6 +887,15 @@ function pcInstruction(text) {
   return JSON.stringify({ op: 'write', path: 'azzouz-' + Date.now() + '.txt', content: t });
 }
 
+async function pcWait(id, tries = 12) {
+  for (let i = 0; i < tries; i++) {
+    await new Promise(r => setTimeout(r, 2500));
+    const r = await pcCall({ op: 'job', id });
+    if (r && r.ok && (r.status === 'done' || r.status === 'error')) return r;
+  }
+  return { ok: false, status: 'timeout', result: '' };
+}
+
 async function pcAsk(text) {
   let kind = 'write';
   if (/^\/run/i.test(text.trim())) kind = 'run';
@@ -952,6 +961,14 @@ async function ask(text) {
   if (pcIntent(q)) {
     addMsg(esc(q), 'out');
     const out = await pcAsk(q);
+    if (out.ok && out.id) {
+      addMsg('<div class="h">1. الخلاصة</div><b>المهمة واصلة لحاسوبك، كنستنى النتيجة…</b>', 'in');
+      const done = await pcWait(out.id);
+      const head = done.ok ? (done.status === 'done' ? '✅ تنفذات' : '⚠️ سالات بخطأ') : '⏳ مازال ما رجعش الجواب';
+      addMsg('<div class="h">1. الخلاصة</div><b>' + head + '</b><br><br><div class="h">2. الشرح</div><b>النتيجة:</b><br><pre style="white-space:pre-wrap;font-size:12px;background:#0d1a20;padding:8px;border-radius:8px;overflow:auto">' + esc(done.result || 'بلا خرج') + '</pre><br><div class="h">3. مثال</div>تقدر تعاود بنفس الصيغة: «اكتب لي كود …» ولا «/run أمر».<br><br><div class="h">4. شنو ندير دابا</div>إلا كان الخطأ، قول ليا نصلحو.<br><br><b>واش بغيتي نكمل؟</b>', 'in');
+      renderPC();
+      return;
+    }
     addMsg(out.ok
       ? '<div class="h">1. الخلاصة</div><b>صيفطت المهمة لحاسوبك.</b><br><br><div class="h">2. الشرح</div>1. المهمة واصلة للجسر فـ Base44.<br>2. العامل المحلي غادي ياخدها فثواني وينفذها.<br>3. تقدر تشوف النتيجة فـ ☰ ← الحاسوب.<br><br><div class="h">3. مثال</div>«اكتب لي كود Python كيحسب المعدل» ← كيتكتب ملف فمجلد azzouz-work.<br><br><div class="h">4. شنو ندير دابا</div>تأكد بلي <code>node azzouz-computer.mjs</code> شغال فالحاسوب.<br><br><b>واش بغيتي نكمل؟</b>'
       : '<div class="h">1. الخلاصة</div><b>ما قدرتش نرسل.</b><br><br>' + esc(out.msg || '') + '<br><br><b>واش بغيتي نكمل؟</b>', 'in');
