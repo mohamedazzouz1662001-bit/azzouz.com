@@ -478,6 +478,8 @@ function suggestionsFor(q) {
 
 function renderAnswer(q, data, prior) {
   let h = '';
+  const fx = findFix(topicOf(q));
+  if (fx) h += '<div class="h">✍️ تصحيح محفوظ</div>' + esc(String(fx.note).slice(0, 260)) + '<br><br>';
   if (prior) h += '<div class="h">🧠 من الذاكرة</div>سولتني على «' + esc(prior.q) + '» من قبل، وها اللي عرفت من ديك المرة.<br><br>';
 
   h += '<div class="h">1. الخلاصة</div><b>' + esc(data.short) + '</b>';
@@ -529,8 +531,16 @@ function renderAnswer(q, data, prior) {
 async function ask(text) {
   const q = String(text || '').trim();
   if (!q || busy) return;
+  if (PENDING_FIX) {
+    addMsg(esc(q), 'out');
+    saveFix(PENDING_FIX, q);
+    addMsg('<div class="h">1. الخلاصة</div><b>سمح ليا، حفظت التصحيح.</b><br><br><div class="h">2. الشرح</div>1. التصحيح ديالك تسجل على موضوع «' + esc(PENDING_FIX) + '».<br>2. غادي نستعملو فكل جواب جاي على هاد الموضوع.<br><br><div class="h">3. مثال</div>إلا سولتيني على «' + esc(PENDING_FIX) + '» من بعد، غادي نبدا بالتصحيح ديالك قبل المصادر.<br><br><div class="h">4. شنو ندير دابا</div>سولني نفس السؤال ونشوف واش ولا صحيح.<br><br><b>واش بغيتي نكمل؟</b>', 'in');
+    PENDING_FIX = null;
+    return;
+  }
+
   const fix = correction(q);
-  if (fix) { addMsg(esc(q), 'out'); addMsg('<div class="h">تصحيح</div><b>سمح ليا، فهمت الغلط.</b><br><br>قول ليا آش بالضبط اللي ماشي صحيح، ونصححو ونحفظو باش ما نعاودوش.<br><br><b>واش بغيتي نكمل؟</b>', 'in'); return; }
+  if (fix) { addMsg(esc(q), 'out'); PENDING_FIX = LAST ? topicOf(LAST.q) : topicOf(q); addMsg('<div class="h">تصحيح</div><b>سمح ليا، فهمت الغلط.</b><br><br>قول ليا آش بالضبط اللي ماشي صحيح، ونصححو ونحفظو باش ما نعاودوش.<br><br><b>واش بغيتي نكمل؟</b>', 'in'); return; }
   const quick = smallTalk(q);
   if (quick) { addMsg(q, 'out'); addMsg(esc(quick), 'in'); return; }
   busy = true;
@@ -931,6 +941,20 @@ $('clearChat').onclick = () => { if (confirm('تمسح المحادثة كامل
 loadChat().then(() => { refreshMemCount(); hUI(); });
 setTimeout(() => { if (!log.children.length) loadChat(); }, 400);
 
+
+
+/* ===== التصحيحات ===== */
+let PENDING_FIX = null;
+function fixes() { try { return JSON.parse(localStorage.getItem('azzouz-fixes-v1') || '[]'); } catch (e) { return []; } }
+function saveFix(topic, note) {
+  const a = fixes();
+  a.push({ topic, note, at: Date.now() });
+  try { localStorage.setItem('azzouz-fixes-v1', JSON.stringify(a.slice(-120))); } catch (e) {}
+}
+function findFix(topic) {
+  const a = fixes().filter(f => f.topic && (topic.includes(f.topic) || f.topic.includes(topic)));
+  return a.length ? a[a.length - 1] : null;
+}
 
 /* ===== قراءة الملفات ===== */
 function fileAnswer(name, text) {
