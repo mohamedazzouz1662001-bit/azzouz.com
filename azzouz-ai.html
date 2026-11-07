@@ -1,545 +1,656 @@
 <!DOCTYPE html>
-<html lang="ar" dir="rtl"><head><meta charset="UTF-8">
-<title>Azzouz AI - ذكاء اصطناعي عالمي 🧠</title>
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#202c33">
+<title>Azzouz — مساعد ذكي</title>
 <style>
-*{box-sizing:border-box}
-body{margin:0;background:#0a0a0f;color:#fff;font-family:system-ui,Consolas}
-#top{position:fixed;top:0;left:0;right:0;background:rgba(10,10,15,.98);padding:10px;border-bottom:1px solid #00ff88;z-index:10}
-#brain{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-#orb{width:44px;height:44px;border-radius:50%;background:radial-gradient(circle,#00ff88,#004d2e);display:flex;align-items:center;justify-content:center;font-size:22px;cursor:pointer;box-shadow:0 0 25px #00ff88;flex-shrink:0}
-#orb.thinking{animation:spin 1s infinite;background:radial-gradient(circle,#ffaa00,#4d2e00);box-shadow:0 0 30px #ffaa00}
-@keyframes spin{0%{transform:rotate(0)}100%{transform:rotate(360deg)}}
-#orb.listening{background:radial-gradient(circle,#ff0044,#4d0000);box-shadow:0 0 30px #ff0044}
-.chip{border:1px solid #222;padding:3px 9px;border-radius:8px;font-size:11px;text-align:center}
-.chip b{display:block;color:#00ff88;font-size:12px}
-#chat{padding:120px 12px 130px;max-width:900px;margin:0 auto}
-.msg{padding:13px;border-radius:14px;margin:12px 0;line-height:1.9;font-size:14px;word-break:break-word}
-.me{background:#004d2e;margin-left:15%}
-.ai{background:#14141d;border:1px solid #00ff88}
-.ref{background:#0a1a2e;border:1px solid #00aaff;padding:8px;border-radius:8px;margin:6px 0;font-size:12px}
-.ref a{color:#7fd6ff;text-decoration:none;word-break:break-all}
-.summary{background:linear-gradient(135deg,#0a1a0f,#1a0f00);border:1px solid #ffaa00;padding:10px;border-radius:10px;margin:8px 0}
-.sourceTag{display:inline-block;background:#222;padding:2px 7px;border-radius:12px;font-size:10px;margin:2px}
-.sugg{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
-.tools{margin-top:10px;border-top:1px dashed #2a2a3a;padding-top:8px}
-.tools b{font-size:12px;color:#9ad}
-.barrow{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
-.barrow button{background:#1b1b28;color:#cfe;border:1px solid #335;padding:7px 9px;border-radius:8px;font-size:11.5px;font-weight:normal;cursor:pointer}
-.kw{cursor:pointer}
-.tl{font-size:11px;color:#9ad;margin-top:6px}
-.tl i{display:inline-block;background:#00ff88;height:9px;border-radius:3px;margin-left:2px;vertical-align:middle}
-#memList{max-height:230px;overflow:auto;background:#101018;border:1px solid #223;border-radius:10px;padding:8px;margin-top:8px;font-size:12px}
-#memList div{padding:5px 0;border-bottom:1px solid #1b1b28;display:flex;gap:6px;align-items:center}
-#memList span{flex:1}
-#memList button{background:#331;color:#fbb;border:1px solid #553;padding:3px 7px;border-radius:6px;font-size:10px}
-.sugg button{background:#0f2a1c;color:#9dffd0;border:1px solid #00ff88;padding:8px 10px;border-radius:10px;font-size:12px;font-weight:normal;cursor:pointer}
-#bottom{position:fixed;bottom:0;left:0;right:0;background:rgba(10,10,15,.98);padding:10px;display:flex;gap:6px}
-input{flex:1;background:#111;border:1px solid #333;color:#fff;padding:12px;border-radius:10px;font-size:14px}
-button{background:#00ff88;border:none;padding:12px 13px;border-radius:10px;cursor:pointer;font-weight:bold;color:#04150d}
-#progress{height:3px;background:#222;margin-top:6px;border-radius:3px;overflow:hidden;display:none}
-#progressBar{height:100%;background:#00ff88;width:0%;transition:0.3s}
-</style></head><body>
-<div id="top">
-<div id="brain">
-<div id="orb" onclick="toggleVoice()">🧠</div>
-<div><b>Azzouz AI - ذكاء اصطناعي عالمي</b><div id="status" style="font-size:11px;color:#888">جاهز - سول أي سؤال - كنقرا من 16 مصدر (كتب، أبحاث، مواقع) وكنلخصهم ف فكرة وحدة</div></div>
-<div style="margin-right:auto;display:flex;gap:5px;flex-wrap:wrap">
-<div class="chip">الأسئلة<b id="qCount">0</b></div>
-<div class="chip">المصادر<b id="refCount">0</b></div>
-<div class="chip">الذاكرة<b id="memCount">0</b></div>
-<div class="chip">الذكاء<b id="intel">0%</b></div>
-<div class="chip">التعلم<b id="learn">مبتدئ</b></div>
-</div>
-</div>
-<div id="memPanel" style="display:none"><div id="memList"></div></div>
-<div id="progress"><div id="progressBar"></div></div>
-<div style="font-size:11px;margin-top:4px">اللغة: <select id="lang" style="background:#111;color:#fff;border:1px solid #333;padding:4px;border-radius:6px"><option value="ar-MA">الدارجة المغربية</option><option value="ar-SA">العربية</option><option value="fr-FR">Français</option><option value="en-US">English</option></select> <button onclick="exportMemory()" style="padding:4px 8px;font-size:11px">💾 تصدير الذاكرة</button> <button onclick="toggleMemPanel()" style="padding:4px 8px;font-size:11px">🧠 الذاكرة</button> <button onclick="document.getElementById('imp').click()" style="padding:4px 8px;font-size:11px">📥 استيراد</button> <input id="imp" type="file" accept="application/json" style="display:none" onchange="importMemory(this)"> <button onclick="clearMemory()" style="padding:4px 8px;font-size:11px;background:#333;color:#fff">🗑️ مسح الذاكرة</button></div>
-</div>
-<div id="chat"><div class="msg ai">🕋 <b>بسم الله - أنا Azzouz AI:</b><br>ذكاء اصطناعي عالمي - كنقرا من <b>16 مصدر</b> (كتب، أبحاث، موسوعات، مواقع) وكنلخصهم ف <b>فكرة وحدة</b>.<br>وكنتعلم بحال البشر: كل جواب كنحفظو، وإلا عاودت نفس السؤال كنفكر القديم ونزيد عليه الجديد.<br><br>جرب: <b>شنو هو الثقب الأسود؟</b> ولا <b>ما هو النحل؟</b> ولا <b>114*6236</b><br><br>اهضر معايا بالصوت 🎙️ ولا كتب ✍️ - أنا كنسمع وكندوي.</div></div>
-<div id="bottom">
-<input id="q" placeholder="سول أي سؤال..." onkeypress="if(event.key==='Enter') askAI()">
-<button onclick="askAI()">اسأل ➤</button>
-<button onclick="toggleVoice()">🎙️</button>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{--bg:#0b141a;--panel:#202c33;--panel2:#111b21;--line:#2a3942;--out:#005c4b;--in:#202c33;--txt:#e9edef;--dim:#8696a0;--acc:#00a884;--tick:#53bdeb}
+html,body{height:100%}
+body{background:var(--bg);color:var(--txt);font-family:-apple-system,'Segoe UI',Roboto,Tahoma,sans-serif;display:flex;flex-direction:column;overflow:hidden}
+header{display:flex;align-items:center;gap:10px;padding:9px 12px;background:var(--panel);border-bottom:1px solid var(--line);flex-shrink:0}
+.avatar{width:38px;height:38px;border-radius:50%;background:linear-gradient(140deg,#00a884,#0b6b57);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:16px;color:#04241c}
+.hd{flex:1;min-width:0}
+.hd b{font-size:15.5px;display:block}
+.hd span{font-size:11px;color:var(--dim);display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.icon{width:34px;height:34px;border-radius:50%;background:#2a3942;border:none;color:var(--txt);font-size:15px;cursor:pointer;flex-shrink:0}
+#log{flex:1;overflow-y:auto;padding:12px 10px 8px;display:flex;flex-direction:column;gap:7px}
+.msg{max-width:86%;padding:8px 11px;border-radius:9px;font-size:14px;line-height:1.75;position:relative;word-wrap:break-word;white-space:pre-wrap}
+.in{background:var(--in);align-self:flex-start;border-top-right-radius:2px}
+.out{background:var(--out);align-self:flex-end;border-top-left-radius:2px}
+.meta{font-size:10px;color:#7d8f99;text-align:left;margin-top:3px}
+.out .meta{color:#a7c7bd}
+.h{font-weight:700;color:#9be0c6;margin-bottom:3px;font-size:13px}
+.lnk{color:#7fd9ff;text-decoration:none;word-break:break-all;font-size:12px;display:block;margin-top:2px}
+.exp{display:inline-block;margin-top:7px;font-size:12px;color:#9be0c6;background:#1b2b28;border:1px solid #2c4a44;border-radius:8px;padding:6px 10px;cursor:pointer}
+.refs{display:none;margin-top:7px;border-top:1px solid #2f4048;padding-top:6px;max-height:250px;overflow-y:auto}
+.refs.on{display:block}
+.r{font-size:12px;color:#cfd9dd;padding:4px 0;border-bottom:1px dashed #25343b}
+.r b{color:#9be0c6;font-weight:600}
+.sugg{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+.sugg button{background:#1b2b28;border:1px solid #2c4a44;color:#9be0c6;font-size:11.5px;padding:5px 9px;border-radius:14px;cursor:pointer;font-family:inherit}
+.chain{background:var(--in);align-self:flex-start;border-radius:9px;padding:8px 11px;font-size:12px;color:#9fb2ba}
+.chain .st{display:flex;gap:7px;align-items:center;margin:3px 0}
+.chain .dot{width:6px;height:6px;border-radius:50%;background:var(--acc);animation:bl 1s infinite}
+@keyframes bl{50%{opacity:.25}}
+footer{background:var(--panel);padding:8px 9px;display:flex;gap:7px;align-items:flex-end;border-top:1px solid var(--line);flex-shrink:0}
+#q{flex:1;background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:20px;padding:11px 14px;font-size:14px;font-family:inherit;resize:none;max-height:110px;min-height:44px;outline:none}
+.fbtn{width:44px;height:44px;border-radius:50%;border:none;background:var(--panel2);color:var(--txt);font-size:17px;cursor:pointer;flex-shrink:0}
+.fbtn.send{background:var(--acc);color:#04241c}
+.fbtn.rec{background:#c62828;color:#fff;animation:pulse 1.4s infinite}
+@keyframes pulse{50%{box-shadow:0 0 0 8px rgba(198,40,40,.15)}}
+.vbar{display:none;align-items:center;gap:8px;background:#182229;border-top:1px solid var(--line);padding:8px 12px;font-size:12.5px;color:#cfe6de}
+.vbar.on{display:flex}
+.vbar .txt{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sheet{position:fixed;inset:auto 0 0 0;height:80vh;background:var(--bg);border-top:1px solid var(--line);border-radius:16px 16px 0 0;transform:translateY(102%);transition:.25s;z-index:60;display:flex;flex-direction:column}
+.sheet.on{transform:none}
+.sh{display:flex;align-items:center;gap:8px;padding:12px;border-bottom:1px solid var(--line)}
+.sh b{flex:1;font-size:14.5px}
+.stabs{display:flex;gap:6px;padding:9px 12px;background:var(--panel2)}
+.stabs button{flex:1;background:#1b272e;border:1px solid var(--line);color:#a8bcc7;font-size:12.5px;padding:7px;border-radius:10px;font-family:inherit;cursor:pointer}
+.stabs button.on{background:var(--acc);color:#04241c;border-color:var(--acc);font-weight:700}
+.sbody{flex:1;overflow-y:auto;padding:12px}
+.card{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:11px;margin-bottom:10px;font-size:13px;line-height:1.7}
+.card h4{font-size:13px;color:#9be0c6;margin-bottom:6px}
+.chip{display:inline-block;background:#1b2b28;border:1px solid #2c4a44;color:#9be0c6;font-size:11.5px;padding:3px 9px;border-radius:12px;margin:2px;cursor:pointer}
+.brow{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.brow button{background:#1b2b28;border:1px solid #2c4a44;color:#cfe6de;font-size:12px;padding:6px 10px;border-radius:9px;font-family:inherit;cursor:pointer}
+.mrow{display:flex;gap:8px;align-items:center;border-bottom:1px solid #1d2a31;padding:7px 0;font-size:12.5px}
+.mrow span{flex:1;color:#cfd9dd;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mrow button{background:#22303a;border:none;color:#ff8a80;border-radius:7px;padding:4px 8px;font-size:11px;cursor:pointer}
+.num{font-size:11px;color:var(--dim)}
+.bars{display:flex;gap:3px;align-items:flex-end;height:44px;margin-top:6px}
+.bars i{flex:1;background:#2c4a44;border-radius:2px 2px 0 0;min-height:2px}
+</style>
+</head>
+<body>
+<header>
+  <div class="avatar">A</div>
+  <div class="hd"><b>Azzouz</b><span id="status">متصل · كنقرا من كل الويب</span></div>
+  <button class="icon" id="tools" title="الأدوات">☰</button>
+  <button class="icon" id="mic" title="فويس">🎙️</button>
+</header>
+<main id="log"></main>
+<div class="vbar" id="vbar"><span>🎙️</span><span class="txt" id="vtxt">كنسمع...</span><button class="icon" id="vstop">سالِي</button></div>
+<footer>
+  <button class="fbtn" id="mic2">🎙️</button>
+  <textarea id="q" rows="1" placeholder="كتب سؤالك..."></textarea>
+  <button class="fbtn send" id="send">➤</button>
+</footer>
+<div class="sheet" id="sheet">
+  <div class="sh"><b>الأدوات</b><button class="icon" id="shclose">✕</button></div>
+  <div class="stabs"><button data-p="report" class="on">آخر جواب</button><button data-p="memory">الذاكرة</button></div>
+  <div class="sbody" id="paneReport"></div>
+  <div class="sbody" id="paneMemory" hidden></div>
 </div>
 <script>
-// ===== الذاكرة الدائمة - IndexedDB + localStorage =====
-let DB=null, memory=[], qCount=0, refTotal=0, intel=0;
-const DB_NAME='azzouz-brain';
-function initDB(){
-  try{
-    let req=indexedDB.open(DB_NAME,1);
-    req.onupgradeneeded=(e)=>{ let db=e.target.result; if(!db.objectStoreNames.contains('memories')) db.createObjectStore('memories',{keyPath:'id', autoIncrement:true}); if(!db.objectStoreNames.contains('knowledge')) db.createObjectStore('knowledge',{keyPath:'topic'}); };
-    req.onsuccess=(e)=>{ DB=e.target.result; loadMemory(); };
-    req.onerror=()=>{ loadMemoryFallback(); };
-  }catch(e){ loadMemoryFallback(); }
-}
-function loadMemoryFallback(){ try{ memory=JSON.parse(localStorage.getItem('azzouz-global-memory')||'[]'); }catch(e){ memory=[]; } updateStats(); }
-function loadMemory(){
-  try{
-    let tx=DB.transaction('memories','readonly'); let store=tx.objectStore('memories'); let req=store.getAll();
-    req.onsuccess=()=>{ memory=req.result||[]; updateStats(); };
-    req.onerror=()=>{ loadMemoryFallback(); };
-  }catch(e){ loadMemoryFallback(); }
-}
-function saveMemory(q, answer, sources, summary){
-  let item={q, a:answer, sources, summary, time:Date.now(), topic:extractTopic(q), titles:(window.__lastTitles||[])};
-  memory.push(item); if(memory.length>500) memory=memory.slice(-500);
-  try{ localStorage.setItem('azzouz-global-memory', JSON.stringify(memory.slice(-100))); }catch(e){}
-  try{
-    if(DB){ let tx=DB.transaction('memories','readwrite'); tx.objectStore('memories').add(item);
-      let tx2=DB.transaction('knowledge','readwrite'); let st=tx2.objectStore('knowledge');
-      let get=st.get(item.topic); get.onsuccess=()=>{ let k=get.result||{topic:item.topic, count:0, answers:[]}; k.count++; k.answers.push(answer.slice(0,300)); if(k.answers.length>10) k.answers=k.answers.slice(-10); st.put(k); };
-    }
-  }catch(e){}
-  updateStats();
-}
-function updateStats(){
-  document.getElementById('memCount').textContent=memory.length;
-  document.getElementById('qCount').textContent=qCount;
-  document.getElementById('refCount').textContent=refTotal;
-  intel=Math.min(100, memory.length*0.8 + qCount*1.5 + refTotal*0.3);
-  document.getElementById('intel').textContent=intel.toFixed(0)+'%';
-  let level = intel<10?'مبتدئ': intel<30?'متعلم': intel<60?'ذكي': intel<85?'خبير':'عالم';
-  document.getElementById('learn').textContent=level;
-}
-initDB();
+/* ===== أدوات ===== */
+const $ = id => document.getElementById(id);
+const log = $('log'), qEl = $('q'), statusEl = $('status');
+const enc = encodeURIComponent;
+let busy = false, LAST = null;
 
-function addMsg(html, cls='ai'){ let c=document.getElementById('chat'); let d=document.createElement('div'); d.className='msg '+cls; d.innerHTML=html; c.appendChild(d); window.scrollTo(0, document.body.scrollHeight); return d; }
-function setStatus(t){ document.getElementById('status').textContent=t; }
-function setProgress(p){ let pr=document.getElementById('progress'); pr.style.display=p>0?'block':'none'; document.getElementById('progressBar').style.width=p+'%'; }
-
-// ===== الصوت =====
-let recognition=null, isListening=false;
-function toggleVoice(){
-  let SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-  if(!SR){ setStatus('المتصفح ما كيدعمش الصوت - استعمل Chrome ولا كتب السؤال'); return; }
-  if(isListening){ recognition.stop(); return; }
-  recognition=new SR(); recognition.lang=document.getElementById('lang').value; recognition.interimResults=true; recognition.continuous=false;
-  recognition.onstart=()=>{ isListening=true; document.getElementById('orb').className='listening'; document.getElementById('orb').textContent='🔴'; setStatus('🎙️ كنسمعك... اهضر دابا...'); };
-  recognition.onend=()=>{ isListening=false; document.getElementById('orb').className=''; document.getElementById('orb').textContent='🧠'; setStatus('جاهز...'); };
-  recognition.onresult=(e)=>{
-    let text='';
-    for(let i=0;i<e.results.length;i++) text+=e.results[i][0].transcript;
-    text=text.trim();
-    if(!text) return;
-    document.getElementById('q').value=text;
-    if(e.results[e.results.length-1].isFinal!==false){ addMsg(text,'me'); document.getElementById('q').value=''; askAIWithText(text); }
-  };
-  recognition.onerror=()=>{ isListening=false; document.getElementById('orb').className=''; document.getElementById('orb').textContent='🧠'; setStatus('ما سمعتكش - عاود ولا كتب'); };
-  recognition.start();
+function esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 }
-function speak(text){
-  if(!('speechSynthesis' in window)) return;
-  speechSynthesis.cancel();
-  let clean=text.replace(/<[^>]*>/g,'').replace(/[🧠🐝📖📚🔬💻🌐✨﴿﴾📋]/g,'').replace(/\s+/g,' ').slice(0,600);
-  if(!clean.trim()) return;
-  let u=new SpeechSynthesisUtterance(clean); u.lang=document.getElementById('lang').value; u.rate=1; u.pitch=1;
-  let voices=speechSynthesis.getVoices(); let ar=voices.find(v=>v.lang.startsWith('ar')); if(ar) u.voice=ar;
-  u.onstart=()=>{ document.getElementById('orb').className='thinking'; };
-  u.onend=()=>{ document.getElementById('orb').className=''; };
-  speechSynthesis.speak(u);
+function clean(h) { return String(h || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim(); }
+function now() { const d = new Date(); return d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0'); }
+function tick() { return '✓✓'; }
+
+async function jget(url, ms = 9000) {
+  const c = new AbortController(), t = setTimeout(() => c.abort(), ms);
+  try { const r = await fetch(url, { signal: c.signal }); if (!r.ok) throw new Error('x'); return await r.json(); }
+  finally { clearTimeout(t); }
 }
-if('speechSynthesis' in window){ speechSynthesis.onvoiceschanged=()=>{ speechSynthesis.getVoices(); }; }
-
-// ===== جمع المصادر =====
-async function fetchWithTimeout(url, ms=6000){
-  let ctrl=new AbortController(); let t=setTimeout(()=>ctrl.abort(), ms);
-  try{ let r=await fetch(url,{signal:ctrl.signal}); clearTimeout(t); return r; }catch(e){ clearTimeout(t); throw e; }
+async function jtxt(url, ms = 15000) {
+  const c = new AbortController(), t = setTimeout(() => c.abort(), ms);
+  try { const r = await fetch(url, { signal: c.signal }); if (!r.ok) throw new Error('x'); return await r.text(); }
+  finally { clearTimeout(t); }
 }
-const strip = s => String(s||'').replace(/<[^>]*>/g,' ').replace(/\s+/g,' ').trim();
-
-async function gatherSources(q){
-  let sources=[];
-  let jobs=[];
-  // 1. القرآن
-  jobs.push((async()=>{ try{ let kw=extractKeyword(q); if(!kw) return; let r=await fetchWithTimeout(`https://api.alquran.cloud/v1/search/${encodeURIComponent(kw)}/all/quran-uthmani`); let d=await r.json(); if(d.data&&d.data.count>0){ d.data.matches.slice(0,2).forEach(a=> sources.push({name:'📖 القرآن الكريم', title:`${a.surah.englishName} - آية ${a.numberInSurah}`, text:a.text, url:'https://quran.com/'+a.surah.number+'/'+a.numberInSurah, weight:10})); } }catch(e){} })());
-  // 2. ويكيبيديا
-  jobs.push((async()=>{ try{ let r=await fetchWithTimeout(`https://ar.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(q)}&format=json&origin=*`); let d=await r.json(); if(d.query&&d.query.search&&d.query.search.length){ let p=d.query.search[0]; sources.push({name:'📚 ويكيبيديا العربية', title:p.title, text:strip(p.snippet), url:'https://ar.wikipedia.org/wiki/'+encodeURIComponent(p.title), weight:8}); } }catch(e){} })());
-  jobs.push((async()=>{ try{ let r=await fetchWithTimeout(`https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(q)}&format=json&origin=*`); let d=await r.json(); if(d.query&&d.query.search&&d.query.search.length){ let p=d.query.search[0]; sources.push({name:'📚 Wikipedia English', title:p.title, text:strip(p.snippet), url:'https://en.wikipedia.org/wiki/'+encodeURIComponent(p.title), weight:8}); } }catch(e){} })());
-  // 3. OpenAlex
-  jobs.push((async()=>{ try{ let r=await fetchWithTimeout(`https://api.openalex.org/works?search=${encodeURIComponent(q)}&per_page=3`); let d=await r.json(); (d.results||[]).forEach(w=> sources.push({name:'🔬 OpenAlex - بحث علمي', title:w.display_name||'بحث', text:strip(w.display_name), url:w.doi?String(w.doi):w.id, weight:7, year:w.publication_year})); }catch(e){} })());
-  // 4. Crossref
-  jobs.push((async()=>{ try{ let r=await fetchWithTimeout(`https://api.crossref.org/works?query=${encodeURIComponent(q)}&rows=2&select=title,URL,abstract,issued`); let d=await r.json(); (d.message&&d.message.items||[]).forEach(w=> sources.push({name:'🎓 Crossref - بحث أكاديمي', title:(w.title||['بحث'])[0], text:strip(w.abstract)||'بحث أكاديمي محكم', url:w.URL, weight:7})); }catch(e){} })());
-  // 5. GitHub
-  jobs.push((async()=>{ try{ let r=await fetchWithTimeout(`https://api.github.com/search/repositories?q=${encodeURIComponent(q)}&per_page=3`); let d=await r.json(); (d.items||[]).forEach(i=> sources.push({name:'💻 GitHub - كود', title:i.full_name, text:strip(i.description), url:i.html_url, weight:5})); }catch(e){} })());
-  // 6. DuckDuckGo
-  jobs.push((async()=>{ try{ let r=await fetchWithTimeout(`https://api.duckduckgo.com/?q=${encodeURIComponent(q)}&format=json&no_html=1`); let d=await r.json(); if(d.Abstract) sources.push({name:'🌐 DuckDuckGo - ملخص', title:d.Heading||q, text:strip(d.Abstract), url:d.AbstractURL||'', weight:6}); }catch(e){} })());
-  // 7. Open Library
-  jobs.push((async()=>{ try{ let r=await fetchWithTimeout(`https://openlibrary.org/search.json?q=${encodeURIComponent(q)}&limit=2`); let d=await r.json(); (d.docs||[]).forEach(b=> sources.push({name:'📕 Open Library - كتاب', title:b.title, text:`كتاب لـ ${(b.author_name||[]).join(', ')||'مؤلف غير معروف'} - سنة ${b.first_publish_year||'غير معروفة'}`, url:'https://openlibrary.org'+(b.key||''), weight:6})); }catch(e){} })());
-  // 8. حكمة
-  jobs.push((async()=>{ try{ let r=await fetchWithTimeout(`https://api.quotable.io/quotes/random?tags=wisdom`,4000); let d=await r.json(); if(d&&d[0]) sources.push({name:'💡 حكمة', title:d[0].author, text:d[0].content, url:'', weight:3}); }catch(e){} })());
-  // 9. Numbers API
-  if(/\d/.test(q)){ jobs.push((async()=>{ try{ let num=q.match(/\d+/)[0]; let r=await fetchWithTimeout(`https://numbersapi.com/${num}/math?json`,4000); let d=await r.json(); if(d.text) sources.push({name:'🔢 حقيقة رياضية', title:`العدد ${num}`, text:d.text, url:'', weight:4}); }catch(e){} })()); }
-  // 11. arXiv
-  jobs.push((async()=>{ try{ const r=await fetchWithTimeout(`https://export.arxiv.org/api/query?search_query=all:${encodeURIComponent(q)}&max_results=3`); const t=await r.text(); const doc=new DOMParser().parseFromString(t,'text/xml'); [...doc.querySelectorAll('entry')].forEach(en=>{ const title=en.querySelector('title')?.textContent||''; const sum=en.querySelector('summary')?.textContent||''; const link=en.querySelector('id')?.textContent||''; if(title) sources.push({name:'📄 arXiv - ورقة بحثية', title:title.trim(), text:strip(sum), url:link.trim(), weight:7}); }); }catch(e){} })());
-  // 12. PubMed
-  jobs.push((async()=>{ try{ const r=await fetchWithTimeout(`https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&retmode=json&retmax=3&term=${encodeURIComponent(q)}`); const d=await r.json(); const ids=(d.esearchresult&&d.esearchresult.idlist)||[]; if(ids.length){ const s=await fetchWithTimeout(`https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=pubmed&retmode=json&id=${ids.join(',')}`); const sd=await s.json(); ids.forEach(id=>{ const it=sd.result&&sd.result[id]; if(it) sources.push({name:'🩺 PubMed - طب', title:it.title, text:(it.source||'')+' · '+(it.pubdate||''), url:'https://pubmed.ncbi.nlm.nih.gov/'+id+'/', weight:7}); }); } }catch(e){} })());
-  // 13. Europe PMC
-  jobs.push((async()=>{ try{ const r=await fetchWithTimeout(`https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=${encodeURIComponent(q)}&format=json&pageSize=3`); const d=await r.json(); ((d.resultList&&d.resultList.result)||[]).forEach(p=> sources.push({name:'🔬 Europe PMC', title:p.title, text:strip(p.abstractText||p.journalTitle||''), url:p.doi?'https://doi.org/'+p.doi:'https://europepmc.org/article/'+p.id, weight:7})); }catch(e){} })());
-  // 14. Internet Archive
-  jobs.push((async()=>{ try{ const r=await fetchWithTimeout(`https://archive.org/advancedsearch.php?q=${encodeURIComponent(q)}&fl[]=title&fl[]=identifier&rows=3&output=json`); const d=await r.json(); ((d.response&&d.response.docs)||[]).forEach(x=> sources.push({name:'🗄️ أرشيف الإنترنت', title:x.title, text:'نسخة محفوظة فالأرشيف', url:'https://archive.org/details/'+x.identifier, weight:5})); }catch(e){} })());
-  // 15. Hacker News
-  jobs.push((async()=>{ try{ const r=await fetchWithTimeout(`https://hn.algolia.com/api/v1/search?query=${encodeURIComponent(q)}&hitsPerPage=4`); const d=await r.json(); (d.hits||[]).forEach(x=> sources.push({name:'💬 Hacker News', title:x.title||x.story_title, text:strip(x.story_text||x.comment_text), url:x.url||('https://news.ycombinator.com/item?id='+x.objectID), weight:5})); }catch(e){} })());
-  // 16. Stack Overflow
-  jobs.push((async()=>{ try{ const r=await fetchWithTimeout(`https://api.stackexchange.com/2.3/search/advanced?order=desc&sort=relevance&q=${encodeURIComponent(q)}&site=stackoverflow&pagesize=3`); const d=await r.json(); (d.items||[]).forEach(x=> sources.push({name:'💻 Stack Overflow', title:x.title, text:strip(x.title), url:x.link, weight:4})); }catch(e){} })());
-
-  // 10. الذاكرة
-  let topic=extractTopic(q);
-  let related=memory.filter(m=> m.topic===topic || m.q.toLowerCase().includes(topic.toLowerCase())).slice(-3);
-  related.forEach(m=> sources.push({name:'💾 ذاكرتي - تعلمت من قبل', title:`سؤال سابق: ${m.q}`, text:strip(m.summary||m.a).slice(0,250), url:'', weight:9}));
-
-  for(let i=0;i<jobs.length;i++){ setProgress(((i+1)/jobs.length)*100); await jobs[i].catch(()=>{}); }
-  setProgress(100); setTimeout(function(){setProgress(0);},500);
-  return sources;
+function invAbs(idx) {
+  if (!idx) return '';
+  const arr = [];
+  Object.keys(idx).forEach(w => idx[w].forEach(p => { arr[p] = w; }));
+  return arr.filter(Boolean).join(' ');
 }
 
-// ===== التلخيص: تجميع المصادر ف فكرة وحدة =====
-function firstClause(s, n) {
-  const t = strip(s);
-  const cut = t.split(/[.!؟?،]/)[0] || t;
-  return cut.slice(0, n || 150).trim();
-}
-
-function unifyIdea(q, points) {
-  const p = points.slice(0, 3).map(x => firstClause(x.text, 130)).filter(Boolean);
-  if (!p.length) return '';
-  let idea = p[0];
-  if (p[1]) idea += '، وهاد الطرح كيتدعم من مصدر آخر كيقول ' + p[1];
-  if (p[2]) idea += '، ومن زاوية أخرى ' + p[2];
-  return idea;
-}
-
-function summarize(q, sources) {
-  if (!sources.length) return { summary: 'ما لقيتش مصادر كافية. جرب سؤال آخر بكلمات أبسط.', keyPoints: [], verse: getVerse(q), sorted: [], idea: '' };
-  const sorted = [...sources].sort((a, b) => b.weight - a.weight);
-  const keyPoints = [];
-  const seenSentence = new Set();
-  for (const s of sorted) {
-    const sentence = strip(s.text).slice(0, 190);
-    if (!sentence) continue;
-    const sig = sentence.slice(0, 45).toLowerCase();
-    if (seenSentence.has(sig)) continue;
-    seenSentence.add(sig);
-    keyPoints.push({ source: s.name, text: sentence, url: s.url || '' });
-    if (keyPoints.length >= 6) break;
-  }
-  const idea = unifyIdea(q, keyPoints);
-  const summary = 'الفكرة الوحدة: ' + idea;
-  return { summary, keyPoints, verse: getVerse(q), sorted, idea };
-}
-
-// ===== الذاكرة: كيتفكر القديم وكيزيد الجديد =====
-function findPrior(q) {
-  const topic = extractTopic(q);
-  let best = null, bestScore = 0;
-  for (const m of memory) {
-    const mt = extractTopic(m.q);
-    let s = 0;
-    if (mt === topic) s = 100;
-    else {
-      const w = mt.split(' ').filter(x => x.length > 2);
-      const hit = w.filter(x => q.includes(x)).length;
-      if (w.length) s = (hit / w.length) * 70;
-    }
-    if (s > bestScore) { bestScore = s; best = m; }
-  }
-  return bestScore >= 60 ? best : null;
-}
-
-// ===== ثلاثة اقتراحات - كتطيح فخانة البحث وكتبدا من جديد =====
-function addSuggestions(q){
-  const t=String(q).replace(/^(ما هو|ما هي|شنو هو|شنو هي|كيفاش|كيف|لماذا|علاش)\s+/i,'').replace(/[؟?]/g,'').trim();
-  const list=[
-    'أحدث الأبحاث حول '+t,
-    'التطبيقات العملية ديال '+t,
-    'التحديات والانتقادات فـ '+t
-  ];
-  let box=document.createElement('div'); box.className='sugg';
-  list.forEach(s=>{
-    let b=document.createElement('button'); b.textContent='💡 '+s;
-    b.onclick=()=>{
-      const input=document.getElementById('q');
-      input.value=s; input.focus();
-      setTimeout(()=>{ addMsg(s,'me'); input.value=''; askAIWithText(s); },250);
+/* ===== الذاكرة ===== */
+let DB = null, memory = [];
+const DB_NAME = 'azzouz-brain-v3';
+function initDB() {
+  try {
+    const req = indexedDB.open(DB_NAME, 1);
+    req.onupgradeneeded = e => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains('memories')) db.createObjectStore('memories', { keyPath: 'id', autoIncrement: true });
     };
-    box.appendChild(b);
-  });
-  document.getElementById('chat').appendChild(box);
-  window.scrollTo(0, document.body.scrollHeight);
+    req.onsuccess = e => { DB = e.target.result; loadMem(); };
+    req.onerror = () => loadMem();
+  } catch (e) { loadMem(); }
 }
-
-async function askAI(){ let input=document.getElementById('q'); let q=input.value.trim(); if(!q) return; input.value=''; addMsg(q.replace(/</g,'&lt;'),'me'); askAIWithText(q); }
-
-async function askAIWithText(q){
-  qCount++; updateStats();
-  document.getElementById('orb').className='thinking'; document.getElementById('orb').textContent='⏳';
-  setStatus('🧠 كنفكر... كنقرا المصادر وكنلخص ف فكرة وحدة...');
-
-  if(/^[0-9+\-*/(). ]+$/.test(q)){
-    try{
-      let res=Function('"use strict"; return ('+q+')')();
-      let ans=`${q} = ${res}`;
-      addMsg(`🧮 <b>حسبت:</b> ${q} = <b style="color:#00ff88;font-size:20px">${res}</b><br>📚 المرجع: الجبر - الخوارزمي`, 'ai');
-      speak(ans); saveMemory(q, ans, ['رياضيات'], ans);
-      addSuggestions(q);
-      document.getElementById('orb').className=''; document.getElementById('orb').textContent='🧠'; setStatus('جاهز...'); return;
-    }catch(e){}
-  }
-
-  const prior=findPrior(q);
-  if(prior){
-    addMsg('🧠 <b>من الذاكرة:</b> سولتني على «'+escapeHtml(prior.q)+'» من قبل.<br>'+escapeHtml(String(prior.summary||prior.a||'').replace(/<[^>]*>/g,'').slice(0,420))+'<br><br><span style="color:#888">دابا غادي نعاود نقرا المصادر ونشوف واش كاين شي جديد باش نزيدو على اللي عرفت.</span>','ai');
-  }
-
-  let sources=await gatherSources(q);
-  refTotal+=sources.length; updateStats();
-  window.__lastTitles=sources.map(s=>String(s.title||'').slice(0,80));
-
-  let {summary, keyPoints, verse, sorted, idea}=summarize(q, sources);
-
-  // شنو زاد على اللي كان فالذاكرة
-  let fresh=[];
-  if(prior && Array.isArray(prior.titles)){
-    const had=new Set(prior.titles.map(t=>String(t).toLowerCase()));
-    fresh=sorted.filter(s=>!had.has(String(s.title||'').slice(0,80).toLowerCase()));
-  }
-
-  let html=`🧠 <b>Azzouz AI — قرأت ${sources.length} مصدر، ولخصتهم ف فكرة وحدة:</b><br>`;
-  html+=`<div class="summary"><b style="color:#ffaa00">📋 ${prior?'الفكرة الوحدة (محدّثة)':'الفكرة الوحدة'}:</b><br>${escapeHtml(idea||summary)}<br><br><b>الآية المناسبة:</b> ${escapeHtml(verse)}</div>`;
-  if(prior){
-    html+=`<div class="ref" style="border-color:#00ff88"><b>🧠 تفكرت القديم:</b> ${escapeHtml(String(prior.summary||'').replace(/<[^>]*>/g,'').slice(0,200))}<br><b>🆕 زدت الجديد:</b> `+(fresh.length? escapeHtml(fresh.slice(0,3).map(f=>f.title).join(' · '))+' ('+fresh.length+' مصدر جديد)' : 'ما لقيتش جديد هاد الدورة، غير صياغة أوضح')+`</div>`;
-  }
-  html+=`<b>🔑 النقاط الأساسية:</b><br>`;
-  keyPoints.forEach(p=>{
-    html+=`<div class="ref"><b>${escapeHtml(p.source)}:</b> ${escapeHtml(p.text)}...`+(p.url?`<br><a href="${p.url}" target="_blank" rel="noopener">${p.url.slice(0,70)}</a>`:'')+`</div>`;
-  });
-  html+=`<div style="margin-top:8px"><b>📚 جميع المصادر (${sources.length}):</b> `;
-  sorted.forEach(s=>{ html+=`<span class="sourceTag">${escapeHtml(s.name)}</span> `; });
-  html+=`</div>`;
-  html+=`<div style="font-size:11px;color:#888;margin-top:6px">💾 حفظت هاد الجواب فالذاكرة - إلا سولتي نفس السؤال غدا، غادي نتفكرو ونزيد عليه الجديد.</div>`;
-
-  const el = addMsg(html, 'ai');
-  LAST = { q, idea: idea || summary, summary, verse, sorted, keyPoints, sources, fresh, prior };
-  attachTools(el, LAST);
-  speak(summary.slice(0,600));
-  saveMemory(q, summary, sources.map(s=>s.name), summary);
-  addSuggestions(q);
-  document.getElementById('orb').className=''; document.getElementById('orb').textContent='🧠';
-  setStatus('جاهز - تعلمت شي حاجة جديدة - سولني شي سؤال آخر...');
-}
-
-
-// ================== أدوات إضافية ==================
-let LAST = null;
-
-function keywordsOf(sorted) {
-  const stop = new Set(['من','في','على','إلى','عن','هذا','هذه','التي','الذي','كان','كما','بين','بعد','قبل','حتى','أو','ثم','لكن','كل','بعض','the','and','for','with','that','this','from','are','was','were','its','his','her','not','you','they']);
-  const freq = new Map();
-  for (const s of sorted.slice(0, 14)) {
-    const words = (String(s.title || '') + ' ' + String(s.text || ''))
-      .replace(/[^\p{L}\p{N}\s]/gu, ' ')
-      .split(/\s+/)
-      .map(w => w.trim())
-      .filter(w => w.length > 3 && !stop.has(w.toLowerCase()));
-    for (const w of words) freq.set(w, (freq.get(w) || 0) + 1);
-  }
-  return [...freq.entries()].filter(([, n]) => n >= 2).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([w]) => w);
-}
-
-function timelineOf(sorted) {
-  const ys = sorted.map(s => parseInt(s.year, 10)).filter(y => y && y > 1400 && y <= new Date().getFullYear() + 1);
-  if (ys.length < 2) return '';
-  const min = Math.min(...ys), max = Math.max(...ys);
-  const buckets = 8, span = Math.max(1, max - min);
-  const counts = new Array(buckets).fill(0);
-  ys.forEach(y => counts[Math.min(buckets - 1, Math.floor(((y - min) / span) * buckets))]++);
-  const peak = Math.max(...counts);
-  let out = `<div class="tl">🕓 توزيع المصادر على السنين (${min} → ${max}): `;
-  counts.forEach(c => { out += `<i style="width:${Math.round((c / peak) * 26) + 3}px;opacity:${c ? 0.9 : 0.2}"></i>`; });
-  out += `</div>`;
-  return out;
-}
-
-function attachTools(el, D) {
-  const kw = keywordsOf(D.sorted);
-  const box = document.createElement('div');
-  box.className = 'tools';
-  box.innerHTML =
-    (kw.length ? `<div><b>🔗 مفاهيم كتكرر فالمصادر:</b> ` + kw.map(k => `<span class="sourceTag kw">${escapeHtml(k)}</span>`).join(' ') + `</div>` : '') +
-    timelineOf(D.sorted) +
-    `<div class="barrow">
-       <button data-act="deep">🔎 عمّق أكثر (كنقرا الصفحات)</button>
-       <button data-act="copy">📋 نسخ الجواب</button>
-       <button data-act="md">⬇️ تقرير Markdown</button>
-       <button data-act="print">🖨️ طباعة / PDF</button>
-     </div>`;
-
-  box.querySelectorAll('.kw').forEach(s => {
-    s.onclick = () => {
-      const t = s.textContent;
-      document.getElementById('q').value = t;
-      addMsg('🔎 ' + escapeHtml(t), 'me');
-      document.getElementById('q').value = '';
-      askAIWithText(t);
-    };
-  });
-
-  box.querySelector('[data-act="copy"]').onclick = () => {
-    const txt = `${D.q}\n\n${D.idea}\n\n` + D.keyPoints.map(k => '- ' + k.source + ': ' + k.text).join('\n') +
-      '\n\n' + D.sorted.filter(s => s.url).slice(0, 12).map(s => '• ' + s.title + ' — ' + s.url).join('\n');
-    navigator.clipboard.writeText(txt).then(() => setStatus('📋 تنسخ الجواب')).catch(() => setStatus('ما قدرتش ننسخ'));
-  };
-
-  box.querySelector('[data-act="md"]').onclick = () => exportReport(D);
-
-  box.querySelector('[data-act="print"]').onclick = () => {
-    const w = window.open('', '_blank');
-    w.document.write('<html dir="rtl"><meta charset="utf-8"><title>' + escapeHtml(D.q) + '</title><body style="font-family:system-ui;line-height:1.9;padding:24px">' +
-      '<h2>' + escapeHtml(D.q) + '</h2><p><b>الفكرة الوحدة:</b> ' + escapeHtml(D.idea) + '</p><p><b>الآية:</b> ' + escapeHtml(D.verse) + '</p><h3>النقاط</h3>' +
-      D.keyPoints.map(k => '<p><b>' + escapeHtml(k.source) + ':</b> ' + escapeHtml(k.text) + '</p>').join('') +
-      '<h3>المصادر</h3>' + D.sorted.filter(s => s.url).map(s => '<p>' + escapeHtml(s.title) + ' — ' + escapeHtml(s.url) + '</p>').join('') + '</body></html>');
-    w.document.close(); w.print();
-  };
-
-  box.querySelector('[data-act="deep"]').onclick = async (e) => {
-    const btn = e.target;
-    btn.disabled = true; btn.textContent = '⏳ كنقرا الصفحات...';
-    setStatus('📖 كندخل للصفحات وكنقرا المحتوى...');
-    const picked = D.sorted.filter(s => s.url && /^https?:/.test(s.url)).slice(0, 3);
-    const pages = await readPages(picked.map(p => p.url));
-    btn.disabled = false; btn.textContent = '🔎 عمّق أكثر (كنقرا الصفحات)';
-    if (!pages.length) { setStatus('ما قدرتش نقرا الصفحات دابا'); return; }
-    const merged = D.sources.concat(pages);
-    const s2 = summarize(D.q, merged);
-    let html = `<b>📖 قراءة معمّقة للصفحات (${pages.length}):</b><br>`;
-    html += `<div class="summary"><b style="color:#ffaa00">📋 الفكرة الوحدة بعد القراءة:</b><br>${escapeHtml(s2.idea)}</div>`;
-    s2.keyPoints.slice(0, 4).forEach(p => {
-      html += `<div class="ref"><b>${escapeHtml(p.source)}:</b> ${escapeHtml(p.text)}...</div>`;
-    });
-    const el2 = addMsg(html, 'ai');
-    LAST = { ...D, sorted: s2.sorted, keyPoints: s2.keyPoints, idea: s2.idea, sources: merged };
-    attachTools(el2, LAST);
-    setStatus('✅ قرأت ' + pages.length + ' صفحة كاملة وزدتها للمصادر');
-  };
-
-  el.appendChild(box);
-}
-
-async function readPages(urls) {
-  const out = [];
-  for (const u of urls) {
+function loadMem() {
+  try { memory = JSON.parse(localStorage.getItem('azzouz-mem-v3') || '[]'); } catch (e) { memory = []; }
+  refreshMemCount();
+  if (DB) {
     try {
-      const r = await fetchWithTimeout('https://r.jina.ai/' + u, 18000);
-      const t = await r.text();
-      const lines = t.split('\n').map(l => l.trim()).filter(l => l.length > 120 && !l.startsWith('['));
-      if (!lines.length) continue;
-      out.push({
-        name: '📖 قراءة الصفحة',
-        title: (t.split('\n').find(l => l.trim().length > 10) || u).slice(0, 90),
-        text: lines.slice(0, 3).join(' ').slice(0, 700),
-        url: u, weight: 9
-      });
+      const rq = DB.transaction('memories', 'readonly').objectStore('memories').getAll();
+      rq.onsuccess = () => { if (rq.result && rq.result.length) { memory = rq.result; refreshMemCount(); } };
     } catch (e) {}
   }
+}
+function refreshMemCount() { $('status').dataset.mem = memory.length; }
+function persistMem() {
+  try { localStorage.setItem('azzouz-mem-v3', JSON.stringify(memory.slice(-120))); } catch (e) {}
+  if (DB) { try { DB.transaction('memories', 'readwrite').objectStore('memories').put(memory[memory.length - 1]); } catch (e) {} }
+}
+function topicOf(q) {
+  const t = String(q || '').toLowerCase().replace(/[؟?.,،!]/g, ' ').replace(/\s+/g, ' ').trim();
+  const w = t.split(' ').filter(x => x.length > 2 && !['ما', 'هو', 'هي', 'شنو', 'كيفاش', 'كيف', 'على', 'عن', 'في', 'من', 'the', 'what', 'how'].includes(x));
+  return w.slice(0, 3).join(' ') || t.slice(0, 20);
+}
+function findPrior(q) {
+  const t = topicOf(q), ws = t.split(' ');
+  let best = null, score = 0;
+  memory.forEach(m => {
+    let s = 0;
+    if (m.topic === t) s = 1;
+    else {
+      const mw = String(m.topic || '').split(' ');
+      const hit = mw.filter(x => ws.includes(x)).length;
+      s = mw.length ? hit / Math.max(mw.length, ws.length) : 0;
+    }
+    if (s > score) { score = s; best = m; }
+  });
+  return score >= 0.6 ? best : null;
+}
+
+/* ===== قراءة الويب: محركات ===== */
+function extractKeyword(q) {
+  const map = { 'ثقب': 'السماء', 'نحل': 'النحل', 'نمل': 'النمل', 'نور': 'النور', 'سماء': 'السماء', 'حديد': 'الحديد', 'علم': 'العلم', 'قلب': 'القلب', 'قرآن': 'القرآن', 'طاقة': 'الطاقة', 'ماء': 'الماء', 'أرض': 'الأرض', 'رحمة': 'الرحمة' };
+  for (const k in map) if (q.includes(k)) return map[k];
+  const w = q.split(/\s+/).filter(x => x.length > 2 && /[\u0600-\u06FF]/.test(x));
+  return w[0] || null;
+}
+function englishOf(q) {
+  const g = { 'النحل': 'honey bee', 'الصيام المتقطع': 'intermittent fasting', 'الزليج': 'zellige', 'التشفير': 'encryption', 'الذكاء الاصطناعي': 'artificial intelligence', 'ضغط البيانات': 'data compression', 'الثقب الأسود': 'black hole', 'الطاقة': 'energy', 'الماء': 'water' };
+  for (const k in g) if (q.includes(k)) return g[k];
+  return q;
+}
+function realU(u) {
+  try { const m = /uddg=([^&]+)/.exec(u); if (m) return decodeURIComponent(m[1]); } catch (e) {}
+  return u;
+}
+function parseLinks(md, engine) {
+  const out = [], re = /\[([^\]\n]{10,150})\]\((https?:\/\/[^)\s]+)\)/g;
+  let m;
+  while ((m = re.exec(md))) {
+    const title = clean(m[1]), url = realU(m[2]);
+    if (/jina\.ai|bing\.com\/ck|duckduckgo\.com\/l|google\.com\/search|startpage\.com|qwant\.com|ecosia\.org/.test(url)) continue;
+    if (title.length < 12) continue;
+    out.push({ name: '🌐 ' + engine, title: title.slice(0, 140), text: '', url, weight: 6 });
+  }
   return out;
 }
 
-function exportReport(D) {
-  const md = [
-    '# ' + D.q, '',
-    '**الفكرة الوحدة:** ' + D.idea, '',
-    '**الآية:** ' + D.verse, '',
-    '## النقاط الأساسية',
-    ...D.keyPoints.map(k => `- **${k.source}:** ${k.text}`),
-    '', '## المصادر',
-    ...D.sorted.filter(s => s.url).map(s => `- [${s.title}](${s.url})`),
-    '', '_توليد: Azzouz AI · ' + new Date().toISOString().slice(0, 10) + '_'
-  ].join('\n');
-  const blob = new Blob([md], { type: 'text/markdown' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'azzouz-' + (D.q.slice(0, 24).replace(/[^\p{L}\p{N}]+/gu, '-')) + '.md';
-  a.click();
-  setStatus('⬇️ تحمل التقرير');
+async function gather(q, tickFn) {
+  const S = [], en = englishOf(q), seen = new Set();
+  const push = o => {
+    if (!o || !o.title) return;
+    const k = String(o.url || o.title).split('#')[0];
+    if (seen.has(k)) return;
+    seen.add(k);
+    S.push(o);
+    if (tickFn) tickFn(S.length);
+  };
+
+  const tasks = [
+    async () => { const kw = extractKeyword(q); if (!kw) return; const d = await jget('https://api.alquran.cloud/v1/search/' + enc(kw) + '/all/quran-uthmani');
+      (d.data && d.data.matches || []).slice(0, 2).forEach(a => push({ name: '📖 القرآن', title: a.surah.englishName + ' — آية ' + a.numberInSurah, text: a.text, url: 'https://quran.com/' + a.surah.number + '/' + a.numberInSurah, weight: 10 })); },
+    async () => { const d = await jget('https://ar.wikipedia.org/w/api.php?action=query&list=search&srsearch=' + enc(q) + '&format=json&origin=*');
+      (d.query && d.query.search || []).slice(0, 3).forEach(r => push({ name: '📚 ويكيبيديا العربية', title: r.title, text: clean(r.snippet), url: 'https://ar.wikipedia.org/wiki/' + enc(r.title.replace(/ /g, '_')), weight: 9 })); },
+    async () => { const d = await jget('https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=' + enc(en) + '&format=json&origin=*');
+      (d.query && d.query.search || []).slice(0, 3).forEach(r => push({ name: '📚 Wikipedia', title: r.title, text: clean(r.snippet), url: 'https://en.wikipedia.org/wiki/' + enc(r.title.replace(/ /g, '_')), weight: 8 })); },
+    async () => { const d = await jget('https://api.openalex.org/works?search=' + enc(q) + '&per_page=8&sort=relevance_score:desc');
+      (d.results || []).forEach(w => push({ name: '🔬 OpenAlex', title: w.display_name, text: invAbs(w.abstract_inverted_index).slice(0, 400), url: w.doi ? 'https://doi.org/' + String(w.doi).replace('https://doi.org/', '') : w.id, year: w.publication_year, weight: 8 })); },
+    async () => { const d = await jget('https://api.crossref.org/works?query=' + enc(en) + '&rows=6&select=title,URL,issued,abstract');
+      ((d.message && d.message.items) || []).forEach(w => push({ name: '🎓 Crossref', title: (w.title || [])[0], text: clean(w.abstract).slice(0, 350), url: w.URL, year: (w.issued && w.issued['date-parts'] || [[]])[0][0], weight: 7 })); },
+    async () => { const d = await jget('https://api.semanticscholar.org/graph/v1/paper/search?query=' + enc(en) + '&limit=6&fields=title,abstract,url,year');
+      (d.data || []).forEach(p => push({ name: '📄 Semantic Scholar', title: p.title, text: (p.abstract || '').slice(0, 350), url: p.url, year: p.year, weight: 7 })); },
+    async () => { const d = await jget('https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=' + enc(en) + '&format=json&pageSize=6');
+      ((d.resultList && d.resultList.result) || []).forEach(r => push({ name: '🧪 Europe PMC', title: r.title, text: clean(r.abstractText).slice(0, 350), url: r.doi ? 'https://doi.org/' + r.doi : 'https://europepmc.org/article/' + r.id, year: r.pubYear, weight: 7 })); },
+    async () => { const d = await jget('https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&retmode=json&retmax=6&term=' + enc(en));
+      const ids = (d.esearchresult && d.esearchresult.idlist) || [];
+      if (!ids.length) return;
+      const s = await jget('https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=pubmed&retmode=json&id=' + ids.join(','));
+      Object.values(s.result || {}).forEach(r => { if (r && r.title) push({ name: '🩺 PubMed', title: r.title, text: '', url: 'https://pubmed.ncbi.nlm.nih.gov/' + r.uid + '/', year: (r.pubdate || '').slice(0, 4), weight: 7 }); }); },
+    async () => { const d = await jtxt('https://export.arxiv.org/api/query?search_query=all:' + enc(en) + '&max_results=6');
+      const blocks = d.split('<entry>').slice(1);
+      blocks.forEach(b => {
+        const t = (b.match(/<title>([\s\S]*?)<\/title>/) || [])[1] || '';
+        const u = (b.match(/<id>([\s\S]*?)<\/id>/) || [])[1] || '';
+        const su = (b.match(/<summary>([\s\S]*?)<\/summary>/) || [])[1] || '';
+        push({ name: '📐 arXiv', title: clean(t), text: clean(su).slice(0, 300), url: clean(u), weight: 7 });
+      }); },
+    async () => { const d = await jget('https://openlibrary.org/search.json?q=' + enc(q) + '&limit=6');
+      (d.docs || []).forEach(b => push({ name: '📕 Open Library', title: b.title, text: 'كتاب' + (b.author_name ? ' لـ ' + b.author_name.join(', ') : '') + (b.first_publish_year ? ' — ' + b.first_publish_year : ''), url: 'https://openlibrary.org' + (b.key || ''), year: b.first_publish_year, weight: 7 })); },
+    async () => { const d = await jget('https://archive.org/advancedsearch.php?q=' + enc(q) + '&fl%5B%5D=identifier&fl%5B%5D=title&fl%5B%5D=year&rows=6&page=1&output=json');
+      (((d.response || {}).docs) || []).forEach(b => push({ name: '🗄️ أرشيف الإنترنت', title: b.title, text: '', url: 'https://archive.org/details/' + b.identifier, year: b.year, weight: 6 })); },
+    async () => { const d = await jget('https://hn.algolia.com/api/v1/search?query=' + enc(en) + '&hitsPerPage=8');
+      (d.hits || []).forEach(h => push({ name: '💬 Hacker News', title: h.title || h.story_title, text: clean(h.story_text || h.comment_text).slice(0, 250), url: h.url || 'https://news.ycombinator.com/item?id=' + h.objectID, year: (h.created_at || '').slice(0, 4), weight: 5 })); },
+    async () => { const d = await jget('https://api.stackexchange.com/2.3/search/advanced?order=desc&sort=relevance&q=' + enc(en) + '&site=stackoverflow&pagesize=6&filter=default');
+      (d.items || []).forEach(i => push({ name: '💻 Stack Overflow', title: clean(i.title), text: '', url: i.link, year: (i.creation_date ? new Date(i.creation_date * 1000).getFullYear() : null), weight: 6 })); },
+    async () => { const d = await jget('https://api.github.com/search/repositories?q=' + enc(en) + '&per_page=5&sort=stars');
+      (d.items || []).forEach(r => push({ name: '💻 GitHub', title: r.full_name, text: (r.description || '').slice(0, 200), url: r.html_url, weight: 5 })); },
+    async () => { const d = await jget('https://www.wikidata.org/w/api.php?action=wbsearchentities&search=' + enc(q) + '&language=ar&limit=5&format=json&origin=*');
+      (d.search || []).forEach(e => push({ name: '🧩 Wikidata', title: e.label || e.id, text: clean(e.description), url: 'https://www.wikidata.org/wiki/' + e.id, weight: 5 })); },
+    async () => { const d = await jget('https://api.duckduckgo.com/?q=' + enc(en) + '&format=json&no_html=1&skip_disambig=1');
+      if (d.AbstractText) push({ name: '🌐 DuckDuckGo', title: d.Heading || en, text: d.AbstractText.slice(0, 350), url: d.AbstractURL || ('https://duckduckgo.com/?q=' + enc(en)), weight: 7 }); }
+  ];
+
+  // مسح الويب: محركات كاملة عبر قارئ الصفحات + صيغ الملفات
+  const sweeps = [
+    ['duckduckgo', 'https://html.duckduckgo.com/html/?q=' + enc(q)],
+    ['duckduckgo-en', 'https://html.duckduckgo.com/html/?q=' + enc(en)],
+    ['bing', 'https://www.bing.com/search?q=' + enc(en)],
+    ['startpage', 'https://www.startpage.com/sp/search?query=' + enc(en)],
+    ['brave', 'https://search.brave.com/search?q=' + enc(en)],
+    ['ecosia', 'https://www.ecosia.org/search?q=' + enc(en)],
+    ['qwant', 'https://www.qwant.com/?q=' + enc(en)],
+    ['mojeek', 'https://www.mojeek.com/search?q=' + enc(en)],
+    ['pdf', 'https://html.duckduckgo.com/html/?q=' + enc(en + ' filetype:pdf')],
+    ['office', 'https://html.duckduckgo.com/html/?q=' + enc(en + ' (filetype:docx OR filetype:pptx OR filetype:xlsx)')],
+    ['drive', 'https://html.duckduckgo.com/html/?q=' + enc(en + ' site:drive.google.com')],
+    ['deep-web', 'https://html.duckduckgo.com/html/?q=' + enc(q + ' archive OR database OR repository')]
+  ];
+  sweeps.forEach(([name, url]) => {
+    tasks.push(async () => {
+      const md = await jtxt('https://r.jina.ai/' + url);
+      parseLinks(md, name).slice(0, 18).forEach(push);
+    });
+  });
+
+  // تنفيذ بتوازي محدود
+  let i = 0;
+  async function worker() {
+    while (i < tasks.length) {
+      const idx = i++;
+      try { await tasks[idx](); } catch (e) {}
+      if (tickFn) tickFn(S.length);
+    }
+  }
+  await Promise.all([worker(), worker(), worker(), worker()]);
+  return S;
 }
 
-function toggleMemPanel() {
-  const p = document.getElementById('memPanel');
-  if (p.style.display === 'none') { p.style.display = 'block'; renderMemList(); }
-  else p.style.display = 'none';
+/* ===== التلخيص ===== */
+function clause(t, n = 150) {
+  let s = clean(t).replace(/\s+/g, ' ');
+  const cut = s.search(/[.!؟;]/);
+  if (cut > 40) s = s.slice(0, cut + 1);
+  return s.slice(0, n).trim();
+}
+function getVerse(q) {
+  const t = q.toLowerCase();
+  if (/نحل|bee/.test(t)) return '﴿ وأوحى ربك إلى النحل ﴾ النحل 68';
+  if (/نمل|ant/.test(t)) return '﴿ قالت نملة يا أيها النمل ﴾ النمل 18';
+  if (/نور|ضوء|light/.test(t)) return '﴿ الله نور السماوات والأرض ﴾ النور 35';
+  if (/ماء|water|طاقة|energy/.test(t)) return '﴿ وجعلنا من الماء كل شيء حي ﴾ الأنبياء 30';
+  if (/علم|science|بحث/.test(t)) return '﴿ وقل رب زدني علما ﴾ طه 114';
+  if (/سماء|كون|space|black/.test(t)) return '﴿ والسماء بنيناها بأيد وإنا لموسعون ﴾ الذاريات 47';
+  return '﴿ وفي الأرض آيات للموقنين ﴾ الذاريات 20';
+}
+function synthesize(q, sources, prior) {
+  const sorted = sources.slice().sort((a, b) => (b.weight || 0) - (a.weight || 0));
+  const rich = sorted.filter(s => (s.text || '').length > 40);
+  const parts = rich.slice(0, 3).map(s => clause(s.text, 150));
+  let idea = '';
+  if (parts.length) {
+    idea = parts[0];
+    if (parts[1]) idea += ' وهاد الشي كيتأكد من مصادر أخرى كتقول ' + parts[1];
+    if (parts[2]) idea += '، ومن زاوية أخرى ' + parts[2];
+  } else if (sorted.length) {
+    idea = 'لقيت ' + sorted.length + ' مصدر مرتبط بـ«' + q + '»، أهمها: ' + sorted.slice(0, 3).map(s => s.title).join(' · ');
+  } else {
+    idea = 'ما لقيتش مصادر كافية على «' + q + '». جرب صياغة أخرى.';
+  }
+  const points = [];
+  const usedTitles = new Set();
+  rich.forEach(s => {
+    const c = clause(s.text, 130);
+    if (!c || c.length < 30) return;
+    const key = c.slice(0, 40);
+    if (usedTitles.has(key)) return;
+    usedTitles.add(key);
+    if (points.length < 4) points.push({ src: s.name, text: c });
+  });
+  let fresh = [];
+  if (prior) {
+    const old = new Set(prior.urls || []);
+    fresh = sorted.filter(s => s.url && !old.has(s.url)).slice(0, 6);
+  }
+  return { idea, points, sorted, fresh, verse: getVerse(q) };
 }
 
-function renderMemList() {
-  const box = document.getElementById('memList');
-  if (!memory.length) { box.innerHTML = '<div style="color:#888">الذاكرة خاوية دابا. سول شي سؤال وتبدا تتعلم.</div>'; return; }
-  const byTopic = new Map();
-  memory.forEach(m => { const t = m.topic || extractTopic(m.q); byTopic.set(t, (byTopic.get(t) || 0) + 1); });
-  box.innerHTML = [...byTopic.entries()].sort((a, b) => b[1] - a[1]).slice(0, 30).map(([t, n]) =>
-    `<div><span>📌 ${escapeHtml(t)} <b style="color:#00ff88">(${n})</b></span><button data-del="${escapeHtml(t)}">حذف</button></div>`).join('');
-  box.querySelectorAll('[data-del]').forEach(b => {
-    b.onclick = () => {
-      const t = b.dataset.del;
-      memory = memory.filter(m => (m.topic || extractTopic(m.q)) !== t);
-      try { localStorage.setItem('azzouz-global-memory', JSON.stringify(memory.slice(-100))); } catch (e) {}
-      updateStats(); renderMemList();
+/* ===== واجهة المحادثة ===== */
+function addMsg(html, who) {
+  const d = document.createElement('div');
+  d.className = 'msg ' + who;
+  d.innerHTML = html + '<div class="meta">' + now() + (who === 'out' ? ' ' + tick() : '') + '</div>';
+  log.appendChild(d);
+  log.scrollTop = log.scrollHeight;
+  return d;
+}
+function typing() {
+  const el = document.createElement('div');
+  el.className = 'chain';
+  el.innerHTML = '<div class="st"><span class="dot"></span><span class="t">كنفكك السؤال...</span></div>';
+  log.appendChild(el);
+  log.scrollTop = log.scrollHeight;
+  let step = 0;
+  const steps = ['كنقلب فكل محركات الويب...', 'كنقرا الصفحات والملفات...', 'كنقارن بين المصادر...', 'كنصيغ الفكرة الوحدة...'];
+  const timer = setInterval(() => {
+    if (step < steps.length) el.querySelector('.t').textContent = steps[step++];
+  }, 1600);
+  return { count: n => { el.querySelector('.t').textContent = 'كنقرا المصادر · ' + n; step = 0; }, done: () => { clearInterval(timer); el.remove(); } };
+}
+
+function suggestionsFor(q) {
+  const t = q.replace(/[؟?]/g, '').trim();
+  return ['أحدث ما كاين على ' + t, 'التطبيقات العملية ديال ' + t, 'الانتقادات والحدود ديال ' + t];
+}
+
+function renderAnswer(q, data, prior) {
+  let h = '';
+  if (prior) {
+    h += '<div class="h">🧠 من الذاكرة</div>سولتني على «' + esc(prior.q) + '» من قبل. ' + esc(String(prior.idea || '').slice(0, 220)) + '...<br><br>';
+  }
+  h += '<div class="h">الجواب</div>' + esc(data.idea);
+  if (data.points.length) {
+    h += '<br><br>';
+    data.points.forEach((p, i) => { h += (i + 1) + '. ' + esc(p.text) + '<br>'; });
+  }
+  if (prior && data.fresh.length) {
+    h += '<br>🆕 زدت ' + data.fresh.length + ' مصدر جديد هاد المرة.';
+  }
+  h += '<br><br>' + esc(data.verse);
+
+  const el = addMsg(h, 'in');
+
+  if (data.sorted.length) {
+    const btn = document.createElement('span');
+    btn.className = 'exp';
+    btn.textContent = '📚 المراجع (' + data.sorted.length + ')';
+    const box = document.createElement('div');
+    box.className = 'refs';
+    box.innerHTML = data.sorted.slice(0, 60).map((s, i) =>
+      '<div class="r"><b>' + (i + 1) + '.</b> ' + esc(s.name.replace(/^\S+\s/, '')) + ' — ' + esc(String(s.title).slice(0, 110)) +
+      (s.year ? ' (' + s.year + ')' : '') +
+      (s.url ? '<a class="lnk" href="' + esc(s.url) + '" target="_blank" rel="noopener">' + esc(s.url.slice(0, 70)) + '</a>' : '') + '</div>').join('');
+    btn.onclick = () => {
+      box.classList.toggle('on');
+      btn.textContent = box.classList.contains('on') ? '🙈 خبي المراجع' : '📚 المراجع (' + data.sorted.length + ')';
+      log.scrollTop = log.scrollHeight;
     };
+    el.appendChild(btn);
+    el.appendChild(box);
+  }
+
+  const sg = document.createElement('div');
+  sg.className = 'sugg';
+  suggestionsFor(q).forEach(s => {
+    const b = document.createElement('button');
+    b.textContent = '💡 ' + s;
+    b.onclick = () => ask(s);
+    sg.appendChild(b);
+  });
+  el.appendChild(sg);
+
+  LAST = { q, data, prior, at: Date.now() };
+  log.scrollTop = log.scrollHeight;
+  return el;
+}
+
+/* ===== السؤال ===== */
+async function ask(text) {
+  const q = String(text || '').trim();
+  if (!q || busy) return;
+  busy = true;
+  $('send').disabled = true;
+  addMsg(esc(q), 'out');
+  qEl.value = '';
+  statusEl.textContent = 'كنبحث...';
+
+  if (/^[0-9+\-*/(). ]+$/.test(q)) {
+    try {
+      const r = Function('"use strict";return (' + q + ')')();
+      addMsg('<div class="h">🧮 حساب</div>' + esc(q) + ' = ' + r, 'in');
+      busy = false; $('send').disabled = false; statusEl.textContent = 'جاهز';
+      return;
+    } catch (e) {}
+  }
+
+  const prior = findPrior(q);
+  const t = typing();
+  let sources = [];
+  try {
+    sources = await gather(q, n => t.count(n));
+    t.done();
+    const data = synthesize(q, sources, prior);
+    renderAnswer(q, data, prior);
+
+    const rec = {
+      q, topic: topicOf(q), idea: data.idea,
+      points: data.points.map(p => p.text),
+      urls: data.sorted.map(s => s.url).filter(Boolean),
+      titles: data.sorted.map(s => s.title),
+      at: Date.now()
+    };
+    memory.push(rec);
+    if (memory.length > 200) memory = memory.slice(-200);
+    persistMem();
+    statusEl.textContent = 'جاهز · ' + memory.length + ' ذكرى';
+  } catch (e) {
+    t.done();
+    addMsg('⚠️ وقع مشكل فالقراءة: ' + esc(e.message) + ' — عاود جرب.', 'in');
+  }
+  busy = false;
+  $('send').disabled = false;
+}
+
+/* ===== الصوت ===== */
+let rec = null, V = { on: false, base: '', cur: '', timer: null };
+function dedupe(t) {
+  let s = String(t || '').replace(/\s+/g, ' ').trim();
+  for (let n = 8; n >= 2; n--) {
+    const re = new RegExp('(\\S+(?: \\S+){' + (n - 1) + '})(?: \\1)+', 'g');
+    s = s.replace(re, '$1');
+  }
+  return s.replace(/\s+/g, ' ').trim();
+}
+function vStop() {
+  if (!V.on) return;
+  V.on = false;
+  clearTimeout(V.timer);
+  $('vbar').classList.remove('on');
+  $('mic').classList.add('rec');
+  try { rec && rec.stop(); } catch (e) {}
+  const said = dedupe(V.cur || '');
+  setTimeout(() => {
+    if (said.length > 2) ask(said);
+    else addMsg('ما سمعت والو. عاود اضغط 🎙️ وقول سؤالك.', 'in');
+  }, 120);
+}
+function startVoice() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) { addMsg('المتصفح ما كيدعمش الصوت. استعمل Chrome.', 'in'); return; }
+  rec = new SR();
+  rec.lang = 'ar';
+  rec.continuous = true;
+  rec.interimResults = true;
+  V = { on: true, base: '', cur: '', timer: null };
+
+  rec.onstart = () => {
+    $('vbar').classList.add('on');
+    $('vtxt').textContent = 'كنسمع... اهضر عادي';
+    $('mic').classList.remove('rec');
+  };
+  rec.onresult = e => {
+    let cur = '';
+    for (let i = 0; i < e.results.length; i++) cur += e.results[i][0].transcript + ' ';
+    const full = dedupe(((V.base ? V.base + ' ' : '') + cur).trim());
+    V.cur = full;
+    $('vtxt').textContent = full || 'كنسمع...';
+    clearTimeout(V.timer);
+    V.timer = setTimeout(vStop, 2400);
+  };
+  rec.onerror = e => {
+    if (e.error === 'no-speech' || e.error === 'aborted') return;
+    $('vtxt').textContent = 'خطأ فالصوت: ' + e.error;
+  };
+  rec.onend = () => {
+    if (V.on) { V.base = V.cur; try { rec.start(); } catch (e) {} }
+    else { $('vbar').classList.remove('on'); $('mic').classList.remove('rec'); }
+  };
+  try { rec.start(); } catch (e) { addMsg('ما قدرتش نشعل الميكرو.', 'in'); }
+}
+
+/* ===== الأدوات ===== */
+const sheet = $('sheet');
+function openTools(which) {
+  sheet.classList.add('on');
+  $('paneReport').hidden = which !== 'report';
+  $('paneMemory').hidden = which !== 'memory';
+  document.querySelectorAll('.stabs button').forEach(b => b.classList.toggle('on', b.dataset.p === which));
+  if (which === 'memory') renderMemory(); else renderReport();
+}
+function keywordsOf(sources) {
+  const stop = new Set(['the', 'and', 'for', 'with', 'from', 'that', 'this', 'على', 'في', 'من', 'إلى', 'عن', 'التي', 'الذي', 'هذا', 'هذه', 'كان', 'كما', 'بين', 'أو', 'ثم', 'كل', 'بعد', 'قبل', 'غير', 'حتى', 'هو', 'هي']);
+  const cnt = {};
+  sources.forEach(s => {
+    const words = clean((s.title || '') + ' ' + (s.text || '')).split(/[^\p{L}\p{N}]+/u);
+    words.forEach(w => {
+      const t = w.toLowerCase();
+      if (t.length < 4 || stop.has(t) || /^\d+$/.test(t)) return;
+      cnt[t] = (cnt[t] || 0) + 1;
+    });
+  });
+  return Object.entries(cnt).sort((a, b) => b[1] - a[1]).slice(0, 14).map(x => x[0]);
+}
+function renderReport() {
+  const p = $('paneReport');
+  if (!LAST) { p.innerHTML = '<div class="card">سول شي سؤال باش يبان التقرير هنا.</div>'; return; }
+  const s = LAST.data.sorted;
+  const years = s.filter(x => x.year && +x.year > 1500).map(x => +x.year);
+  let bars = '';
+  if (years.length > 2) {
+    const min = Math.min(...years), max = Math.max(...years);
+    const bins = new Array(8).fill(0);
+    years.forEach(y => { const i = Math.min(7, Math.floor(((y - min) / Math.max(1, max - min)) * 8)); bins[i]++; });
+    const top = Math.max(...bins) || 1;
+    bars = '<div class="bars">' + bins.map(b => '<i style="height:' + Math.max(3, (b / top) * 44) + 'px"></i>').join('') + '</div><div class="num">' + min + ' → ' + max + '</div>';
+  }
+  const kws = keywordsOf(s).map(k => '<span class="chip" data-kw="' + esc(k) + '">' + esc(k) + '</span>').join('');
+  p.innerHTML =
+    '<div class="card"><h4>السؤال</h4>' + esc(LAST.q) + '<br><span class="num">' + s.length + ' مصدر · ' + new Date(LAST.at).toLocaleString('ar-MA') + '</span></div>' +
+    '<div class="card"><h4>مفاهيم كتكرر</h4>' + (kws || '—') + '</div>' +
+    (bars ? '<div class="card"><h4>توزيع السنين</h4>' + bars + '</div>' : '') +
+    '<div class="card"><h4>خيارات</h4><div class="brow">' +
+    '<button data-a="deep">🔎 عمّق أكثر</button><button data-a="copy">📋 نسخ</button>' +
+    '<button data-a="md">⬇️ تقرير Markdown</button><button data-a="print">🖨️ طباعة / PDF</button></div></div>';
+
+  p.querySelectorAll('.chip').forEach(c => c.onclick = () => { sheet.classList.remove('on'); ask(c.dataset.kw); });
+  p.querySelectorAll('[data-a]').forEach(b => b.onclick = async () => {
+    const a = b.dataset.a;
+    if (a === 'copy') navigator.clipboard.writeText(LAST.data.idea).then(() => b.textContent = '✅ تنسخ');
+    if (a === 'md') downloadReport();
+    if (a === 'print') window.print();
+    if (a === 'deep') { sheet.classList.remove('on'); await deepDive(); }
+  });
+}
+async function deepDive() {
+  if (!LAST) return;
+  const targets = LAST.data.sorted.filter(s => s.url && /^https?:/.test(s.url)).slice(0, 3);
+  if (!targets.length) return;
+  addMsg('🔎 كنقرا الصفحات نفسها باش نعمّق...', 'out');
+  const t = typing();
+  const extra = [];
+  for (const s of targets) {
+    try {
+      const md = await jtxt('https://r.jina.ai/' + s.url, 18000);
+      const paras = md.split('\n').map(l => l.trim()).filter(l => l.length > 140 && !/^(URL Source|Title|Markdown Content|Published Time)/i.test(l));
+      if (paras.length) extra.push({ name: '📖 نص الصفحة', title: s.title, text: paras.slice(0, 4).join(' ').slice(0, 900), url: s.url, weight: 9 });
+    } catch (e) {}
+  }
+  t.done();
+  if (!extra.length) { addMsg('ما قدرتش نقرا الصفحات (ممنوعين ولا بطيئين).', 'in'); return; }
+  const all = LAST.data.sorted.concat(extra);
+  const data = synthesize(LAST.q, all, null);
+  renderAnswer(LAST.q, data, null);
+}
+function downloadReport() {
+  const s = LAST.data.sorted;
+  let md = '# ' + LAST.q + '\n\n## الفكرة الوحدة\n' + LAST.data.idea + '\n\n## النقاط\n' + LAST.data.points.map((p, i) => (i + 1) + '. ' + p.text).join('\n') + '\n\n## المراجع\n' + s.map((r, i) => (i + 1) + '. ' + r.name.replace(/^\S+\s/, '') + ' — ' + r.title + (r.url ? ' — ' + r.url : '')).join('\n');
+  const b = new Blob([md], { type: 'text/markdown' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(b);
+  a.download = 'azzouz-' + Date.now() + '.md';
+  a.click();
+}
+function renderMemory() {
+  const p = $('paneMemory');
+  const list = memory.slice().reverse().slice(0, 60).map((m, i) =>
+    '<div class="mrow"><span>' + esc(m.q) + '</span><button data-del="' + esc(m.q) + '">حذف</button></div>').join('') || '<div class="num">باقي ما تعلمت والو.</div>';
+  p.innerHTML =
+    '<div class="card"><h4>الذاكرة</h4>' + memory.length + ' سؤال محفوظ<br><span class="num">كل جواب كيتخزن، وإلا عاودت السؤال كنفكر القديم ونزيد الجديد.</span>' +
+    '<div class="brow"><button data-a="exp">⬇️ تصدير</button><button data-a="imp">⬆️ استيراد</button><button data-a="clr">🗑️ مسح</button></div></div>' +
+    '<div class="card"><h4>المواضيع</h4>' + list + '</div>';
+  p.querySelectorAll('[data-del]').forEach(b => b.onclick = () => {
+    memory = memory.filter(m => m.q !== b.dataset.del);
+    try { localStorage.setItem('azzouz-mem-v3', JSON.stringify(memory)); } catch (e) {}
+    renderMemory();
+  });
+  p.querySelectorAll('[data-a]').forEach(b => b.onclick = () => {
+    const a = b.dataset.a;
+    if (a === 'exp') {
+      const blob = new Blob([JSON.stringify(memory, null, 2)], { type: 'application/json' });
+      const el = document.createElement('a');
+      el.href = URL.createObjectURL(blob); el.download = 'azzouz-memory.json'; el.click();
+    }
+    if (a === 'imp') {
+      const inp = document.createElement('input');
+      inp.type = 'file'; inp.accept = '.json';
+      inp.onchange = () => {
+        const f = inp.files[0]; if (!f) return;
+        f.text().then(tx => {
+          try { const arr = JSON.parse(tx); if (Array.isArray(arr)) { memory = arr.concat(memory).slice(-200); localStorage.setItem('azzouz-mem-v3', JSON.stringify(memory)); renderMemory(); } } catch (e) {}
+        });
+      };
+      inp.click();
+    }
+    if (a === 'clr' && confirm('تمسح الذاكرة كاملة؟')) {
+      memory = [];
+      try { localStorage.removeItem('azzouz-mem-v3'); } catch (e) {}
+      try { if (DB) DB.transaction('memories', 'readwrite').objectStore('memories').clear(); } catch (e) {}
+      renderMemory();
+    }
   });
 }
 
-function importMemory(input) {
-  const f = input.files && input.files[0];
-  if (!f) return;
-  const rd = new FileReader();
-  rd.onload = () => {
-    try {
-      const arr = JSON.parse(rd.result);
-      if (!Array.isArray(arr)) throw new Error('صيغة ماشي صحيحة');
-      const have = new Set(memory.map(m => (m.q || '') + '|' + (m.time || '')));
-      let added = 0;
-      arr.forEach(m => { if (m && m.q && !have.has((m.q || '') + '|' + (m.time || ''))) { memory.push(m); added++; } });
-      try { localStorage.setItem('azzouz-global-memory', JSON.stringify(memory.slice(-100))); } catch (e) {}
-      updateStats(); renderMemList();
-      addMsg('📥 <b>استوردت الذاكرة:</b> ' + added + ' عنصر جديد.', 'ai');
-    } catch (e) {
-      addMsg('⚠️ الملف ماشي صالح: ' + escapeHtml(e.message), 'ai');
-    }
-  };
-  rd.readAsText(f);
-}
+/* ===== ربط ===== */
+$('send').onclick = () => ask(qEl.value);
+qEl.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); ask(qEl.value); } });
+$('mic').onclick = () => { if (V.on) vStop(); else startVoice(); };
+$('mic2').onclick = $('mic').onclick;
+$('vstop').onclick = vStop;
+$('tools').onclick = () => openTools('report');
+$('shclose').onclick = () => sheet.classList.remove('on');
+document.querySelectorAll('.stabs button').forEach(b => b.onclick = () => openTools(b.dataset.p));
+initDB();
 
-function escapeHtml(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-function extractTopic(q){
-  let t=q.toLowerCase().replace(/[?؟!.,]/g,'').trim();
-  let words=t.split(/\s+/).filter(w=>w.length>2);
-  return words.slice(0,2).join(' ')||t.slice(0,15);
-}
-function extractKeyword(q){
-  let map={'ثقب':'السماء','أسود':'السماء','نحل':'النحل','نمل':'النمل','نور':'النور','سماء':'السماء','حديد':'الحديد','كرسي':'الكرسي','رحمة':'الرحمة','علم':'العلم','قلب':'القلب','قرآن':'القرآن','الله':'الله','طاقة':'الطاقة','ماء':'الماء','أرض':'الأرض'};
-  for(let k in map){ if(q.includes(k)) return map[k]; }
-  let words=q.split(/\s+/).filter(w=>w.length>2 && /[\u0600-\u06FF]/.test(w));
-  return words[0]||null;
-}
-function getVerse(q){
-  let t=q.toLowerCase();
-  if(t.includes('ثقب')||t.includes('black')||t.includes('كون')||t.includes('space')) return '﴿ والسماء بنيناها بأيد وإنا لموسعون ﴾ الذاريات 47';
-  if(t.includes('نحل')||t.includes('bee')) return '﴿ وأوحى ربك إلى النحل ﴾ النحل 68';
-  if(t.includes('نمل')||t.includes('ant')) return '﴿ قالت نملة يا أيها النمل ﴾ النمل 18';
-  if(t.includes('نور')||t.includes('light')) return '﴿ الله نور السماوات والأرض ﴾ النور 35';
-  if(t.includes('طاقة')||t.includes('energy')) return '﴿ وجعلنا من الماء كل شيء حي ﴾ الأنبياء 30';
-  if(t.includes('علم')||t.includes('science')) return '﴿ وقل رب زدني علما ﴾ طه 114';
-  return '﴿ وفي الأرض آيات للموقنين ﴾ الذاريات 20';
-}
-function exportMemory(){
-  let data=JSON.stringify(memory,null,2);
-  let blob=new Blob([data],{type:'application/json'}); let url=URL.createObjectURL(blob);
-  let a=document.createElement('a'); a.href=url; a.download='azzouz-brain.json'; a.click();
-  addMsg('💾 <b>صدرت الذاكرة:</b> '+memory.length+' سؤال وجواب - تقدر تحفظ الملف وتسترجعو فأي جهاز.', 'ai');
-}
-function clearMemory(){
-  if(!confirm('واش بغيتي تمسح الذاكرة كاملة؟ Azzouz غادي ينسى كلشي اللي تعلمو معاك.')) return;
-  memory=[]; try{ localStorage.removeItem('azzouz-global-memory'); }catch(e){}
-  try{ if(DB){ let tx=DB.transaction('memories','readwrite'); tx.objectStore('memories').clear(); } }catch(e){}
-  updateStats(); addMsg('🗑️ <b>مسحت الذاكرة:</b> Azzouz نسى كلشي - وغادي يبدا يتعلم من جديد معاك.', 'ai');
-}
-</script></body></html>
+addMsg('<div class="h">سلام 👋</div>أنا Azzouz. كنقرا من كل محركات الويب، الكتب، الأبحاث، والملفات، وكنعطيك فكرة وحدة بالمراجع. وإلا عاودت سؤال، كنفكر الجواب القديم ونزيد عليه الجديد.<br><br>جرب: <b>ما هو النحل؟</b> ولا <b>الصيام المتقطع</b>.', 'in');
+statusEl.textContent = 'متصل · كنقرا من كل الويب';
+</script>
+</body>
+</html>
