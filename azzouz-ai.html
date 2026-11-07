@@ -211,7 +211,7 @@ async function gather(q, tickFn) {
     async () => { const kw = extractKeyword(q); if (!kw) return; const d = await jget('https://api.alquran.cloud/v1/search/' + enc(kw) + '/all/quran-uthmani');
       (d.data && d.data.matches || []).slice(0, 2).forEach(a => push({ name: '📖 القرآن', title: a.surah.englishName + ' — آية ' + a.numberInSurah, text: a.text, url: 'https://quran.com/' + a.surah.number + '/' + a.numberInSurah, weight: 10 })); },
     async () => { const d = await jget('https://ar.wikipedia.org/w/api.php?action=query&list=search&srsearch=' + enc(q) + '&format=json&origin=*');
-      (d.query && d.query.search || []).slice(0, 6).forEach(r => push({ name: '📚 ويكيبيديا العربية', title: r.title, text: clean(r.snippet), url: 'https://ar.wikipedia.org/wiki/' + enc(r.title.replace(/ /g, '_')), weight: 9 })); },
+      (d.query && d.query.search || []).filter(r => matchScore({ title: r.title, text: clean(r.snippet) }, termsOf(q, en)) > 0).slice(0, 6).forEach(r => push({ name: '📚 ويكيبيديا العربية', title: r.title, text: clean(r.snippet), url: 'https://ar.wikipedia.org/wiki/' + enc(r.title.replace(/ /g, '_')), weight: 9 })); },
     async () => { const d = await jget('https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=' + enc(en) + '&format=json&origin=*');
       (d.query && d.query.search || []).slice(0, 6).forEach(r => push({ name: '📚 Wikipedia', title: r.title, text: clean(r.snippet), url: 'https://en.wikipedia.org/wiki/' + enc(r.title.replace(/ /g, '_')), weight: 8 })); },
     async () => { const d = await jget('https://api.openalex.org/works?search=' + enc(q) + '&per_page=50&sort=relevance_score:desc');
@@ -323,6 +323,18 @@ async function fillSnippets(S, tickFn) {
   S.forEach(o => { o.sum = firstSentence(o.text); });
 }
 
+
+function termsOf(q, en) {
+  const t = (q + ' ' + (en || '')).toLowerCase();
+  return [...new Set(t.split(/[^\p{L}\p{N}]+/u).filter(w => w.length > 3))];
+}
+function matchScore(o, terms) {
+  const t = (o.title + ' ' + (o.text || '')).toLowerCase();
+  let n = 0;
+  for (const k of terms) if (t.includes(k)) n++;
+  return n;
+}
+
 /* ===== التلخيص ===== */
 function clause(t, n = 150) {
   let s = clean(t).replace(/\s+/g, ' ');
@@ -341,8 +353,10 @@ function getVerse(q) {
   return '﴿ وفي الأرض آيات للموقنين ﴾ الذاريات 20';
 }
 function synthesize(q, sources, prior) {
-  const sorted = sources.slice().sort((a, b) => (b.weight || 0) - (a.weight || 0));
-  const rich = sorted.filter(s => (s.text || '').length > 40);
+  const terms = termsOf(q, englishOf(q));
+  const score = s => (s.weight || 0) + 6 * matchScore(s, terms);
+  const sorted = sources.slice().sort((a, b) => score(b) - score(a));
+  const rich = sorted.filter(s => (s.text || '').length > 40 && matchScore(s, terms) > 0);
   const parts = rich.slice(0, 3).map(s => clause(s.text, 150));
   let idea = '';
   if (parts.length) {
