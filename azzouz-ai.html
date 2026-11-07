@@ -754,9 +754,9 @@ initDB();
 
 addMsg('<div class="h">سلام 👋</div>أنا Azzouz. كنقرا من كل محركات الويب، الكتب، الأبحاث، والملفات، وكنعطيك فكرة وحدة بالمراجع. وإلا عاودت سؤال، كنفكر الجواب القديم ونزيد عليه الجديد.<br><br>جرب: <b>ما هو النحل؟</b> ولا <b>الصيام المتقطع</b>.', 'in');
 statusEl.textContent = 'متصل · كنقرا من كل الويب';
-</script>
-</body>
-</html>
+
+
+
 
 /* ===== استمرارية المحادثة ===== */
 let chatDB = null;
@@ -909,3 +909,7 @@ $('user').onclick = accountClick;
 $('clearChat').onclick = () => { if (confirm('تمسح المحادثة كاملة؟')) { clearChat(); sheet.classList.remove('on'); } };
 loadChat().then(() => { refreshMemCount(); hUI(); });
 setTimeout(() => { if (!log.children.length) loadChat(); }, 400);
+
+</script>
+</body>
+</html>
