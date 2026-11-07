@@ -513,7 +513,7 @@ function clusterClaims(cands) {
       const b = sigWords(gr.text);
       let inter = 0;
       a.forEach(w => { if (b.has(w)) inter++; });
-      if (inter / Math.max(1, Math.min(a.size, b.size)) > 0.45) { g = gr; break; }
+      if (inter / Math.max(1, Math.min(a.size, b.size)) > 0.35) { g = gr; break; }
     }
     if (g) {
       g.support++;
