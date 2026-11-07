@@ -86,6 +86,37 @@ footer{background:var(--panel);padding:8px 9px;display:flex;gap:7px;align-items:
 .num{font-size:11px;color:var(--dim)}
 .bars{display:flex;gap:3px;align-items:flex-end;height:44px;margin-top:6px}
 .bars i{flex:1;background:#2c4a44;border-radius:2px 2px 0 0;min-height:2px}
+
+/* ===== تحسين الواجهة ===== */
+:root{--acc:#00a884;--bg:#0b141a;--panel:#111b21;--panel2:#202c33;--line:#2a3942;--txt:#e9edef;--dim:#8696a0}
+html,body{background:radial-gradient(1200px 600px at 80% -10%,#123 0%,#0b141a 55%) ,var(--bg)}
+header{background:rgba(32,44,51,.92);backdrop-filter:blur(10px);border-bottom:1px solid rgba(255,255,255,.05)}
+.avatar{background:linear-gradient(135deg,#00a884,#0a7c66);box-shadow:0 0 14px rgba(0,168,132,.35)}
+.hd b{letter-spacing:.2px}
+.hd span{color:var(--dim)}
+main#log{padding-top:6px}
+.msg{border-radius:16px;box-shadow:0 1px 2px rgba(0,0,0,.28);border:1px solid rgba(255,255,255,.04);line-height:1.85}
+.msg.in{background:#141f26;border-bottom-right-radius:6px}
+.msg.out{background:#005c4b;border-bottom-left-radius:6px;margin-left:16%;max-width:84%}
+.msg .h{display:inline-block;background:rgba(0,168,132,.14);color:#7ff0d4;border:1px solid rgba(0,168,132,.3);padding:2px 9px;border-radius:999px;font-size:11px;font-weight:700;margin:8px 0 4px}
+.msg .h:first-child{margin-top:0}
+.meta{color:#6b7d86;font-size:10px;margin-top:6px;text-align:left}
+.exp{display:inline-block;margin-top:9px;background:rgba(0,168,132,.12);border:1px solid rgba(0,168,132,.32);color:#8ff0d6;border-radius:999px;padding:5px 11px;font-size:11.5px;cursor:pointer}
+.refs.on{margin-top:6px;background:#0e181e;border:1px solid rgba(255,255,255,.05);border-radius:12px;padding:8px 10px}
+.r{padding:7px 0;border-bottom:1px dashed rgba(255,255,255,.06)}
+.r:last-child{border-bottom:none}
+.lnk{color:#5cc8ff;font-size:10.5px;word-break:break-all}
+.srctag{background:rgba(255,255,255,.06);color:#9fb3bd;border-radius:999px;padding:1px 7px;font-size:10px;margin-right:4px}
+footer{background:rgba(32,44,51,.96);backdrop-filter:blur(10px);border-top:1px solid rgba(255,255,255,.05);padding-bottom:calc(10px + env(safe-area-inset-bottom))}
+textarea#q{max-height:130px;overflow-y:auto;line-height:1.6}
+.fbtn{background:#2a3942;transition:transform .12s ease}
+.fbtn:active{transform:scale(.94)}
+.fbtn.send{background:var(--acc)}
+.sheet{border-radius:18px 18px 0 0;box-shadow:0 -10px 40px rgba(0,0,0,.5)}
+.stabs button{background:#1b272e;border:1px solid #2a3942}
+.stabs button.on{background:var(--acc);color:#04241c}
+.hread{letter-spacing:.2px}
+.hprog i{box-shadow:0 0 10px rgba(0,168,132,.6)}
 </style>
 </head>
 <body>
@@ -918,7 +949,10 @@ async function loadChat() {
   if (!rows.length) return;
   log.innerHTML = '';
   const clean = rows.filter(r => !/وقع مشكل فالقراءة|Cannot read properties/.test(String(r.html || '')));
+  let prevHtml = '';
   clean.slice(-200).forEach(r => {
+    if (String(r.html || '') === prevHtml) return;
+    prevHtml = String(r.html || '');
     const d = document.createElement('div');
     d.className = 'msg ' + (r.who === 'out' ? 'out' : 'in');
     d.innerHTML = r.html;
@@ -1150,6 +1184,13 @@ function uploadAnswer(f) {
 
 if ('serviceWorker' in navigator) { navigator.serviceWorker.register('sw.js').catch(() => {}); }
 document.addEventListener('DOMContentLoaded', () => {
+  const ta = document.getElementById('q');
+  if (ta) {
+    ta.addEventListener('input', () => {
+      ta.style.height = 'auto';
+      ta.style.height = Math.min(130, ta.scrollHeight) + 'px';
+    });
+  }
   const clip = $('clip'), file = $('file');
   if (clip && file) {
     clip.onclick = () => file.click();
