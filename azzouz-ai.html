@@ -4,6 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#202c33">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="AZZOUZ AI">
 <meta property="og:title" content="AZZOUZ AI - ذكاء اصطناعي مغربي">
 <meta property="og:description" content="كيجاوب منظم، كيقرا PDF والصور، وكيتعلم من الغلط ديالو">
 <meta property="og:type" content="website">
@@ -1124,6 +1128,7 @@ function uploadAnswer(f) {
   });
 }
 
+if ('serviceWorker' in navigator) { navigator.serviceWorker.register('sw.js').catch(() => {}); }
 document.addEventListener('DOMContentLoaded', () => {
   const clip = $('clip'), file = $('file');
   if (clip && file) {
