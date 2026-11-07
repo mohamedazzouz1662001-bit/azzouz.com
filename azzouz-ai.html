@@ -372,34 +372,42 @@ function synthesize(q, sources, prior) {
   const score = s => (s.weight || 0) + 6 * matchScore(s, terms) + (String(s.title || '').includes(q) ? 12 : 0);
   const sorted = sources.slice().sort((a, b) => score(b) - score(a));
   const rich = sorted.filter(s => (s.text || '').length > 40 && matchScore(s, terms) > 0);
-  const parts = rich.slice(0, 3).map(s => clause(s.text, 150));
-  let idea = '';
-  if (parts.length) {
-    idea = parts[0];
-    if (parts[1]) idea += ' وهاد الشي كيتأكد من مصادر أخرى كتقول ' + parts[1];
-    if (parts[2]) idea += '، ومن زاوية أخرى ' + parts[2];
-  } else if (sorted.length) {
-    idea = 'لقيت ' + sorted.length + ' مصدر مرتبط بـ«' + q + '»، أهمها: ' + sorted.slice(0, 3).map(s => s.title).join(' · ');
-  } else {
-    idea = 'ما لقيتش مصادر كافية على «' + q + '». جرب صياغة أخرى.';
-  }
+
+  const shortOf = s => {
+    let c = clause(s.text, 110);
+    if (c.length > 118) c = c.slice(0, 115) + '…';
+    return c;
+  };
+
+  let short = '', found = rich.length > 0;
+  if (found) short = shortOf(rich[0]);
+  else short = 'ما لقيتهاش: ما لقيتش مصادر واضحة على «' + q + '».';
+
   const points = [];
-  const usedTitles = new Set();
+  const used = new Set();
   rich.forEach(s => {
     const c = s.sum || clause(s.text, 130);
     if (!c || c.length < 30) return;
-    const key = c.slice(0, 40);
-    if (usedTitles.has(key)) return;
-    usedTitles.add(key);
-    if (points.length < 5) points.push({ src: s.name, text: c });
+    const k = c.slice(0, 40);
+    if (used.has(k)) return;
+    used.add(k);
+    if (points.length < 4) points.push({ src: s.name, text: c });
   });
+
+  let example = '';
+  const ex = rich.find(s => /(مثال|على سبيل المثال|ex\.|e\.g\.)/i.test(s.text || '')) || rich.find(s => /\d/.test(s.text || ''));
+  if (ex) example = clause(ex.text, 130);
+  else if (points.length) example = points[0].text.slice(0, 120);
+  if (!found) example = 'جرب صياغة بحال: «' + q + ' بالتفصيل» ولا بالإنجليزية، وأنا كنعاود البحث فكل المصادر.';
+
   let fresh = [];
   if (prior) {
     const old = new Set(prior.urls || []);
     fresh = sorted.filter(s => s.url && !old.has(s.url)).slice(0, 6);
   }
-  return { idea, points, sorted, fresh, verse: getVerse(q) };
+  return { short, points, example, found, sorted, fresh, verse: getVerse(q) };
 }
+
 
 
 /* ===== الطابع البشري ===== */
@@ -457,18 +465,21 @@ function suggestionsFor(q) {
 
 function renderAnswer(q, data, prior) {
   let h = '';
-  if (prior) {
-    h += '<div class="h">🧠 من الذاكرة</div>سولتني على «' + esc(prior.q) + '» من قبل. ' + esc(String(prior.idea || '').slice(0, 220)) + '...<br><br>';
-  }
-  h += '<div class="h">الجواب</div>' + esc(data.idea);
+  if (prior) h += '<div class="h">🧠 من الذاكرة</div>سولتني على «' + esc(prior.q) + '» من قبل، وها اللي عرفت من ديك المرة.<br><br>';
+
+  h += '<div class="h">' + (data.found ? 'الجواب' : 'النتيجة') + '</div><b>' + esc(data.short) + '</b><br><br>';
+
   if (data.points.length) {
-    h += '<br><br>';
+    h += '<div class="h">الشرح</div>';
     data.points.forEach((p, i) => { h += (i + 1) + '. ' + esc(p.text) + ' <span class="srctag">' + esc(String(p.src).replace(/^\S+\s/, '')) + '</span><br>'; });
+    h += '<br>';
   }
-  if (prior && data.fresh.length) {
-    h += '<br>🆕 زدت ' + data.fresh.length + ' مصدر جديد هاد المرة.';
-  }
-  h += '<br><br>' + esc(data.verse);
+
+  h += '<div class="h">' + (data.found ? 'مثال' : 'بديل') + '</div>' + esc(data.example) + '<br>';
+
+  if (prior && data.fresh.length) h += '<br>🆕 زدت ' + data.fresh.length + ' مصدر جديد هاد المرة.<br>';
+
+  h += '<br><b>واش بغيتي نكمل؟</b>';
 
   const el = addMsg(h, 'in');
 
@@ -492,20 +503,11 @@ function renderAnswer(q, data, prior) {
     el.appendChild(box);
   }
 
-  const sg = document.createElement('div');
-  sg.className = 'sugg';
-  suggestionsFor(q).forEach(s => {
-    const b = document.createElement('button');
-    b.textContent = '💡 ' + s;
-    b.onclick = () => ask(s);
-    sg.appendChild(b);
-  });
-  el.appendChild(sg);
-
   LAST = { q, data, prior, at: Date.now() };
   log.scrollTop = log.scrollHeight;
   return el;
 }
+
 
 /* ===== السؤال ===== */
 async function ask(text) {
@@ -752,7 +754,7 @@ $('shclose').onclick = () => sheet.classList.remove('on');
 document.querySelectorAll('.stabs button').forEach(b => b.onclick = () => openTools(b.dataset.p));
 initDB();
 
-addMsg('<div class="h">سلام 👋</div>أنا Azzouz. كنقرا من كل محركات الويب، الكتب، الأبحاث، والملفات، وكنعطيك فكرة وحدة بالمراجع. وإلا عاودت سؤال، كنفكر الجواب القديم ونزيد عليه الجديد.<br><br>جرب: <b>ما هو النحل؟</b> ولا <b>الصيام المتقطع</b>.', 'in');
+addMsg('<div class="h">سلام 👋</div>أنا Azzouz. كنبحث فكل الويب والأبحاث والملفات، وكنجاوبك بالدارجة: سطر واحد، شرح بالنقط، مثال، وسؤال فالأخير. وإلا عاودت سؤال، كنفكر الجواب القديم ونزيد عليه الجديد.<br><br>جرب: <b>ما هو النحل؟</b> ولا <b>الصيام المتقطع</b>.', 'in');
 statusEl.textContent = 'متصل · كنقرا من كل الويب';
 
 
