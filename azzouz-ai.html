@@ -475,6 +475,99 @@ function dedupeSources(list) {
   return out;
 }
 
+
+/* ===== العقل: تفكيك الجمل وتجميع الأفكار ===== */
+const NOISE = /(انتقل إلى المحتوى|تصفح من غير|تسجيل الدخول|سياسة الخصوصية|جميع الحقوق|اقرأ المزيد|اضغط هنا|تخطى إلى|Cookie|subscribe|newsletter|حساب جديد|رمز التحقق)/i;
+const DEFINE = /(\sهو\s|\sهي\s|\sهما\s|عبارة عن|\sيعني\s|يُعرف|تُعرف|is an?\s|are a\s|refers to|is defined|consists of)/i;
+
+function sentencesOf(txt) {
+  const flat = String(txt || '').replace(/\s+/g, ' ').replace(/\[[^\]]{0,40}\]/g, ' ').trim();
+  return flat.split(/(?<=[.!?؟])\s+|\s+[·•]\s+|(?<=[،])\s+(?=[A-Za-z\u0600-\u06FF]{4,}\s)/)
+    .map(s => s.replace(/^[\s\-–—*]+/, '').trim())
+    .filter(s => s.length >= 45 && s.length <= 320);
+}
+
+function sigWords(s) {
+  return new Set(String(s).toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(w => w.length > 3));
+}
+
+function sentScore(s, terms) {
+  const t = s.toLowerCase();
+  let sc = 0;
+  terms.forEach(w => { if (w && w.length > 2 && t.includes(w)) sc += 3; });
+  if (DEFINE.test(s)) sc += 5;
+  if (/^\d+[.)]/.test(s)) sc -= 4;
+  if (NOISE.test(s)) sc -= 25;
+  if (/\d{4}/.test(s)) sc += 1;
+  if (s.length > 90 && s.length < 240) sc += 2;
+  if ((s.match(/\p{L}/gu) || []).length / s.length < 0.6) sc -= 6;
+  return sc;
+}
+
+function clusterClaims(cands) {
+  const groups = [];
+  cands.forEach(c => {
+    const a = sigWords(c.text);
+    let g = null;
+    for (const gr of groups) {
+      const b = sigWords(gr.text);
+      let inter = 0;
+      a.forEach(w => { if (b.has(w)) inter++; });
+      if (inter / Math.max(1, Math.min(a.size, b.size)) > 0.45) { g = gr; break; }
+    }
+    if (g) {
+      g.support++;
+      if (c.score > g.score) { g.text = c.text; g.src = c.src; g.score = c.score; }
+    } else {
+      groups.push({ text: c.text, src: c.src, score: c.score, support: 1 });
+    }
+  });
+  return groups.sort((x, y) => (y.support - x.support) || (y.score - x.score));
+}
+
+function think(q, sources, terms, prior) {
+  const cands = [];
+  sources.forEach(s => {
+    sentencesOf(s.text || s.sum || '').forEach(txt => {
+      const sc = sentScore(txt, terms) + Math.min(6, (s.weight || 0) / 2) + trustScore(s) / 3;
+      if (sc > 0) cands.push({ text: txt, src: s.name, score: sc });
+    });
+  });
+  const claims = clusterClaims(cands).filter(c => c.score > 2).slice(0, 6);
+  const agreements = claims.filter(c => c.support >= 2).length;
+  const nums = new Set();
+  claims.slice(0, 3).forEach(c => (c.text.match(/\d[\d.,]{1,12}/g) || []).forEach(n => nums.add(n)));
+  return {
+    claims,
+    agreements,
+    numbers: Array.from(nums).slice(0, 6),
+    intent: intentOf(q),
+    confidence: claims.length ? Math.min(97, 34 + agreements * 12 + Math.min(20, claims[0].score * 2)) : 0
+  };
+}
+
+function intentOf(q) {
+  const t = String(q).toLowerCase();
+  if (/كيفاش|كيف |how to|طريقة/.test(t)) return 'how';
+  if (/علاش|لماذا|why|سبب/.test(t)) return 'why';
+  if (/شنو الفرق|الفرق بين|مقارنة|vs|versus|أفضل|احسن/.test(t)) return 'compare';
+  if (/^(من هو|من هي|شكون|who is)/.test(t)) return 'who';
+  if (/(ثمن|سعر|price|بشحال|تكلفة)/.test(t)) return 'price';
+  if (/(أخبار|النهار|اليوم|2026|news)/.test(t)) return 'news';
+  if (/(تطبيق|app|برنامج|برمجة|code|python|javascript)/.test(t)) return 'tech';
+  return 'what';
+}
+
+function shapeByIntent(intent, claims, q) {
+  if (!claims.length) return null;
+  const lead = claims[0].text.trim();
+  if (intent === 'how') return 'الطريقة باختصار: ' + lead;
+  if (intent === 'why') return 'السبب الأساسي: ' + lead;
+  if (intent === 'compare') return 'الفرق كيبان فهادشي: ' + lead;
+  if (intent === 'price') return 'بخصوص الثمن: ' + lead;
+  return lead;
+}
+
 function synthesize(q, sources, prior) {
   const terms = termsOf(q, englishOf(q));
   const score = s => (s.weight || 0) + 6 * matchScore(s, terms) + trustScore(s) + (String(s.title || '').includes(q) ? 12 : 0);
@@ -487,20 +580,27 @@ function synthesize(q, sources, prior) {
     return c;
   };
 
-  let short = '', found = rich.length > 0;
-  if (found) short = shortOf(rich[0]);
+  const brain = think(q, sorted, terms, prior);
+  const claims = brain.claims;
+  const found = claims.length > 0 || rich.length > 0;
+
+  let short = '';
+  if (claims.length) short = shapeByIntent(brain.intent, claims, q);
+  else if (rich.length) short = shortOf(rich[0]);
   else short = 'ما لقيتهاش: ما لقيتش مصادر واضحة على «' + q + '».';
+  if (short.length > 210) short = short.slice(0, 205) + '…';
 
   const points = [];
-  const used = new Set();
-  rich.forEach(s => {
-    const c = s.sum || clause(s.text, 130);
-    if (!c || c.length < 30) return;
-    const k = c.slice(0, 40);
-    if (used.has(k)) return;
-    used.add(k);
-    if (points.length < 4) points.push({ src: s.name, text: c });
+  claims.slice(0, 5).forEach(c => {
+    const tag = c.support >= 2 ? c.src + ' · ' + c.support + ' مصادر' : c.src;
+    points.push({ src: tag, text: c.text });
   });
+  if (points.length < 2) {
+    rich.slice(0, 3).forEach(s => {
+      const c = s.sum || clause(s.text, 140);
+      if (c && c.length > 30 && !points.some(p => p.text.slice(0, 35) === c.slice(0, 35))) points.push({ src: s.name, text: c });
+    });
+  }
 
   let example = '';
   const ex = rich.find(s => /(مثال|على سبيل المثال|ex\.|e\.g\.)/i.test(s.text || '')) || rich.find(s => /\d/.test(s.text || ''));
@@ -517,10 +617,10 @@ function synthesize(q, sources, prior) {
     const old = new Set(prior.urls || []);
     fresh = sorted.filter(s => s.url && !old.has(s.url)).slice(0, 6);
   }
-  const sure = !found ? false : (matchScore(rich[0], terms) >= 2 || (rich[0].weight || 0) >= 9);
+  const sure = !found ? false : (brain.confidence >= 45 || matchScore(rich[0] || { text: '' }, terms) >= 2);
   const trustCount = sorted.filter(s => trustScore(s) > 0).length;
-  const conf = !found ? 0 : Math.min(99, 38 + Math.min(38, trustCount * 2) + Math.min(18, matchScore(rich[0], terms) * 6));
-  return { short, points, example, next, found, sure, conf, trustCount, sorted, fresh, verse: getVerse(q) };
+  const conf = !found ? 0 : Math.max(brain.confidence, Math.min(99, 30 + Math.min(30, trustCount * 2)));
+  return { short, points, example, next, found, sure, conf, trustCount, sorted, fresh, brain, verse: getVerse(q) };
 }
 
 
@@ -712,6 +812,7 @@ function renderAnswer(q, data, prior) {
   if (!data.sure) h += '<br><span class="srctag">ما متأكدش 100%، ولكن هاد اللي لقيت.</span>';
   h += '<br><br>';
 
+  if (data.brain && data.brain.numbers && data.brain.numbers.length) h += '<span class="srctag">أرقام: ' + esc(data.brain.numbers.join(' · ')) + '</span><br>';
   if (data.points.length) {
     h += '<div class="h">2. الشرح</div>';
     data.points.forEach((p, i) => { h += (i + 1) + '. ' + esc(p.text) + ' <span class="srctag">' + esc(String(p.src).replace(/^\S+\s/, '')) + '</span><br>'; });
