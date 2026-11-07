@@ -88,6 +88,8 @@ footer{background:var(--panel);padding:8px 9px;display:flex;gap:7px;align-items:
 <main id="log"></main>
 <div class="vbar" id="vbar"><span>🎙️</span><span class="txt" id="vtxt">كنسمع...</span><button class="icon" id="vstop">سالِي</button></div>
 <footer>
+  <button class="fbtn" id="clip" title="ملف">📎</button>
+  <input type="file" id="file" accept=".pdf,.txt,.md,.csv,.json,.js,.py,.html,.css,.docx,.png,.jpg,.jpeg,.webp" hidden>
   <button class="fbtn" id="mic2">🎙️</button>
   <textarea id="q" rows="1" placeholder="كتب سؤالك..."></textarea>
   <button class="fbtn send" id="send">➤</button>
@@ -440,7 +442,7 @@ function smallTalk(q) {
   if (/(كيف حالك|كيداير|لباس|كيفاش داير)/i.test(t) && t.length < 30)
     return 'الحمد لله، خدام كنقرا ونبحث. ونتا كيف داير؟' + (nm ? '' : ' وسميني باش نتعرف عليك.');
   if (/^(شكرا|بارك الله|الله يخليك|تسلم)/i.test(t)) return pick(['على الرحب والسعة 🌿', 'الله يبارك فيك 🌿 أي وقت.']);
-  if (/(شكون نتا|من نتا|سميتك)/i.test(t)) return 'أنا Azzouz 🌿 كنقرا من محركات الويب والأبحاث والكتب، وكنعطيك فكرة وحدة بالمراجع.' + (nm ? ' ونتا ' + nm + '.' : '');
+  if (/(شكون نتا|من نتا|سميتك)/i.test(t)) return 'أنا AZZOUZ AI PRO 🌿 كنقرا من محركات الويب والأبحاث والكتب، وكنعطيك فكرة وحدة بالمراجع.' + (nm ? ' ونتا ' + nm + '.' : '');
   if (/(بسلامة|نشوفك من بعد|تصبح على خير)/i.test(t)) return 'بسلامة الله 🌿 أنا هنا إلا بغيتي شي حاجة.';
   return null;
 }
@@ -929,6 +931,81 @@ $('clearChat').onclick = () => { if (confirm('تمسح المحادثة كامل
 loadChat().then(() => { refreshMemCount(); hUI(); });
 setTimeout(() => { if (!log.children.length) loadChat(); }, 400);
 
+
+/* ===== قراءة الملفات ===== */
+function fileAnswer(name, text) {
+  const t = clean(text);
+  const words = t.split(/\s+/).filter(Boolean);
+  if (words.length < 5) {
+    return addMsg('<div class="h">1. الخلاصة</div><b>الملف باين خاوي ولا ما فيهش نص مقروء.</b><br><br><div class="h">2. الشرح</div>1. يمكن يكون PDF مصور، ولا صورة ضعيفة الإضاءة.<br><div class="h">3. بديل</div>عطيني نسخة نصية ولا صورة أوضح.<br><br><div class="h">4. شنو ندير دابا</div>صيفط ليا الملف بصيغة txt ولا docx.<br><br><b>واش بغيتي نكمل؟</b>', 'in');
+  }
+  const sents = t.split(/(?<=[.!؟])\s+/).filter(s => s.length > 45);
+  const kws = keywordsOf([{ title: '', text: t }]).slice(0, 6);
+  const short = (sents[0] || t).slice(0, 130);
+  const pts = sents.slice(0, 4).map(s => s.slice(0, 150));
+  const ex = (t.match(/(مثال|مثلا|example)[^.]{10,150}/i) || [])[0] || (sents[1] ? sents[1].slice(0, 130) : '');
+  let h = '<div class="h">1. الخلاصة</div><b>' + esc(short) + '</b><br><br>';
+  h += '<div class="h">2. الشرح</div>' + (pts.length ? pts.map((p, i) => (i + 1) + '. ' + esc(p) + '<br>').join('') : '1. الملف قصير، ما فيهش جمل كافية للتلخيص.<br>');
+  h += '<br><span class="srctag">الملف: ' + esc(name) + ' · ' + words.length + ' كلمة · ' + (kws.join(' · ') || '') + '</span><br>';
+  h += '<br><div class="h">3. مثال</div>' + esc(ex || 'ما لقيتش مثال داخل الملف، ولكن نقدر نفسر ليك شي جزئية بشرح بسيط.') + '<br>';
+  h += '<br><div class="h">4. شنو ندير دابا</div>قول ليا «لخصو أكثر» ولا «فسر ليا الجزء ديال ...» وأنا نكمل.<br><br><b>واش بغيتي نكمل؟</b>';
+  const el = addMsg(h, 'in');
+  LAST = { q: 'ملف: ' + name, data: { short, points: pts.map(p => ({ src: name, text: p })), example: ex, next: '', found: true, sure: true, sorted: [], fresh: [] }, prior: null, at: Date.now() };
+  return el;
+}
+
+async function readPDF(f) {
+  const pdfjs = await import('https://cdn.jsdelivr.net/npm/pdfjs-dist@4.0.379/build/pdf.min.mjs');
+  pdfjs.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.0.379/build/pdf.worker.min.mjs';
+  const doc = await pdfjs.getDocument({ data: await f.arrayBuffer() }).promise;
+  let out = '';
+  const pages = Math.min(doc.numPages, 25);
+  for (let p = 1; p <= pages; p++) {
+    const pg = await doc.getPage(p);
+    const c = await pg.getTextContent();
+    out += c.items.map(i => i.str).join(' ') + '\n';
+  }
+  return out;
+}
+
+async function readImage(f) {
+  const mod = await import('https://cdn.jsdelivr.net/npm/tesseract.js@5.1.0/dist/tesseract.esm.min.js');
+  const worker = await mod.createWorker('ara+eng');
+  const { data } = await worker.recognize(f);
+  await worker.terminate();
+  return data.text || '';
+}
+
+async function readAny(f) {
+  const n = f.name.toLowerCase();
+  if (n.endsWith('.pdf')) return readPDF(f);
+  if (/\.(png|jpe?g|webp)$/.test(n)) return readImage(f);
+  return f.text();
+}
+
+function uploadAnswer(f) {
+  addMsg(esc(f.name) + ' 📎', 'out');
+  const t = typing();
+  readAny(f).then(txt => {
+    t.done();
+    fileAnswer(f.name, txt);
+    statusEl.textContent = 'جاهز';
+  }).catch(err => {
+    t.done();
+    addMsg('<div class="h">1. الخلاصة</div><b>ما قدرتش نقرا هاد الملف.</b><br><br><div class="h">2. الشرح</div>1. ' + esc(String(err.message || err).slice(0, 160)) + '<br><div class="h">3. بديل</div>صيفط ليا النص مباشرة، ولا صور ليه screenshot.<br><br><div class="h">4. شنو ندير دابا</div>عاود صيفط الملف بصيغة txt ولا pdf.<br><br><b>واش بغيتي نكمل؟</b>', 'in');
+  });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const clip = $('clip'), file = $('file');
+  if (clip && file) {
+    clip.onclick = () => file.click();
+    file.onchange = e => { const f = e.target.files && e.target.files[0]; if (f) uploadAnswer(f); file.value = ''; };
+  }
+  if (location.search.includes('demo=1')) {
+    setTimeout(() => fileAnswer('demo.txt', 'المغرب بلاد كتطل على المحيط الأطلسي والبحر الأبيض المتوسط. العاصمة ديالها الرباط، والمدن الكبرى بحال الدار البيضاء ومراكش وفاس. الاقتصاد كيعتمد على الفلاحة والصناعة والسياحة. مثال: الفلاحة كتصدر الحوامض والطماطم لأوروبا. اللغة الرسمية هي العربية والأمازيغية، والدارجة هي لغة التواصل اليومي.'), 500);
+  }
+});
 </script>
 </body>
 </html>
