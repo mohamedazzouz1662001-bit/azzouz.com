@@ -109,7 +109,8 @@ footer{background:var(--panel);padding:8px 9px;display:flex;gap:7px;align-items:
   <button class="fbtn send" id="send">➤</button>
 </footer>
 <div class="sheet" id="sheet">
-  <div class="sh"><b>الأدوات</b><button class="icon" id="clearChat" title="مسح المحادثة">🗑️</button><button class="icon" id="shclose">✕</button></div>
+  <div class="sh"><b>الأدوات</b><button class="icon" id="clearChat" title="مسح المحادثة">🗑️</button>
+    <button class="icon" id="expChat" title="تصدير المحادثة">📤</button><button class="icon" id="shclose">✕</button></div>
   <div class="stabs"><button data-p="report" class="on">آخر جواب</button><button data-p="memory">الذاكرة</button></div>
   <div class="vkey"><input id="vkey" placeholder="مفتاح الرؤية (اختياري)"><button class="mini2" id="vsave">حفظ</button></div>
   <div class="sbody" id="paneReport"></div>
@@ -893,12 +894,31 @@ function persistMsg(el) {
     tx.oncomplete = () => pruneChat(db);
   })().catch(() => {});
 }
+
+async function exportChat() {
+  const db = await openChatDB();
+  if (!db) return;
+  const rows = await new Promise(res => {
+    const q = db.transaction('msgs', 'readonly').objectStore('msgs').getAll();
+    q.onsuccess = () => res(q.result || []);
+    q.onerror = () => res([]);
+  });
+  const lines = rows.map(r => (r.who === 'out' ? '**أنا:** ' : '**أزوز:** ') + String(r.html || '').replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '').trim());
+  const blob = new Blob(['# محادثة أزوز\n\n' + lines.join('\n\n')], { type: 'text/markdown' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'azzouz-chat.md';
+  a.click();
+  addMsg('📤 صدرت المحادثة فملف azzouz-chat.md', 'in');
+}
+
 async function loadChat() {
   const db = await openChatDB(); if (!db) return;
   const rows = await new Promise(res => { const q = db.transaction('msgs', 'readonly').objectStore('msgs').getAll(); q.onsuccess = () => res(q.result || []); q.onerror = () => res([]); });
   if (!rows.length) return;
   log.innerHTML = '';
-  rows.slice(-200).forEach(r => {
+  const clean = rows.filter(r => !/وقع مشكل فالقراءة|Cannot read properties/.test(String(r.html || '')));
+  clean.slice(-200).forEach(r => {
     const d = document.createElement('div');
     d.className = 'msg ' + (r.who === 'out' ? 'out' : 'in');
     d.innerHTML = r.html;
