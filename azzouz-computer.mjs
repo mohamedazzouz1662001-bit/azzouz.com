@@ -60,6 +60,43 @@ function openCmd(url) {
   return `start "" "${u}"`;
 }
 
+
+function stripHtml(html) {
+  return String(html || '')
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;/g, "'")
+    .replace(/\s+/g, ' ').trim();
+}
+
+async function pcFetch(url) {
+  const r = await fetch(url, {
+    headers: { 'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/124 Safari/537.36', 'Accept-Language': 'ar,en;q=0.8' },
+    redirect: 'follow'
+  });
+  const html = await r.text();
+  const title = (html.match(/<title[^>]*>([\s\S]*?)<\/title>/i) || ['', ''])[1];
+  return { title: stripHtml(title).slice(0, 160), text: stripHtml(html).slice(0, 3500), status: r.status };
+}
+
+async function pcSearch(q) {
+  const r = await fetch('https://html.duckduckgo.com/html/?q=' + encodeURIComponent(q), {
+    headers: { 'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/124 Safari/537.36', 'Accept-Language': 'ar,en;q=0.8' }
+  });
+  const html = await r.text();
+  const out = [];
+  const re = /<a[^>]+class="result__a"[^>]+href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi;
+  let m;
+  while ((m = re.exec(html)) && out.length < 8) {
+    let url = m[1];
+    const dm = url.match(/uddg=([^&]+)/);
+    if (dm) url = decodeURIComponent(dm[1]);
+    out.push('- ' + stripHtml(m[2]).slice(0, 100) + ' — ' + url);
+  }
+  return out.length ? out.join('\n') : 'ما لقيتش نتائج من الحاسوب (DuckDuckGo بلوكا).';
+}
+
 async function beat() {
   try { await api('beat'); } catch (e) {}
 }
@@ -117,6 +154,11 @@ setInterval(async () => {
       else if (PLAT === 'darwin') await sh(`screencapture -x "${shot}"`);
       else await sh(`powershell -c "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.Screen]::PrimaryScreen.Bounds"`);
       result = '📸 تصويرة الشاشة: ' + shot;
+    } else if (cmd.op === 'fetch') {
+      const f = await pcFetch(String(cmd.url || ''));
+      result = '🌐 ' + f.title + '\n' + f.text;
+    } else if (cmd.op === 'search') {
+      result = '🔎 نتائج الحاسوب على «' + String(cmd.q || '') + '»:\n' + await pcSearch(String(cmd.q || ''));
     } else if (cmd.op === 'list') {
       const list = await fs.readdir(OUT);
       result = list.length ? list.join(' | ') : '(مجلد خاوي)';
