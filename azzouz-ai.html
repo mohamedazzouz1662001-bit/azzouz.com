@@ -143,9 +143,10 @@ textarea#q{max-height:130px;overflow-y:auto;line-height:1.6}
 <div class="sheet" id="sheet">
   <div class="sh"><b>الأدوات</b><button class="icon" id="clearChat" title="مسح المحادثة">🗑️</button>
     <button class="icon" id="expChat" title="تصدير المحادثة">📤</button><button class="icon" id="shclose">✕</button></div>
-  <div class="stabs"><button data-p="report" class="on">آخر جواب</button><button data-p="memory">الذاكرة</button></div>
+  <div class="stabs"><button data-p="report" class="on">آخر جواب</button><button data-p="threads">المحادثات</button><button data-p="memory">الذاكرة</button></div>
   <div class="vkey"><input id="vkey" placeholder="مفتاح الرؤية (اختياري)"><button class="mini2" id="vsave">حفظ</button></div>
   <div class="sbody" id="paneReport"></div>
+  <div class="sbody" id="paneThreads" hidden></div>
   <div class="sbody" id="paneMemory" hidden></div>
 </div>
 <script>
@@ -584,6 +585,68 @@ function suggestionsFor(q) {
 }
 
 
+
+/* ===== المحادثات ===== */
+function thid() {
+  let id = localStorage.getItem('azzouz-thread-v1');
+  if (!id) { id = 'main'; localStorage.setItem('azzouz-thread-v1', id); }
+  return id;
+}
+function setThid(id) { localStorage.setItem('azzouz-thread-v1', id); }
+function allThreads() { try { return JSON.parse(localStorage.getItem('azzouz-threads-v1') || '[{"id":"main","title":"المحادثة الأولى","at":0}]'); } catch (e) { return [{ id: 'main', title: 'المحادثة الأولى', at: 0 }]; } }
+function saveThreads(list) { localStorage.setItem('azzouz-threads-v1', JSON.stringify(list.slice(-60))); }
+function noteThread(q) {
+  const list = allThreads(), id = thid();
+  let t = list.find(x => x.id === id);
+  if (!t) { t = { id, title: String(q).slice(0, 40), at: Date.now() }; list.push(t); }
+  else if (t.title === 'المحادثة الأولى' || !t.title) t.title = String(q).slice(0, 40);
+  t.at = Date.now();
+  saveThreads(list);
+}
+async function newThread() {
+  const id = 't' + Date.now();
+  setThid(id);
+  const list = allThreads();
+  list.push({ id, title: 'محادثة جديدة', at: Date.now() });
+  saveThreads(list);
+  log.innerHTML = '<div class="msg in"><div class="h">محادثة جديدة</div>سولني أي حاجة، وهاد المحادثة غادي تبقى بوحدها.</div>';
+  const sh = $('sheet'); if (sh) sh.classList.remove('on');
+}
+async function openThread(id) {
+  setThid(id);
+  await loadChat();
+  const sh = $('sheet'); if (sh) sh.classList.remove('on');
+}
+async function delThread(id) {
+  const db = await openChatDB();
+  if (db) await new Promise(res => {
+    const tx = db.transaction('msgs', 'readwrite'), st = tx.objectStore('msgs');
+    const q = st.getAll();
+    q.onsuccess = () => { (q.result || []).filter(r => (r.th || 'main') === id).forEach(r => st.delete(r.id)); };
+    tx.oncomplete = res; tx.onerror = res;
+  });
+  saveThreads(allThreads().filter(x => x.id !== id));
+  if (thid() === id) { setThid('main'); await loadChat(); }
+  renderThreads();
+}
+function renderThreads() {
+  const p = $('paneThreads'); if (!p) return;
+  const list = allThreads().slice().reverse(), cur = thid();
+  let h = '<div class="card" style="margin-bottom:8px"><b>المحادثات (' + list.length + ')</b><br><span style="font-size:11px;color:#8aa">كل محادثة محفوظة بوحدها، تقدر ترجع ليها فأي وقت.</span></div>';
+  h += '<button class="lg" id="newTh">➕ محادثة جديدة</button>';
+  list.forEach(t => {
+    const when = t.at ? new Date(t.at).toLocaleString('ar-MA', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
+    h += '<div class="mrow" style="display:flex;align-items:center;gap:6px;padding:8px 0;border-bottom:1px solid #22303a">'
+      + '<span style="flex:1;font-size:13px">' + esc(t.title || 'محادثة') + (t.id === cur ? ' <span class="srctag">الحالية</span>' : '') + '<br><span style="font-size:10px;color:#7d929c">' + esc(when) + '</span></span>'
+      + '<button class="mini2" data-open="' + esc(t.id) + '">فتح</button>'
+      + '<button class="mini2" data-del="' + esc(t.id) + '">🗑️</button></div>';
+  });
+  p.innerHTML = h;
+  const nb = $('newTh'); if (nb) nb.onclick = newThread;
+  p.querySelectorAll('[data-open]').forEach(b => b.onclick = () => openThread(b.dataset.open));
+  p.querySelectorAll('[data-del]').forEach(b => b.onclick = () => { if (confirm('تمسح هاد المحادثة؟')) delThread(b.dataset.del); });
+}
+
 /* ===== قراية سريعة بالتوازي ===== */
 async function turboRead(list, limit = 40, conc = 8) {
   const targets = list.filter(s => s.url && (!s.text || s.text.length < 40)).slice(0, limit);
@@ -709,6 +772,7 @@ async function ask(text) {
   if (quick) { addMsg(q, 'out'); addMsg(esc(quick), 'in'); return; }
   busy = true;
   $('send').disabled = true;
+  noteThread(q);
   addMsg(esc(q), 'out');
   qEl.value = '';
   if (!GH.cache) { try { await loadGH(); } catch (e) {} }
@@ -829,8 +893,11 @@ function openTools(which) {
   sheet.classList.add('on');
   $('paneReport').hidden = which !== 'report';
   $('paneMemory').hidden = which !== 'memory';
+  const pt = $('paneThreads'); if (pt) pt.hidden = which !== 'threads';
   document.querySelectorAll('.stabs button').forEach(b => b.classList.toggle('on', b.dataset.p === which));
-  if (which === 'memory') renderMemory(); else renderReport();
+  if (which === 'memory') renderMemory();
+  else if (which === 'threads') renderThreads();
+  else renderReport();
 }
 function keywordsOf(sources) {
   const stop = new Set(['the', 'and', 'for', 'with', 'from', 'that', 'this', 'على', 'في', 'من', 'إلى', 'عن', 'التي', 'الذي', 'هذا', 'هذه', 'كان', 'كما', 'بين', 'أو', 'ثم', 'كل', 'بعد', 'قبل', 'غير', 'حتى', 'هو', 'هي']);
@@ -986,7 +1053,7 @@ function persistMsg(el) {
   (async () => {
     const db = await openChatDB(); if (!db) return;
     const tx = db.transaction('msgs', 'readwrite');
-    tx.objectStore('msgs').add({ who: el.classList.contains('out') ? 'out' : 'in', html: el.innerHTML, at: Date.now() });
+    tx.objectStore('msgs').add({ th: thid(), who: el.classList.contains('out') ? 'out' : 'in', html: el.innerHTML, at: Date.now() });
     tx.oncomplete = () => pruneChat(db);
   })().catch(() => {});
 }
@@ -1013,7 +1080,9 @@ async function loadChat() {
   const rows = await new Promise(res => { const q = db.transaction('msgs', 'readonly').objectStore('msgs').getAll(); q.onsuccess = () => res(q.result || []); q.onerror = () => res([]); });
   if (!rows.length) return;
   log.innerHTML = '';
-  const clean = rows.filter(r => !/وقع مشكل فالقراءة|Cannot read properties/.test(String(r.html || '')));
+  const cur = thid();
+  const mine = rows.filter(r => (r.th || 'main') === cur);
+  const clean = mine.filter(r => !/وقع مشكل فالقراءة|Cannot read properties/.test(String(r.html || '')));
   let prevHtml = '';
   clean.slice(-200).forEach(r => {
     if (String(r.html || '') === prevHtml) return;
