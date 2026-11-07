@@ -4,6 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#202c33">
+<meta property="og:title" content="AZZOUZ AI - ذكاء اصطناعي مغربي">
+<meta property="og:description" content="كيجاوب منظم، كيقرا PDF والصور، وكيتعلم من الغلط ديالو">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://mohamedazzouz1662001-bit.github.io/azzouz.com/azzouz-ai.html">
+<meta name="twitter:card" content="summary">
+<meta name="description" content="AZZOUZ AI: بحث فكل الويب، قراءة PDF والصور، وتعلم من التصحيح">
 <title>Azzouz — مساعد ذكي</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
@@ -59,6 +65,9 @@ footer{background:var(--panel);padding:8px 9px;display:flex;gap:7px;align-items:
 .sh b{flex:1;font-size:14.5px}
 .stabs{display:flex;gap:6px;padding:9px 12px;background:var(--panel2)}
 .stabs button.third{font-size:11px}
+.vkey{display:flex;gap:6px;padding:8px 12px}
+.vkey input{flex:1;background:#111b21;border:1px solid #2a3942;color:#e9edef;border-radius:8px;padding:8px;font-size:11.5px;font-family:inherit}
+.mini2{background:#2a3942;color:#e9edef;border:none;border-radius:8px;padding:8px 10px;font-size:11.5px;font-family:inherit;cursor:pointer}
 .stabs button{flex:1;background:#1b272e;border:1px solid var(--line);color:#a8bcc7;font-size:12.5px;padding:7px;border-radius:10px;font-family:inherit;cursor:pointer}
 .stabs button.on{background:var(--acc);color:#04241c;border-color:var(--acc);font-weight:700}
 .sbody{flex:1;overflow-y:auto;padding:12px}
@@ -79,6 +88,7 @@ footer{background:var(--panel);padding:8px 9px;display:flex;gap:7px;align-items:
 <header>
   <div class="avatar">A</div>
   <div class="hd"><b>Azzouz</b><span id="status">متصل · كنقرا من كل الويب</span></div>
+  <button class="icon" id="share" title="شارك">📤</button>
   <button class="icon" id="user" title="الحساب">👤</button>
   <button class="icon" id="tools" title="الأدوات">☰</button>
   <button class="icon" id="mic" title="فويس">🎙️</button>
@@ -97,6 +107,7 @@ footer{background:var(--panel);padding:8px 9px;display:flex;gap:7px;align-items:
 <div class="sheet" id="sheet">
   <div class="sh"><b>الأدوات</b><button class="icon" id="clearChat" title="مسح المحادثة">🗑️</button><button class="icon" id="shclose">✕</button></div>
   <div class="stabs"><button data-p="report" class="on">آخر جواب</button><button data-p="memory">الذاكرة</button></div>
+  <div class="vkey"><input id="vkey" placeholder="مفتاح الرؤية (اختياري)"><button class="mini2" id="vsave">حفظ</button></div>
   <div class="sbody" id="paneReport"></div>
   <div class="sbody" id="paneMemory" hidden></div>
 </div>
@@ -992,6 +1003,29 @@ async function readPDF(f) {
   return out;
 }
 
+
+/* ===== الرؤية (كتخدم أوتوماتيكيا إلا كان المفتاح) ===== */
+function visionKey() { try { return localStorage.getItem('azzouz-vision-key') || ''; } catch (e) { return ''; } }
+async function describeImage(f) {
+  const key = visionKey();
+  if (!key) return '';
+  const b64 = await new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(String(r.result).split(',')[1] || '');
+    r.onerror = () => rej(new Error('read fail'));
+    r.readAsDataURL(f);
+  });
+  const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=' + key, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ contents: [{ parts: [
+      { text: 'وصف هاد الصورة بالدارجة المغربية: شنو فيها بالضبط، واش فيها بنادم، شنو لابس، فين كاين، وشنو كيدير. بلا حشو.' },
+      { inline_data: { mime_type: f.type || 'image/jpeg', data: b64 } }
+    ] }] })
+  });
+  const d = await r.json();
+  return (d.candidates && d.candidates[0] && d.candidates[0].content && d.candidates[0].content.parts[0].text) || '';
+}
+
 async function readImage(f) {
   const mod = await import('https://cdn.jsdelivr.net/npm/tesseract.js@5.1.0/dist/tesseract.esm.min.js');
   const worker = await mod.createWorker('ara+eng');
@@ -1003,9 +1037,16 @@ async function readImage(f) {
 async function readAny(f) {
   const n = f.name.toLowerCase();
   if (n.endsWith('.pdf')) return readPDF(f);
-  if (/\.(png|jpe?g|webp)$/.test(n)) return readImage(f);
+  if (/\.(png|jpe?g|webp)$/.test(n)) {
+    let desc = '';
+    try { desc = await describeImage(f); } catch (e) {}
+    if (desc) DESC[String(f.name)] = desc;
+    const ocr = await readImage(f).catch(() => '');
+    return (desc ? desc + '\n\n' : '') + ocr;
+  }
   return f.text();
 }
+const DESC = {};
 
 function uploadAnswer(f) {
   addMsg(esc(f.name) + ' 📎', 'out');
@@ -1026,6 +1067,19 @@ document.addEventListener('DOMContentLoaded', () => {
     clip.onclick = () => file.click();
     file.onchange = e => { const f = e.target.files && e.target.files[0]; if (f) uploadAnswer(f); file.value = ''; };
   }
+  const shareBtn = $('share');
+  if (shareBtn) shareBtn.onclick = async () => {
+    const url = location.origin + location.pathname;
+    const text = 'جرب AZZOUZ AI: كيجاوب بالدارجة، كيقرا PDF والصور، وكيتعلم من الغلط ديالو.\n' + url;
+    if (navigator.share) { try { await navigator.share({ title: 'AZZOUZ AI', text, url }); return; } catch (e) {} }
+    window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank');
+  };
+  const vs = $('vsave'), vk = $('vkey');
+  if (vk) vk.value = visionKey();
+  if (vs) vs.onclick = () => {
+    try { localStorage.setItem('azzouz-vision-key', vk.value.trim()); } catch (e) {}
+    statusEl.textContent = vk.value.trim() ? 'الرؤية متفعلة' : 'الرؤية مطقية';
+  };
   if (location.search.includes('demo=1')) {
     setTimeout(() => fileAnswer('demo.txt', 'المغرب بلاد كتطل على المحيط الأطلسي والبحر الأبيض المتوسط. العاصمة ديالها الرباط، والمدن الكبرى بحال الدار البيضاء ومراكش وفاس. الاقتصاد كيعتمد على الفلاحة والصناعة والسياحة. مثال: الفلاحة كتصدر الحوامض والطماطم لأوروبا. اللغة الرسمية هي العربية والأمازيغية، والدارجة هي لغة التواصل اليومي.'), 500);
   }
