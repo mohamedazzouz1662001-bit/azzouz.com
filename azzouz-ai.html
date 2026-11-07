@@ -22,6 +22,17 @@ body{margin:0;background:#0a0a0f;color:#fff;font-family:system-ui,Consolas}
 .summary{background:linear-gradient(135deg,#0a1a0f,#1a0f00);border:1px solid #ffaa00;padding:10px;border-radius:10px;margin:8px 0}
 .sourceTag{display:inline-block;background:#222;padding:2px 7px;border-radius:12px;font-size:10px;margin:2px}
 .sugg{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.tools{margin-top:10px;border-top:1px dashed #2a2a3a;padding-top:8px}
+.tools b{font-size:12px;color:#9ad}
+.barrow{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.barrow button{background:#1b1b28;color:#cfe;border:1px solid #335;padding:7px 9px;border-radius:8px;font-size:11.5px;font-weight:normal;cursor:pointer}
+.kw{cursor:pointer}
+.tl{font-size:11px;color:#9ad;margin-top:6px}
+.tl i{display:inline-block;background:#00ff88;height:9px;border-radius:3px;margin-left:2px;vertical-align:middle}
+#memList{max-height:230px;overflow:auto;background:#101018;border:1px solid #223;border-radius:10px;padding:8px;margin-top:8px;font-size:12px}
+#memList div{padding:5px 0;border-bottom:1px solid #1b1b28;display:flex;gap:6px;align-items:center}
+#memList span{flex:1}
+#memList button{background:#331;color:#fbb;border:1px solid #553;padding:3px 7px;border-radius:6px;font-size:10px}
 .sugg button{background:#0f2a1c;color:#9dffd0;border:1px solid #00ff88;padding:8px 10px;border-radius:10px;font-size:12px;font-weight:normal;cursor:pointer}
 #bottom{position:fixed;bottom:0;left:0;right:0;background:rgba(10,10,15,.98);padding:10px;display:flex;gap:6px}
 input{flex:1;background:#111;border:1px solid #333;color:#fff;padding:12px;border-radius:10px;font-size:14px}
@@ -32,7 +43,7 @@ button{background:#00ff88;border:none;padding:12px 13px;border-radius:10px;curso
 <div id="top">
 <div id="brain">
 <div id="orb" onclick="toggleVoice()">🧠</div>
-<div><b>Azzouz AI - ذكاء اصطناعي عالمي</b><div id="status" style="font-size:11px;color:#888">جاهز - سول أي سؤال - كنجيب من 12 مصدر وكنلخص فجواب واحد</div></div>
+<div><b>Azzouz AI - ذكاء اصطناعي عالمي</b><div id="status" style="font-size:11px;color:#888">جاهز - سول أي سؤال - كنقرا من 16 مصدر (كتب، أبحاث، مواقع) وكنلخصهم ف فكرة وحدة</div></div>
 <div style="margin-right:auto;display:flex;gap:5px;flex-wrap:wrap">
 <div class="chip">الأسئلة<b id="qCount">0</b></div>
 <div class="chip">المصادر<b id="refCount">0</b></div>
@@ -41,10 +52,11 @@ button{background:#00ff88;border:none;padding:12px 13px;border-radius:10px;curso
 <div class="chip">التعلم<b id="learn">مبتدئ</b></div>
 </div>
 </div>
+<div id="memPanel" style="display:none"><div id="memList"></div></div>
 <div id="progress"><div id="progressBar"></div></div>
-<div style="font-size:11px;margin-top:4px">اللغة: <select id="lang" style="background:#111;color:#fff;border:1px solid #333;padding:4px;border-radius:6px"><option value="ar-MA">الدارجة المغربية</option><option value="ar-SA">العربية</option><option value="fr-FR">Français</option><option value="en-US">English</option></select> <button onclick="exportMemory()" style="padding:4px 8px;font-size:11px">💾 تصدير الذاكرة</button> <button onclick="clearMemory()" style="padding:4px 8px;font-size:11px;background:#333;color:#fff">🗑️ مسح الذاكرة</button></div>
+<div style="font-size:11px;margin-top:4px">اللغة: <select id="lang" style="background:#111;color:#fff;border:1px solid #333;padding:4px;border-radius:6px"><option value="ar-MA">الدارجة المغربية</option><option value="ar-SA">العربية</option><option value="fr-FR">Français</option><option value="en-US">English</option></select> <button onclick="exportMemory()" style="padding:4px 8px;font-size:11px">💾 تصدير الذاكرة</button> <button onclick="toggleMemPanel()" style="padding:4px 8px;font-size:11px">🧠 الذاكرة</button> <button onclick="document.getElementById('imp').click()" style="padding:4px 8px;font-size:11px">📥 استيراد</button> <input id="imp" type="file" accept="application/json" style="display:none" onchange="importMemory(this)"> <button onclick="clearMemory()" style="padding:4px 8px;font-size:11px;background:#333;color:#fff">🗑️ مسح الذاكرة</button></div>
 </div>
-<div id="chat"><div class="msg ai">🕋 <b>بسم الله - أنا Azzouz AI:</b><br>ذكاء اصطناعي عالمي - كنجيب من <b>12 مصدر</b> وكنلخصهم فـ <b>جواب واحد</b>.<br>وكنتعلم بحال البشر - كل سؤال كيزيدني ذكاء، وكل جواب كنحفظو فالذاكرة ديالي.<br><br>جرب: <b>شنو هو الثقب الأسود؟</b> ولا <b>ما هو النحل؟</b> ولا <b>114*6236</b><br><br>اهضر معايا بالصوت 🎙️ ولا كتب ✍️ - أنا كنسمع وكندوي.</div></div>
+<div id="chat"><div class="msg ai">🕋 <b>بسم الله - أنا Azzouz AI:</b><br>ذكاء اصطناعي عالمي - كنقرا من <b>16 مصدر</b> (كتب، أبحاث، موسوعات، مواقع) وكنلخصهم ف <b>فكرة وحدة</b>.<br>وكنتعلم بحال البشر: كل جواب كنحفظو، وإلا عاودت نفس السؤال كنفكر القديم ونزيد عليه الجديد.<br><br>جرب: <b>شنو هو الثقب الأسود؟</b> ولا <b>ما هو النحل؟</b> ولا <b>114*6236</b><br><br>اهضر معايا بالصوت 🎙️ ولا كتب ✍️ - أنا كنسمع وكندوي.</div></div>
 <div id="bottom">
 <input id="q" placeholder="سول أي سؤال..." onkeypress="if(event.key==='Enter') askAI()">
 <button onclick="askAI()">اسأل ➤</button>
@@ -262,7 +274,7 @@ async function askAI(){ let input=document.getElementById('q'); let q=input.valu
 async function askAIWithText(q){
   qCount++; updateStats();
   document.getElementById('orb').className='thinking'; document.getElementById('orb').textContent='⏳';
-  setStatus('🧠 كنفكر... كنجيب من المصادر وكنلخص...');
+  setStatus('🧠 كنفكر... كنقرا المصادر وكنلخص ف فكرة وحدة...');
 
   if(/^[0-9+\-*/(). ]+$/.test(q)){
     try{
@@ -307,12 +319,193 @@ async function askAIWithText(q){
   html+=`</div>`;
   html+=`<div style="font-size:11px;color:#888;margin-top:6px">💾 حفظت هاد الجواب فالذاكرة - إلا سولتي نفس السؤال غدا، غادي نتفكرو ونزيد عليه الجديد.</div>`;
 
-  addMsg(html, 'ai');
+  const el = addMsg(html, 'ai');
+  LAST = { q, idea: idea || summary, summary, verse, sorted, keyPoints, sources, fresh, prior };
+  attachTools(el, LAST);
   speak(summary.slice(0,600));
   saveMemory(q, summary, sources.map(s=>s.name), summary);
   addSuggestions(q);
   document.getElementById('orb').className=''; document.getElementById('orb').textContent='🧠';
   setStatus('جاهز - تعلمت شي حاجة جديدة - سولني شي سؤال آخر...');
+}
+
+
+// ================== أدوات إضافية ==================
+let LAST = null;
+
+function keywordsOf(sorted) {
+  const stop = new Set(['من','في','على','إلى','عن','هذا','هذه','التي','الذي','كان','كما','بين','بعد','قبل','حتى','أو','ثم','لكن','كل','بعض','the','and','for','with','that','this','from','are','was','were','its','his','her','not','you','they']);
+  const freq = new Map();
+  for (const s of sorted.slice(0, 14)) {
+    const words = (String(s.title || '') + ' ' + String(s.text || ''))
+      .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+      .split(/\s+/)
+      .map(w => w.trim())
+      .filter(w => w.length > 3 && !stop.has(w.toLowerCase()));
+    for (const w of words) freq.set(w, (freq.get(w) || 0) + 1);
+  }
+  return [...freq.entries()].filter(([, n]) => n >= 2).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([w]) => w);
+}
+
+function timelineOf(sorted) {
+  const ys = sorted.map(s => parseInt(s.year, 10)).filter(y => y && y > 1400 && y <= new Date().getFullYear() + 1);
+  if (ys.length < 2) return '';
+  const min = Math.min(...ys), max = Math.max(...ys);
+  const buckets = 8, span = Math.max(1, max - min);
+  const counts = new Array(buckets).fill(0);
+  ys.forEach(y => counts[Math.min(buckets - 1, Math.floor(((y - min) / span) * buckets))]++);
+  const peak = Math.max(...counts);
+  let out = `<div class="tl">🕓 توزيع المصادر على السنين (${min} → ${max}): `;
+  counts.forEach(c => { out += `<i style="width:${Math.round((c / peak) * 26) + 3}px;opacity:${c ? 0.9 : 0.2}"></i>`; });
+  out += `</div>`;
+  return out;
+}
+
+function attachTools(el, D) {
+  const kw = keywordsOf(D.sorted);
+  const box = document.createElement('div');
+  box.className = 'tools';
+  box.innerHTML =
+    (kw.length ? `<div><b>🔗 مفاهيم كتكرر فالمصادر:</b> ` + kw.map(k => `<span class="sourceTag kw">${escapeHtml(k)}</span>`).join(' ') + `</div>` : '') +
+    timelineOf(D.sorted) +
+    `<div class="barrow">
+       <button data-act="deep">🔎 عمّق أكثر (كنقرا الصفحات)</button>
+       <button data-act="copy">📋 نسخ الجواب</button>
+       <button data-act="md">⬇️ تقرير Markdown</button>
+       <button data-act="print">🖨️ طباعة / PDF</button>
+     </div>`;
+
+  box.querySelectorAll('.kw').forEach(s => {
+    s.onclick = () => {
+      const t = s.textContent;
+      document.getElementById('q').value = t;
+      addMsg('🔎 ' + escapeHtml(t), 'me');
+      document.getElementById('q').value = '';
+      askAIWithText(t);
+    };
+  });
+
+  box.querySelector('[data-act="copy"]').onclick = () => {
+    const txt = `${D.q}\n\n${D.idea}\n\n` + D.keyPoints.map(k => '- ' + k.source + ': ' + k.text).join('\n') +
+      '\n\n' + D.sorted.filter(s => s.url).slice(0, 12).map(s => '• ' + s.title + ' — ' + s.url).join('\n');
+    navigator.clipboard.writeText(txt).then(() => setStatus('📋 تنسخ الجواب')).catch(() => setStatus('ما قدرتش ننسخ'));
+  };
+
+  box.querySelector('[data-act="md"]').onclick = () => exportReport(D);
+
+  box.querySelector('[data-act="print"]').onclick = () => {
+    const w = window.open('', '_blank');
+    w.document.write('<html dir="rtl"><meta charset="utf-8"><title>' + escapeHtml(D.q) + '</title><body style="font-family:system-ui;line-height:1.9;padding:24px">' +
+      '<h2>' + escapeHtml(D.q) + '</h2><p><b>الفكرة الوحدة:</b> ' + escapeHtml(D.idea) + '</p><p><b>الآية:</b> ' + escapeHtml(D.verse) + '</p><h3>النقاط</h3>' +
+      D.keyPoints.map(k => '<p><b>' + escapeHtml(k.source) + ':</b> ' + escapeHtml(k.text) + '</p>').join('') +
+      '<h3>المصادر</h3>' + D.sorted.filter(s => s.url).map(s => '<p>' + escapeHtml(s.title) + ' — ' + escapeHtml(s.url) + '</p>').join('') + '</body></html>');
+    w.document.close(); w.print();
+  };
+
+  box.querySelector('[data-act="deep"]').onclick = async (e) => {
+    const btn = e.target;
+    btn.disabled = true; btn.textContent = '⏳ كنقرا الصفحات...';
+    setStatus('📖 كندخل للصفحات وكنقرا المحتوى...');
+    const picked = D.sorted.filter(s => s.url && /^https?:/.test(s.url)).slice(0, 3);
+    const pages = await readPages(picked.map(p => p.url));
+    btn.disabled = false; btn.textContent = '🔎 عمّق أكثر (كنقرا الصفحات)';
+    if (!pages.length) { setStatus('ما قدرتش نقرا الصفحات دابا'); return; }
+    const merged = D.sources.concat(pages);
+    const s2 = summarize(D.q, merged);
+    let html = `<b>📖 قراءة معمّقة للصفحات (${pages.length}):</b><br>`;
+    html += `<div class="summary"><b style="color:#ffaa00">📋 الفكرة الوحدة بعد القراءة:</b><br>${escapeHtml(s2.idea)}</div>`;
+    s2.keyPoints.slice(0, 4).forEach(p => {
+      html += `<div class="ref"><b>${escapeHtml(p.source)}:</b> ${escapeHtml(p.text)}...</div>`;
+    });
+    const el2 = addMsg(html, 'ai');
+    LAST = { ...D, sorted: s2.sorted, keyPoints: s2.keyPoints, idea: s2.idea, sources: merged };
+    attachTools(el2, LAST);
+    setStatus('✅ قرأت ' + pages.length + ' صفحة كاملة وزدتها للمصادر');
+  };
+
+  el.appendChild(box);
+}
+
+async function readPages(urls) {
+  const out = [];
+  for (const u of urls) {
+    try {
+      const r = await fetchWithTimeout('https://r.jina.ai/' + u, 18000);
+      const t = await r.text();
+      const lines = t.split('\n').map(l => l.trim()).filter(l => l.length > 120 && !l.startsWith('['));
+      if (!lines.length) continue;
+      out.push({
+        name: '📖 قراءة الصفحة',
+        title: (t.split('\n').find(l => l.trim().length > 10) || u).slice(0, 90),
+        text: lines.slice(0, 3).join(' ').slice(0, 700),
+        url: u, weight: 9
+      });
+    } catch (e) {}
+  }
+  return out;
+}
+
+function exportReport(D) {
+  const md = [
+    '# ' + D.q, '',
+    '**الفكرة الوحدة:** ' + D.idea, '',
+    '**الآية:** ' + D.verse, '',
+    '## النقاط الأساسية',
+    ...D.keyPoints.map(k => `- **${k.source}:** ${k.text}`),
+    '', '## المصادر',
+    ...D.sorted.filter(s => s.url).map(s => `- [${s.title}](${s.url})`),
+    '', '_توليد: Azzouz AI · ' + new Date().toISOString().slice(0, 10) + '_'
+  ].join('\n');
+  const blob = new Blob([md], { type: 'text/markdown' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'azzouz-' + (D.q.slice(0, 24).replace(/[^\p{L}\p{N}]+/gu, '-')) + '.md';
+  a.click();
+  setStatus('⬇️ تحمل التقرير');
+}
+
+function toggleMemPanel() {
+  const p = document.getElementById('memPanel');
+  if (p.style.display === 'none') { p.style.display = 'block'; renderMemList(); }
+  else p.style.display = 'none';
+}
+
+function renderMemList() {
+  const box = document.getElementById('memList');
+  if (!memory.length) { box.innerHTML = '<div style="color:#888">الذاكرة خاوية دابا. سول شي سؤال وتبدا تتعلم.</div>'; return; }
+  const byTopic = new Map();
+  memory.forEach(m => { const t = m.topic || extractTopic(m.q); byTopic.set(t, (byTopic.get(t) || 0) + 1); });
+  box.innerHTML = [...byTopic.entries()].sort((a, b) => b[1] - a[1]).slice(0, 30).map(([t, n]) =>
+    `<div><span>📌 ${escapeHtml(t)} <b style="color:#00ff88">(${n})</b></span><button data-del="${escapeHtml(t)}">حذف</button></div>`).join('');
+  box.querySelectorAll('[data-del]').forEach(b => {
+    b.onclick = () => {
+      const t = b.dataset.del;
+      memory = memory.filter(m => (m.topic || extractTopic(m.q)) !== t);
+      try { localStorage.setItem('azzouz-global-memory', JSON.stringify(memory.slice(-100))); } catch (e) {}
+      updateStats(); renderMemList();
+    };
+  });
+}
+
+function importMemory(input) {
+  const f = input.files && input.files[0];
+  if (!f) return;
+  const rd = new FileReader();
+  rd.onload = () => {
+    try {
+      const arr = JSON.parse(rd.result);
+      if (!Array.isArray(arr)) throw new Error('صيغة ماشي صحيحة');
+      const have = new Set(memory.map(m => (m.q || '') + '|' + (m.time || '')));
+      let added = 0;
+      arr.forEach(m => { if (m && m.q && !have.has((m.q || '') + '|' + (m.time || ''))) { memory.push(m); added++; } });
+      try { localStorage.setItem('azzouz-global-memory', JSON.stringify(memory.slice(-100))); } catch (e) {}
+      updateStats(); renderMemList();
+      addMsg('📥 <b>استوردت الذاكرة:</b> ' + added + ' عنصر جديد.', 'ai');
+    } catch (e) {
+      addMsg('⚠️ الملف ماشي صالح: ' + escapeHtml(e.message), 'ai');
+    }
+  };
+  rd.readAsText(f);
 }
 
 function escapeHtml(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
