@@ -610,6 +610,15 @@ async function ask(text) {
   $('send').disabled = true;
   addMsg(esc(q), 'out');
   qEl.value = '';
+  const hit = cacheHit(q);
+  if (hit && Array.isArray(hit.refs) && hit.refs.length) {
+    busy = true; $('send').disabled = true;
+    renderCached(q, hit);
+    hStart(q, englishOf(q));
+    busy = false; $('send').disabled = false;
+    statusEl.textContent = 'جاهز · من الكاش';
+    return;
+  }
   statusEl.textContent = 'كنبحث...';
 
   if (/^[0-9+\-*/(). ]+$/.test(q)) {
@@ -1137,6 +1146,98 @@ document.addEventListener('DOMContentLoaded', () => {
     setTimeout(() => fileAnswer('demo.txt', 'المغرب بلاد كتطل على المحيط الأطلسي والبحر الأبيض المتوسط. العاصمة ديالها الرباط، والمدن الكبرى بحال الدار البيضاء ومراكش وفاس. الاقتصاد كيعتمد على الفلاحة والصناعة والسياحة. مثال: الفلاحة كتصدر الحوامض والطماطم لأوروبا. اللغة الرسمية هي العربية والأمازيغية، والدارجة هي لغة التواصل اليومي.'), 500);
   }
 });
+
+/* ===== كاش المعرفة من GitHub ===== */
+const GH = { cache: null };
+async function loadGH() {
+  try {
+    const r = await fetch('data/memory.json?t=' + Date.now());
+    const d = await r.json();
+    GH.cache = (d && d.entries) || [];
+  } catch (e) { GH.cache = []; }
+  return GH.cache;
+}
+function cacheHit(q) {
+  if (!GH.cache || !GH.cache.length) return null;
+  const n = s => String(s || '').replace(/[؟?]/g, '').trim().toLowerCase();
+  const t = topicOf(q);
+  return GH.cache.find(e => {
+    const et = topicOf(e.topic || '');
+    const a = n(e.topic || ''), b = n(q);
+    return et === t || (b.includes(a) && a.length > 3) || (a.includes(b) && b.length > 3);
+  }) || null;
+}
+
+/* ===== قراية سريعة ف Web Worker ===== */
+const WORKER_SRC = `
+self.onmessage = async (e) => {
+  const urls = (e.data && e.data.urls) || [];
+  const out = [];
+  for (const u of urls) {
+    try {
+      const r = await fetch('https://r.jina.ai/' + u);
+      const t = await r.text();
+      const lines = t.split('\\n').map(l => l.trim()).filter(l =>
+        l.length > 90 && !/^(URL Source|Published Time|Title:|Markdown Content|Warning:)/i.test(l));
+      out.push({ url: u, text: lines.slice(0, 2).join(' ').slice(0, 500) });
+    } catch (err) {
+      out.push({ url: u, text: '' });
+    }
+  }
+  self.postMessage({ result: out });
+};`;
+function makeReader() {
+  const b = new Blob([WORKER_SRC], { type: 'text/javascript' });
+  return new Worker(URL.createObjectURL(b));
+}
+turboRead = async function (list, limit = 36) {
+  const targets = list.filter(s => s.url && (!s.text || s.text.length < 40)).slice(0, limit);
+  if (!targets.length) return;
+  const note = addMsg('⚡ كنقرا ' + targets.length + ' صفحة بالتوازي...', 'in');
+  const t0 = performance.now();
+  let ok = 0;
+  try {
+    const groups = [];
+    for (let i = 0; i < targets.length; i += 6) groups.push(targets.slice(i, i + 6));
+    const jobs = groups.map(g => new Promise(res => {
+      let w;
+      try { w = makeReader(); } catch (e) { return res([]); }
+      const timer = setTimeout(() => { try { w.terminate(); } catch (e) {} res([]); }, 25000);
+      w.onmessage = ev => {
+        if (!ev.data || !ev.data.result) return;
+        clearTimeout(timer);
+        try { w.terminate(); } catch (e) {}
+        res(ev.data.result);
+      };
+      w.postMessage({ urls: g.map(s => s.url) });
+    }));
+    const all = (await Promise.all(jobs)).flat();
+    const byUrl = new Map(all.map(r => [r.url, r]));
+    targets.forEach(s => {
+      const r = byUrl.get(s.url);
+      if (r && r.text) { s.text = r.text; s.sum = firstSentence(s.text); ok++; }
+    });
+  } catch (e) {}
+  const sec = (performance.now() - t0) / 1000;
+  note.innerHTML = '<div class="h">⚡ قراية سريعة</div>' + ok + ' صفحة فـ ' + sec.toFixed(1) +
+    ' ثانية · ' + Math.round(ok / Math.max(sec, 0.2)) + ' فالثانية<div class="meta">' + now() + '</div>';
+};
+
+/* ===== جواب من الكاش ===== */
+function renderCached(q, hit) {
+  const refs = (hit.refs || []).map(r => ({
+    name: '📦 مخزون', title: r.title || '', url: r.url || '',
+    text: r.snippet || '', sum: r.snippet || '', weight: 5, year: r.year
+  }));
+  const data = synthesize(q, refs, null);
+  const el = renderAnswer(q, data, null);
+  const head = document.createElement('div');
+  head.className = 'h';
+  head.textContent = '⚡ من الكاش';
+  try { (el || log.lastChild).prepend(head); } catch (e) {}
+}
+loadGH();
+
 </script>
 </body>
 </html>
