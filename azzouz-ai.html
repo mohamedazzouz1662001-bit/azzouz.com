@@ -487,6 +487,57 @@ function suggestionsFor(q) {
   return ['أحدث ما كاين على ' + t, 'التطبيقات العملية ديال ' + t, 'الانتقادات والحدود ديال ' + t];
 }
 
+
+/* ===== قراية سريعة بالتوازي ===== */
+async function turboRead(list, limit = 40, conc = 8) {
+  const targets = list.filter(s => s.url && (!s.text || s.text.length < 40)).slice(0, limit);
+  if (!targets.length) return null;
+  const el = document.createElement('div');
+  el.className = 'msg in';
+  el.innerHTML = '<span class="tx">⚡ كنقرا ' + targets.length + ' صفحة بالتوازي...</span>';
+  log.appendChild(el);
+  log.scrollTop = log.scrollHeight;
+  const t0 = performance.now();
+  let i = 0, ok = 0;
+  const set = txt => { const s = el.querySelector('.tx'); if (s) s.textContent = txt; };
+  async function worker() {
+    while (i < targets.length) {
+      const s = targets[i++];
+      try {
+        const md = await jtxt('https://r.jina.ai/' + s.url, 12000);
+        const lines = md.split('\n').map(x => x.trim()).filter(x => x.length > 90 && !/^(URL Source|Published Time|Markdown Content|Title):/i.test(x));
+        if (lines.length) {
+          s.text = lines.slice(0, 2).join(' ').slice(0, 400);
+          s.sum = firstSentence(s.text) || s.sum || '';
+          ok++;
+        }
+      } catch (e) {}
+      set('⚡ قرا ' + ok + '/' + targets.length);
+    }
+  }
+  await Promise.all(Array.from({ length: conc }, worker));
+  const sec = (performance.now() - t0) / 1000;
+  set('⚡ ' + ok + ' صفحة فـ ' + sec.toFixed(1) + ' ثانية (' + Math.round(ok / Math.max(sec, 0.5)) + ' فالثانية)');
+  return { ok: ok, sec: sec, rate: Math.round(ok / Math.max(sec, 0.5)) };
+}
+
+async function readFast(texts) {
+  const t0 = performance.now();
+  const total = texts.length;
+  let i = 0;
+  const out = new Array(total);
+  async function worker() {
+    while (i < total) {
+      const k = i++;
+      const t = String(texts[k] || '');
+      out[k] = { text: t, sum: firstSentence(t) };
+    }
+  }
+  await Promise.all(Array.from({ length: 8 }, worker));
+  const sec = (performance.now() - t0) / 1000;
+  return { items: out, total: total, sec: sec, rate: Math.round(total / Math.max(sec, 0.01)) };
+}
+
 function renderAnswer(q, data, prior) {
   let h = '';
   const fx = findFix(topicOf(q));
@@ -511,6 +562,7 @@ function renderAnswer(q, data, prior) {
   h += '<br><b>واش بغيتي نكمل؟</b>';
 
   const el = addMsg(h, 'in');
+  try { turboRead(data.sorted, 30, 8); } catch (e) {}
 
   if (data.sorted.length) {
     const btn = document.createElement('span');
@@ -985,6 +1037,7 @@ function fileAnswer(name, text) {
   h += '<br><div class="h">3. مثال</div>' + esc(ex || 'ما لقيتش مثال داخل الملف، ولكن نقدر نفسر ليك شي جزئية بشرح بسيط.') + '<br>';
   h += '<br><div class="h">4. شنو ندير دابا</div>قول ليا «لخصو أكثر» ولا «فسر ليا الجزء ديال ...» وأنا نكمل.<br><br><b>واش بغيتي نكمل؟</b>';
   const el = addMsg(h, 'in');
+  try { turboRead(data.sorted, 30, 8); } catch (e) {}
   LAST = { q: 'ملف: ' + name, data: { short, points: pts.map(p => ({ src: name, text: p })), example: ex, next: '', found: true, sure: true, sorted: [], fresh: [] }, prior: null, at: Date.now() };
   return el;
 }
