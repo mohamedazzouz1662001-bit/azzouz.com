@@ -209,23 +209,23 @@ async function gather(q, tickFn) {
     async () => { const kw = extractKeyword(q); if (!kw) return; const d = await jget('https://api.alquran.cloud/v1/search/' + enc(kw) + '/all/quran-uthmani');
       (d.data && d.data.matches || []).slice(0, 2).forEach(a => push({ name: '📖 القرآن', title: a.surah.englishName + ' — آية ' + a.numberInSurah, text: a.text, url: 'https://quran.com/' + a.surah.number + '/' + a.numberInSurah, weight: 10 })); },
     async () => { const d = await jget('https://ar.wikipedia.org/w/api.php?action=query&list=search&srsearch=' + enc(q) + '&format=json&origin=*');
-      (d.query && d.query.search || []).slice(0, 3).forEach(r => push({ name: '📚 ويكيبيديا العربية', title: r.title, text: clean(r.snippet), url: 'https://ar.wikipedia.org/wiki/' + enc(r.title.replace(/ /g, '_')), weight: 9 })); },
+      (d.query && d.query.search || []).slice(0, 6).forEach(r => push({ name: '📚 ويكيبيديا العربية', title: r.title, text: clean(r.snippet), url: 'https://ar.wikipedia.org/wiki/' + enc(r.title.replace(/ /g, '_')), weight: 9 })); },
     async () => { const d = await jget('https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=' + enc(en) + '&format=json&origin=*');
-      (d.query && d.query.search || []).slice(0, 3).forEach(r => push({ name: '📚 Wikipedia', title: r.title, text: clean(r.snippet), url: 'https://en.wikipedia.org/wiki/' + enc(r.title.replace(/ /g, '_')), weight: 8 })); },
-    async () => { const d = await jget('https://api.openalex.org/works?search=' + enc(q) + '&per_page=8&sort=relevance_score:desc');
+      (d.query && d.query.search || []).slice(0, 6).forEach(r => push({ name: '📚 Wikipedia', title: r.title, text: clean(r.snippet), url: 'https://en.wikipedia.org/wiki/' + enc(r.title.replace(/ /g, '_')), weight: 8 })); },
+    async () => { const d = await jget('https://api.openalex.org/works?search=' + enc(q) + '&per_page=50&sort=relevance_score:desc');
       (d.results || []).forEach(w => push({ name: '🔬 OpenAlex', title: w.display_name, text: invAbs(w.abstract_inverted_index).slice(0, 400), url: w.doi ? 'https://doi.org/' + String(w.doi).replace('https://doi.org/', '') : w.id, year: w.publication_year, weight: 8 })); },
-    async () => { const d = await jget('https://api.crossref.org/works?query=' + enc(en) + '&rows=6&select=title,URL,issued,abstract');
+    async () => { const d = await jget('https://api.crossref.org/works?query=' + enc(en) + '&rows=50&select=title,URL,issued,abstract');
       ((d.message && d.message.items) || []).forEach(w => push({ name: '🎓 Crossref', title: (w.title || [])[0], text: clean(w.abstract).slice(0, 350), url: w.URL, year: (w.issued && w.issued['date-parts'] || [[]])[0][0], weight: 7 })); },
-    async () => { const d = await jget('https://api.semanticscholar.org/graph/v1/paper/search?query=' + enc(en) + '&limit=6&fields=title,abstract,url,year');
+    async () => { const d = await jget('https://api.semanticscholar.org/graph/v1/paper/search?query=' + enc(en) + '&limit=20&fields=title,abstract,url,year');
       (d.data || []).forEach(p => push({ name: '📄 Semantic Scholar', title: p.title, text: (p.abstract || '').slice(0, 350), url: p.url, year: p.year, weight: 7 })); },
-    async () => { const d = await jget('https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=' + enc(en) + '&format=json&pageSize=6');
+    async () => { const d = await jget('https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=' + enc(en) + '&format=json&pageSize=25');
       ((d.resultList && d.resultList.result) || []).forEach(r => push({ name: '🧪 Europe PMC', title: r.title, text: clean(r.abstractText).slice(0, 350), url: r.doi ? 'https://doi.org/' + r.doi : 'https://europepmc.org/article/' + r.id, year: r.pubYear, weight: 7 })); },
-    async () => { const d = await jget('https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&retmode=json&retmax=6&term=' + enc(en));
+    async () => { const d = await jget('https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&retmode=json&retmax=20&term=' + enc(en));
       const ids = (d.esearchresult && d.esearchresult.idlist) || [];
       if (!ids.length) return;
       const s = await jget('https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=pubmed&retmode=json&id=' + ids.join(','));
       Object.values(s.result || {}).forEach(r => { if (r && r.title) push({ name: '🩺 PubMed', title: r.title, text: '', url: 'https://pubmed.ncbi.nlm.nih.gov/' + r.uid + '/', year: (r.pubdate || '').slice(0, 4), weight: 7 }); }); },
-    async () => { const d = await jtxt('https://export.arxiv.org/api/query?search_query=all:' + enc(en) + '&max_results=6');
+    async () => { const d = await jtxt('https://export.arxiv.org/api/query?search_query=all:' + enc(en) + '&max_results=12');
       const blocks = d.split('<entry>').slice(1);
       blocks.forEach(b => {
         const t = (b.match(/<title>([\s\S]*?)<\/title>/) || [])[1] || '';
@@ -233,20 +233,26 @@ async function gather(q, tickFn) {
         const su = (b.match(/<summary>([\s\S]*?)<\/summary>/) || [])[1] || '';
         push({ name: '📐 arXiv', title: clean(t), text: clean(su).slice(0, 300), url: clean(u), weight: 7 });
       }); },
-    async () => { const d = await jget('https://openlibrary.org/search.json?q=' + enc(q) + '&limit=6');
+    async () => { const d = await jget('https://openlibrary.org/search.json?q=' + enc(q) + '&limit=12');
       (d.docs || []).forEach(b => push({ name: '📕 Open Library', title: b.title, text: 'كتاب' + (b.author_name ? ' لـ ' + b.author_name.join(', ') : '') + (b.first_publish_year ? ' — ' + b.first_publish_year : ''), url: 'https://openlibrary.org' + (b.key || ''), year: b.first_publish_year, weight: 7 })); },
-    async () => { const d = await jget('https://archive.org/advancedsearch.php?q=' + enc(q) + '&fl%5B%5D=identifier&fl%5B%5D=title&fl%5B%5D=year&rows=6&page=1&output=json');
+    async () => { const d = await jget('https://archive.org/advancedsearch.php?q=' + enc(q) + '&fl%5B%5D=identifier&fl%5B%5D=title&fl%5B%5D=year&rows=15&page=1&output=json');
       (((d.response || {}).docs) || []).forEach(b => push({ name: '🗄️ أرشيف الإنترنت', title: b.title, text: '', url: 'https://archive.org/details/' + b.identifier, year: b.year, weight: 6 })); },
-    async () => { const d = await jget('https://hn.algolia.com/api/v1/search?query=' + enc(en) + '&hitsPerPage=8');
+    async () => { const d = await jget('https://hn.algolia.com/api/v1/search?query=' + enc(en) + '&hitsPerPage=20');
       (d.hits || []).forEach(h => push({ name: '💬 Hacker News', title: h.title || h.story_title, text: clean(h.story_text || h.comment_text).slice(0, 250), url: h.url || 'https://news.ycombinator.com/item?id=' + h.objectID, year: (h.created_at || '').slice(0, 4), weight: 5 })); },
-    async () => { const d = await jget('https://api.stackexchange.com/2.3/search/advanced?order=desc&sort=relevance&q=' + enc(en) + '&site=stackoverflow&pagesize=6&filter=default');
+    async () => { const d = await jget('https://api.stackexchange.com/2.3/search/advanced?order=desc&sort=relevance&q=' + enc(en) + '&site=stackoverflow&pagesize=15&filter=default');
       (d.items || []).forEach(i => push({ name: '💻 Stack Overflow', title: clean(i.title), text: '', url: i.link, year: (i.creation_date ? new Date(i.creation_date * 1000).getFullYear() : null), weight: 6 })); },
-    async () => { const d = await jget('https://api.github.com/search/repositories?q=' + enc(en) + '&per_page=5&sort=stars');
+    async () => { const d = await jget('https://api.github.com/search/repositories?q=' + enc(en) + '&per_page=10&sort=stars');
       (d.items || []).forEach(r => push({ name: '💻 GitHub', title: r.full_name, text: (r.description || '').slice(0, 200), url: r.html_url, weight: 5 })); },
-    async () => { const d = await jget('https://www.wikidata.org/w/api.php?action=wbsearchentities&search=' + enc(q) + '&language=ar&limit=5&format=json&origin=*');
+    async () => { const d = await jget('https://www.wikidata.org/w/api.php?action=wbsearchentities&search=' + enc(q) + '&language=ar&limit=8&format=json&origin=*');
       (d.search || []).forEach(e => push({ name: '🧩 Wikidata', title: e.label || e.id, text: clean(e.description), url: 'https://www.wikidata.org/wiki/' + e.id, weight: 5 })); },
     async () => { const d = await jget('https://api.duckduckgo.com/?q=' + enc(en) + '&format=json&no_html=1&skip_disambig=1');
-      if (d.AbstractText) push({ name: '🌐 DuckDuckGo', title: d.Heading || en, text: d.AbstractText.slice(0, 350), url: d.AbstractURL || ('https://duckduckgo.com/?q=' + enc(en)), weight: 7 }); }
+      if (d.AbstractText) push({ name: '🌐 DuckDuckGo', title: d.Heading || en, text: d.AbstractText.slice(0, 350), url: d.AbstractURL || ('https://duckduckgo.com/?q=' + enc(en)), weight: 7 }); },
+    async () => { const d = await jget('https://www.googleapis.com/books/v1/volumes?q=' + enc(q) + '&maxResults=15');
+      (d.items || []).forEach(b => { const v = b.volumeInfo || {}; push({ name: '📗 Google Books', title: v.title, text: (v.description || '').slice(0, 300), url: v.infoLink, year: (v.publishedDate || '').slice(0, 4), weight: 7 }); }); },
+    async () => { const d = await jget('https://zenodo.org/api/records?q=' + enc(en) + '&size=20');
+      ((d.hits || {}).hits || []).forEach(r => push({ name: '🗃️ Zenodo', title: ((r.metadata || {}).title || ''), text: clean(((r.metadata || {}).description || '')).slice(0, 300), url: r.doi_url || ('https://zenodo.org/record/' + r.id), year: ((r.metadata || {}).publication_date || '').slice(0, 4), weight: 6 })); },
+    async () => { const d = await jget('https://doaj.org/api/search/articles/' + enc(en) + '?pageSize=20');
+      (d.results || []).forEach(r => { const b = r.bibjson || {}; push({ name: '📘 DOAJ', title: b.title, text: clean((b.abstract || '')).slice(0, 300), url: (b.link && b.link[0] && b.link[0].url) || '', year: b.year, weight: 6 }); }); }
   ];
 
   // مسح الويب: محركات كاملة عبر قارئ الصفحات + صيغ الملفات
@@ -267,7 +273,7 @@ async function gather(q, tickFn) {
   sweeps.forEach(([name, url]) => {
     tasks.push(async () => {
       const md = await jtxt('https://r.jina.ai/' + url);
-      parseLinks(md, name).slice(0, 18).forEach(push);
+      parseLinks(md, name).slice(0, 25).forEach(push);
     });
   });
 
@@ -281,7 +287,38 @@ async function gather(q, tickFn) {
     }
   }
   await Promise.all([worker(), worker(), worker(), worker()]);
+  await fillSnippets(S, tickFn);
   return S;
+}
+
+
+/* ===== ملخص لكل مرجع ===== */
+function firstSentence(t) {
+  const s = clean(t);
+  if (!s) return '';
+  const m = s.match(/^(.{40,190}?[.!؟])\s/);
+  return m ? m[1] : s.slice(0, 170);
+}
+
+async function fillSnippets(S, tickFn) {
+  const need = S.filter(o => !o.text || o.text.length < 40).slice(0, 24);
+  let i = 0;
+  async function w() {
+    while (i < need.length) {
+      const o = need[i++];
+      if (!o.url || !/^https?:/.test(o.url)) continue;
+      try {
+        const md = await jtxt('https://r.jina.ai/' + o.url, 12000);
+        const txt = md.split('\n').map(l => l.trim())
+          .filter(l => l.length > 80 && !/^(URL Source|Title|Markdown Content|Published Time|Description):/i.test(l))
+          .slice(0, 2).join(' ');
+        if (txt) o.text = txt.slice(0, 340);
+      } catch (e) {}
+      if (tickFn) tickFn(S.length);
+    }
+  }
+  await Promise.all([w(), w(), w()]);
+  S.forEach(o => { o.sum = firstSentence(o.text); });
 }
 
 /* ===== التلخيص ===== */
@@ -318,12 +355,12 @@ function synthesize(q, sources, prior) {
   const points = [];
   const usedTitles = new Set();
   rich.forEach(s => {
-    const c = clause(s.text, 130);
+    const c = s.sum || clause(s.text, 130);
     if (!c || c.length < 30) return;
     const key = c.slice(0, 40);
     if (usedTitles.has(key)) return;
     usedTitles.add(key);
-    if (points.length < 4) points.push({ src: s.name, text: c });
+    if (points.length < 5) points.push({ src: s.name, text: c });
   });
   let fresh = [];
   if (prior) {
@@ -331,6 +368,31 @@ function synthesize(q, sources, prior) {
     fresh = sorted.filter(s => s.url && !old.has(s.url)).slice(0, 6);
   }
   return { idea, points, sorted, fresh, verse: getVerse(q) };
+}
+
+
+/* ===== الطابع البشري ===== */
+function nameOf() { try { return localStorage.getItem('azzouz-name') || ''; } catch (e) { return ''; } }
+function setName(n) { try { localStorage.setItem('azzouz-name', n); } catch (e) {} }
+function hi() {
+  const h = new Date().getHours();
+  return h < 5 ? 'مبروك عليك الليل' : h < 12 ? 'صباح الخير' : h < 18 ? 'مساء الخير' : 'مسا الخير';
+}
+function pick(a) { return a[Math.floor(Math.random() * a.length)]; }
+
+function smallTalk(q) {
+  const t = String(q).trim();
+  const nm = nameOf();
+  const m = t.match(/(?:سميني|سميتي|نسميني|سمي ليا)\s+([\p{L}]{2,20})/u);
+  if (m) { setName(m[1]); return 'متشرفين ' + m[1] + ' 🌿 غادي نتعلم معاك ونتفكرك.'; }
+  if (/^(السلام|سلام|صباح الخير|مساء الخير|مسا الخير|أهلا|اهلا|مرحبا|هاي)/i.test(t) && t.length < 40)
+    return pick(['وعليكم السلام' + (nm ? ' ' + nm : '') + ' 🌿', 'أهلا' + (nm ? ' ' + nm : '') + ' 🌿 كيفاش داير؟']) + ' سولني أي حاجة ونبحث ليك.';
+  if (/(كيف حالك|كيداير|لباس|كيفاش داير)/i.test(t) && t.length < 30)
+    return 'الحمد لله، خدام كنقرا ونبحث. ونتا كيف داير؟' + (nm ? '' : ' وسميني باش نتعرف عليك.');
+  if (/^(شكرا|بارك الله|الله يخليك|تسلم)/i.test(t)) return pick(['على الرحب والسعة 🌿', 'الله يبارك فيك 🌿 أي وقت.']);
+  if (/(شكون نتا|من نتا|سميتك)/i.test(t)) return 'أنا Azzouz 🌿 كنقرا من محركات الويب والأبحاث والكتب، وكنعطيك فكرة وحدة بالمراجع.' + (nm ? ' ونتا ' + nm + '.' : '');
+  if (/(بسلامة|نشوفك من بعد|تصبح على خير)/i.test(t)) return 'بسلامة الله 🌿 أنا هنا إلا بغيتي شي حاجة.';
+  return null;
 }
 
 /* ===== واجهة المحادثة ===== */
@@ -369,7 +431,7 @@ function renderAnswer(q, data, prior) {
   h += '<div class="h">الجواب</div>' + esc(data.idea);
   if (data.points.length) {
     h += '<br><br>';
-    data.points.forEach((p, i) => { h += (i + 1) + '. ' + esc(p.text) + '<br>'; });
+    data.points.forEach((p, i) => { h += (i + 1) + '. ' + esc(p.text) + ' <span class="srctag">' + esc(String(p.src).replace(/^\S+\s/, '')) + '</span><br>'; });
   }
   if (prior && data.fresh.length) {
     h += '<br>🆕 زدت ' + data.fresh.length + ' مصدر جديد هاد المرة.';
@@ -384,9 +446,10 @@ function renderAnswer(q, data, prior) {
     btn.textContent = '📚 المراجع (' + data.sorted.length + ')';
     const box = document.createElement('div');
     box.className = 'refs';
-    box.innerHTML = data.sorted.slice(0, 60).map((s, i) =>
+    box.innerHTML = data.sorted.slice(0, 200).map((s, i) =>
       '<div class="r"><b>' + (i + 1) + '.</b> ' + esc(s.name.replace(/^\S+\s/, '')) + ' — ' + esc(String(s.title).slice(0, 110)) +
       (s.year ? ' (' + s.year + ')' : '') +
+      (s.sum ? '<div class="rs">' + esc(s.sum) + '</div>' : '') +
       (s.url ? '<a class="lnk" href="' + esc(s.url) + '" target="_blank" rel="noopener">' + esc(s.url.slice(0, 70)) + '</a>' : '') + '</div>').join('');
     btn.onclick = () => {
       box.classList.toggle('on');
@@ -416,6 +479,8 @@ function renderAnswer(q, data, prior) {
 async function ask(text) {
   const q = String(text || '').trim();
   if (!q || busy) return;
+  const quick = smallTalk(q);
+  if (quick) { addMsg(q, 'out'); addMsg(esc(quick), 'in'); return; }
   busy = true;
   $('send').disabled = true;
   addMsg(esc(q), 'out');
