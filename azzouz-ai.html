@@ -43,6 +43,13 @@ footer{background:var(--panel);padding:8px 9px;display:flex;gap:7px;align-items:
 .fbtn.send{background:var(--acc);color:#04241c}
 .fbtn.rec{background:#c62828;color:#fff;animation:pulse 1.4s infinite}
 @keyframes pulse{50%{box-shadow:0 0 0 8px rgba(198,40,40,.15)}}
+.hprog{height:2px;background:#1b2a31;display:none}.hprog i{display:block;height:100%;width:0;background:var(--acc);transition:width .4s}
+.hprog.on{display:block}
+.hread{display:none;font-size:10.5px;color:#7d929c;text-align:center;padding:3px 0}
+.hread.on{display:block}
+.hread b{color:var(--acc)}
+.lg{display:block;width:100%;margin-top:6px;background:var(--acc);color:#04241c;border:none;border-radius:10px;padding:10px;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer}
+.sb{font-size:11px;color:#8aa0aa}
 .vbar{display:none;align-items:center;gap:8px;background:#182229;border-top:1px solid var(--line);padding:8px 12px;font-size:12.5px;color:#cfe6de}
 .vbar.on{display:flex}
 .vbar .txt{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -51,6 +58,7 @@ footer{background:var(--panel);padding:8px 9px;display:flex;gap:7px;align-items:
 .sh{display:flex;align-items:center;gap:8px;padding:12px;border-bottom:1px solid var(--line)}
 .sh b{flex:1;font-size:14.5px}
 .stabs{display:flex;gap:6px;padding:9px 12px;background:var(--panel2)}
+.stabs button.third{font-size:11px}
 .stabs button{flex:1;background:#1b272e;border:1px solid var(--line);color:#a8bcc7;font-size:12.5px;padding:7px;border-radius:10px;font-family:inherit;cursor:pointer}
 .stabs button.on{background:var(--acc);color:#04241c;border-color:var(--acc);font-weight:700}
 .sbody{flex:1;overflow-y:auto;padding:12px}
@@ -71,9 +79,12 @@ footer{background:var(--panel);padding:8px 9px;display:flex;gap:7px;align-items:
 <header>
   <div class="avatar">A</div>
   <div class="hd"><b>Azzouz</b><span id="status">متصل · كنقرا من كل الويب</span></div>
+  <button class="icon" id="user" title="الحساب">👤</button>
   <button class="icon" id="tools" title="الأدوات">☰</button>
   <button class="icon" id="mic" title="فويس">🎙️</button>
 </header>
+<div class="hprog"><i id="hbar"></i></div>
+<div class="hread" id="hread">كنقرا… <b id="hcount">0</b> مصدر</div>
 <main id="log"></main>
 <div class="vbar" id="vbar"><span>🎙️</span><span class="txt" id="vtxt">كنسمع...</span><button class="icon" id="vstop">سالِي</button></div>
 <footer>
@@ -82,7 +93,7 @@ footer{background:var(--panel);padding:8px 9px;display:flex;gap:7px;align-items:
   <button class="fbtn send" id="send">➤</button>
 </footer>
 <div class="sheet" id="sheet">
-  <div class="sh"><b>الأدوات</b><button class="icon" id="shclose">✕</button></div>
+  <div class="sh"><b>الأدوات</b><button class="icon" id="clearChat" title="مسح المحادثة">🗑️</button><button class="icon" id="shclose">✕</button></div>
   <div class="stabs"><button data-p="report" class="on">آخر جواب</button><button data-p="memory">الذاكرة</button></div>
   <div class="sbody" id="paneReport"></div>
   <div class="sbody" id="paneMemory" hidden></div>
@@ -422,6 +433,7 @@ function addMsg(html, who) {
   d.innerHTML = html + '<div class="meta">' + now() + (who === 'out' ? ' ' + tick() : '') + '</div>';
   log.appendChild(d);
   log.scrollTop = log.scrollHeight;
+  try { persistMsg(d); } catch (e) {}
   return d;
 }
 function typing() {
@@ -521,6 +533,12 @@ async function ask(text) {
   let sources = [];
   try {
     sources = await gather(q, n => t.count(n));
+    if (H.q === q && H.refs.length) {
+      const extra = H.refs.slice(0, 400).map(r => ({ ...r, weight: 4 }));
+      const seen = new Set(sources.map(s => s.url));
+      extra.forEach(r => { if (r.url && !seen.has(r.url)) { seen.add(r.url); sources.push(r); } });
+    }
+    hStart(q, en2(q));
     t.done();
     const data = synthesize(q, sources, prior);
     renderAnswer(q, data, prior);
@@ -739,3 +757,155 @@ statusEl.textContent = 'متصل · كنقرا من كل الويب';
 </script>
 </body>
 </html>
+
+/* ===== استمرارية المحادثة ===== */
+let chatDB = null;
+function openChatDB() {
+  return new Promise(res => {
+    try {
+      const r = indexedDB.open('azzouz-chat-v1', 1);
+      r.onupgradeneeded = () => { const db = r.result; if (!db.objectStoreNames.contains('msgs')) db.createObjectStore('msgs', { keyPath: 'id', autoIncrement: true }); };
+      r.onsuccess = () => res(r.result);
+      r.onerror = () => res(null);
+    } catch (e) { res(null); }
+  });
+}
+async function pruneChat(db) {
+  try {
+    const keys = await new Promise(res => { const q = db.transaction('msgs', 'readonly').objectStore('msgs').getAllKeys(); q.onsuccess = () => res(q.result || []); q.onerror = () => res([]); });
+    if (keys.length <= 300) return;
+    const tx = db.transaction('msgs', 'readwrite'), st = tx.objectStore('msgs');
+    keys.slice(0, keys.length - 300).forEach(k => st.delete(k));
+  } catch (e) {}
+}
+function persistMsg(el) {
+  (async () => {
+    const db = await openChatDB(); if (!db) return;
+    const tx = db.transaction('msgs', 'readwrite');
+    tx.objectStore('msgs').add({ who: el.classList.contains('out') ? 'out' : 'in', html: el.innerHTML, at: Date.now() });
+    tx.oncomplete = () => pruneChat(db);
+  })().catch(() => {});
+}
+async function loadChat() {
+  const db = await openChatDB(); if (!db) return;
+  const rows = await new Promise(res => { const q = db.transaction('msgs', 'readonly').objectStore('msgs').getAll(); q.onsuccess = () => res(q.result || []); q.onerror = () => res([]); });
+  if (!rows.length) return;
+  log.innerHTML = '';
+  rows.slice(-200).forEach(r => {
+    const d = document.createElement('div');
+    d.className = 'msg ' + (r.who === 'out' ? 'out' : 'in');
+    d.innerHTML = r.html;
+    log.appendChild(d);
+  });
+  log.scrollTop = log.scrollHeight;
+}
+async function clearChat() {
+  const db = await openChatDB();
+  if (db) await new Promise(res => { const tx = db.transaction('msgs', 'readwrite'); tx.objectStore('msgs').clear(); tx.oncomplete = res; tx.onerror = res; });
+  log.innerHTML = '<div class="msg in"><div class="h">🧠 Azzouz</div>بديت من جديد. سولني أي حاجة.</div>';
+}
+function en2(q) { return englishOf(q); }
+
+/* ===== قراءة عميقة: هدف 20 ألف مصدر ===== */
+const H = { on: false, q: '', total: 0, target: 20000, refs: [], cur: {}, timer: null, busy: false };
+const HARV = [
+  { name: 'OpenAlex', step: async (q, en, c) => {
+      c.p = (c.p || 1); const d = await jget('https://api.openalex.org/works?search=' + enc(c.p % 2 ? q : en) + '&per_page=200&page=' + c.p + '&sort=relevance_score:desc', 18000);
+      c.p++; return { done: c.p > 100, items: (d.results || []).map(w => ({ title: w.display_name, url: w.doi ? 'https://doi.org/' + String(w.doi).replace('https://doi.org/', '') : w.id, text: invAbs(w.abstract_inverted_index), year: w.publication_year, name: 'OpenAlex' })) };
+  } },
+  { name: 'Europe PMC', step: async (q, en, c) => {
+      c.p = (c.p || 1); const d = await jget('https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=' + enc(en || q) + '&format=json&pageSize=1000&resultType=core&page=' + c.p, 20000);
+      c.p++; return { done: c.p > 10, items: ((d.resultList || {}).result || []).map(r => ({ title: r.title, url: r.doi ? 'https://doi.org/' + r.doi : 'https://europepmc.org/article/' + (r.source || 'MED') + '/' + r.id, text: clean(r.abstractText), year: r.pubYear, name: 'Europe PMC' })) };
+  } },
+  { name: 'Crossref', step: async (q, en, c) => {
+      c.o = c.o || 0; const d = await jget('https://api.crossref.org/works?query=' + enc(en || q) + '&rows=1000&offset=' + c.o + '&select=title,URL,issued,abstract,author', 22000);
+      c.o += 1000; return { done: c.o > 10000, items: ((d.message || {}).items || []).map(i => ({ title: (i.title || [])[0], url: i.URL, text: clean(i.abstract), year: (i.issued || {})['date-parts'] ? i.issued['date-parts'][0][0] : null, name: 'Crossref' })) };
+  } },
+  { name: 'DOAJ', step: async (q, en, c) => {
+      c.p = (c.p || 1); const d = await jget('https://doaj.org/api/search/articles/' + enc(en || q) + '?pageSize=100&page=' + c.p, 16000);
+      c.p++; return { done: c.p > 100, items: (d.results || []).map(r => ({ title: ((r.bibjson || {}).title || ''), url: r.bibjson && (r.bibjson.link || []).length ? r.bibjson.link[0].url : 'https://doaj.org/article/' + r.id, text: clean((r.bibjson || {}).abstract), year: (r.bibjson || {}).year, name: 'DOAJ' })) };
+  } },
+  { name: 'PubMed', step: async (q, en, c) => {
+      c.s = c.s || 0; const d = await jget('https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term=' + enc(en || q) + '&retmode=json&retmax=500&retstart=' + c.s, 18000);
+      c.s += 500; const ids = ((d.esearchresult || {}).idlist || []);
+      return { done: c.s > 5000 || !ids.length, items: ids.map(id => ({ title: 'PMID ' + id, url: 'https://pubmed.ncbi.nlm.nih.gov/' + id + '/', text: '', name: 'PubMed' })) };
+  } },
+  { name: 'Zenodo', step: async (q, en, c) => {
+      c.p = (c.p || 1); const d = await jget('https://zenodo.org/api/records?q=' + enc(en || q) + '&size=25&page=' + c.p, 16000);
+      c.p++; return { done: c.p > 200, items: ((d.hits || {}).hits || []).map(r => ({ title: (r.metadata || {}).title, url: r.links ? r.links.self_html || r.doi_url : '', text: clean((r.metadata || {}).description), year: (r.metadata || {}).publication_year, name: 'Zenodo' })) };
+  } },
+  { name: 'HAL', step: async (q, en, c) => {
+      c.s = c.s || 0; const d = await jget('https://api.archives-ouvertes.fr/search/?q=' + enc(en || q) + '&fl=title_s,uri_s,abstract_s,producedDateY_i&rows=1000&start=' + c.s + '&wt=json', 20000);
+      c.s += 1000; return { done: c.s > 8000, items: ((d.response || {}).docs || []).map(r => ({ title: (r.title_s || [])[0], url: (r.uri_s || ''), text: clean((r.abstract_s || [])[0]), year: r.producedDateY_i, name: 'HAL' })) };
+  } },
+  { name: 'Internet Archive', step: async (q, en, c) => {
+      c.p = (c.p || 1); const d = await jget('https://archive.org/advancedsearch.php?q=' + enc('(' + (en || q) + ')') + '&fl[]=identifier&fl[]=title&fl[]=description&fl[]=year&rows=500&page=' + c.p + '&output=json', 20000);
+      c.p++; return { done: c.p > 40, items: (((d.response || {}).docs) || []).map(r => ({ title: r.title, url: 'https://archive.org/details/' + r.identifier, text: clean(Array.isArray(r.description) ? r.description[0] : r.description), year: r.year, name: 'Archive' })) };
+  } }
+];
+function hUI() {
+  const rd = $('hread'), pg = $('hprog');
+  if (!rd) return;
+  rd.classList.toggle('on', H.on);
+  pg.classList.toggle('on', H.on);
+  $('hcount').textContent = H.total.toLocaleString('ar-MA');
+  $('hbar').style.width = Math.min(100, (H.total / H.target) * 100) + '%';
+}
+function hStart(q, en) {
+  if (H.on && H.q === q) return;
+  H.q = q; H.on = true; H.total = 0; H.refs = []; H.cur = {}; H.busy = false;
+  hUI();
+  clearInterval(H.timer);
+  H.timer = setInterval(hTick, 1500);
+  hTick();
+}
+async function hTick() {
+  if (H.busy || !H.on) return;
+  if (H.total >= H.target || H.refs.length >= H.target) { H.on = false; clearInterval(H.timer); hUI(); return; }
+  H.busy = true;
+  const eng = HARV[(H.cursor = (H.cursor || 0) + 1) % HARV.length];
+  const en = en2(H.q);
+  try {
+    const out = await eng.step(H.q, en, H.cur[eng.name] = H.cur[eng.name] || {});
+    (out.items || []).forEach(it => {
+      if (!it.title) return;
+      H.refs.push({ ...it, name: it.name || eng.name });
+      H.total++;
+    });
+    if (out.done) { H.cur[eng.name].done = true; }
+  } catch (e) {}
+  H.busy = false;
+  hUI();
+  statusEl.textContent = 'كنقرا: ' + H.total.toLocaleString('ar-MA') + ' مصدر';
+}
+
+/* ===== الحساب ===== */
+async function accountClick() {
+  let A;
+  try { A = await import('./auth.mjs?v=4'); } catch (e) { addMsg('⚠️ وحدة الدخول ما تحملاتش. عاود فتح الصفحة.', 'in'); return; }
+  const s = A.getSession();
+  if (s && s.token) {
+    const d = addMsg('<div class="h">👤 حسابك</div>' + esc(s.name || '') + (s.email ? '<br>' + esc(s.email) : '') + '<br><span class="sb">مربوط · البحث كيتوسع بحسابك</span><br><button class="lg" id="uout">تسجيل الخروج</button>', 'in');
+    d.querySelector('#uout').onclick = () => { A.signOut(); addMsg('تسجل الخروج. مرحبا بيك فأي وقت 👋', 'in'); };
+    return;
+  }
+  const hasId = !!A.getClientId();
+  const html = '<div class="h">🔐 تسجيل الدخول</div>' +
+    (hasId ? '<button class="lg" id="gin">تسجيل الدخول بجوجل</button>' :
+      'باش تدخل بحساب جوجل، خاص تطبيق الويب يتعرف على الموقع (مرة وحدة فقط):<br><a href="https://console.cloud.google.com/apis/credentials" target="_blank">صايب Client ID</a> ولا كتبو هنا:') +
+    (!hasId ? '<br><input id="cid" placeholder="xxxx.apps.googleusercontent.com"><button class="lg" id="cids">حفظ والمتابعة</button>' : '') +
+    '<div class="sb" style="margin-top:8px">GitHub وCloudflare كيدخلو عبر جسر المصادقة إلا كاين.</div><button class="lg" id="ghin">تسجيل الدخول بGitHub</button>';
+  const d = addMsg(html, 'in');
+  const gi = d.querySelector('#gin'); if (gi) gi.onclick = async () => { try { await A.signIn(); addMsg('✅ دخلت. دابا البحث كيخدم بحسابك.', 'in'); } catch (e) { addMsg('ما كملش الدخول: ' + esc(e.message), 'in'); } };
+  const cs = d.querySelector('#cids'); if (cs) cs.onclick = () => { A.setClientId(d.querySelector('#cid').value.trim()); addMsg('✅ تسجل المعرف. كليكي على 👤 مرة أخرى ودخل.', 'in'); };
+  const gh = d.querySelector('#ghin'); if (gh) gh.onclick = async () => {
+    try { await A.brokerLogin('github'); addMsg('✅ GitHub مربوط.', 'in'); }
+    catch (e) { addMsg('GitHub كيحتاج الجسر (worker/oauth-broker.js). ' + esc(e.message), 'in'); }
+  };
+}
+
+/* ===== تشغيل ===== */
+$('user').onclick = accountClick;
+$('clearChat').onclick = () => { if (confirm('تمسح المحادثة كاملة؟')) { clearChat(); sheet.classList.remove('on'); } };
+loadChat().then(() => { refreshMemCount(); hUI(); });
+setTimeout(() => { if (!log.children.length) loadChat(); }, 400);
