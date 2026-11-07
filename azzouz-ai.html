@@ -83,7 +83,7 @@ footer{background:var(--panel);padding:8px 9px;display:flex;gap:7px;align-items:
   <button class="icon" id="tools" title="الأدوات">☰</button>
   <button class="icon" id="mic" title="فويس">🎙️</button>
 </header>
-<div class="hprog"><i id="hbar"></i></div>
+<div class="hprog" id="hprog"><i id="hbar"></i></div>
 <div class="hread" id="hread">كنقرا… <b id="hcount">0</b> مصدر</div>
 <main id="log"></main>
 <div class="vbar" id="vbar"><span>🎙️</span><span class="txt" id="vtxt">كنسمع...</span><button class="icon" id="vstop">سالِي</button></div>
@@ -845,11 +845,12 @@ const HARV = [
 ];
 function hUI() {
   const rd = $('hread'), pg = $('hprog');
-  if (!rd) return;
+  if (!rd || !pg) return;
   rd.classList.toggle('on', H.on);
   pg.classList.toggle('on', H.on);
-  $('hcount').textContent = H.total.toLocaleString('ar-MA');
-  $('hbar').style.width = Math.min(100, (H.total / H.target) * 100) + '%';
+  const hc = $('hcount'), hb = $('hbar');
+  if (hc) hc.textContent = H.total.toLocaleString('ar-MA');
+  if (hb) hb.style.width = Math.min(100, (H.total / H.target) * 100) + '%';
 }
 function hStart(q, en) {
   if (H.on && H.q === q) return;
