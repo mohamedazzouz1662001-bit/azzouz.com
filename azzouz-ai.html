@@ -879,6 +879,10 @@ function pcInstruction(text) {
   if (/^(اكتب فالنافذة|اكتب في التطبيق)/.test(t)) return JSON.stringify({ op: 'type', text: t.replace(/^(اكتب فالنافذة|اكتب في التطبيق)\s*/, '') });
   if (/^(حل الرابط|حل الموقع)/.test(t)) return JSON.stringify({ op: 'open', url: (t.match(/https?:\/\/\S+/) || ['https://google.com'])[0] });
   if (/(تصويرة|سكرين|screenshot)/i.test(t)) return JSON.stringify({ op: 'shot' });
+  const sch = t.match(/^(?:قلب|بحث|قلب لي|بحث لي)(?: فالحاسوب)?(?: على| على)\s*(.+)$/i) || t.match(/^\/search\s+(.+)$/i);
+  if (sch) return JSON.stringify({ op: 'search', q: sch[1].trim() });
+  const rd = t.match(/^(?:قرا|قراية|قرا لي)\s+(https?:\/\/\S+)/i) || t.match(/^\/read\s+(https?:\/\/\S+)/i);
+  if (rd) return JSON.stringify({ op: 'fetch', url: rd[1] });
   const code = t.match(/```[\s\S]*?```/);
   if (code) return JSON.stringify({ op: 'write', path: 'azzouz-' + Date.now() + '.txt', content: code[0].replace(/```[a-zA-Z]*\n?|```$/g, '') });
   const cmd = t.match(/^\/run\s+([\s\S]+)/i);
@@ -903,6 +907,8 @@ async function pcAsk(text) {
   else if (/^(اكتب فالنافذة|اكتب في التطبيق)/.test(text.trim())) kind = 'type';
   else if (/^(حل الرابط|حل الموقع)/.test(text.trim())) kind = 'open';
   else if (/(تصويرة|سكرين|screenshot)/i.test(text)) kind = 'shot';
+  else if (/^(قلب|بحث|قلب لي|بحث لي)|^\/search/i.test(text.trim())) kind = 'search';
+  else if (/^(قرا|قراية|قرا لي)|^\/read/i.test(text.trim())) kind = 'fetch';
   const r = await pcCall({ op: 'push', kind, instruction: pcInstruction(text) });
   if (!r.ok) return { ok: false, msg: r.error || 'فشل الإرسال' };
   return { ok: true, id: r.job_id };
@@ -927,6 +933,7 @@ async function renderPC() {
     (st.online ? '🟢 متصل: ' + esc(st.machine) + ' · آخر نبضة ' + esc(String(st.last).slice(11, 19)) : '🔴 ماشي متصل — شغل node azzouz-computer.mjs فالحاسوب') +
     '</span><br><span style="font-size:11px;color:#8aa">' +
     (PCMODE ? 'الوضع شغال: كل رسالة كتتصيفط للحاسوب.' : 'الوضع مطفي: اضغط الزر باش تشعلو.') + '</span></div>';
+  h += '<div style="display:flex;gap:6px;margin:8px 0"><button class="lg" id="pcSearch" style="flex:1">🔎 بحث من الحاسوب</button><button class="lg" id="pcRead" style="flex:1">🌐 قراية رابط</button></div>';
   h += '<button class="lg" id="pcToggle">' + (PCMODE ? '🔴 طفي وضع الحاسوب' : '🟢 شعل وضع الحاسوب') + '</button>';
   h += '<div style="font-size:11px;color:#8aa;margin:8px 0">تشغيل العامل فالحاسوب: <code>node azzouz-computer.mjs</code></div>';
   if (!jobs.length) h += '<div class="card">ما كاين حتى مهمة بعد.</div>';
@@ -938,6 +945,10 @@ async function renderPC() {
       + '</div>';
   });
   p.innerHTML = h;
+  const bs = $('pcSearch');
+  if (bs) bs.onclick = async () => { const qq = prompt('شنو نقلب ليك من الحاسوب؟'); if (qq) { sheet.classList.remove('on'); qEl.value = 'قلب على ' + qq; qEl.form && qEl.form.requestSubmit ? qEl.form.requestSubmit() : ask('قلب على ' + qq); } };
+  const br = $('pcRead');
+  if (br) br.onclick = async () => { const uu = prompt('حط الرابط اللي بغيتي نقراه:'); if (uu) { sheet.classList.remove('on'); ask('قرا ' + uu); } };
   const b = $('pcToggle');
   if (b) b.onclick = () => { PCMODE = !PCMODE; localStorage.setItem('azzouz-pc-mode', PCMODE ? '1' : '0'); renderPC(); };
 }
