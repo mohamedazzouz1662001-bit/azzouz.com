@@ -214,6 +214,10 @@ async function gather(q, tickFn) {
       (d.query && d.query.search || []).filter(r => matchScore({ title: r.title, text: clean(r.snippet) }, termsOf(q, en)) > 0).slice(0, 6).forEach(r => push({ name: '📚 ويكيبيديا العربية', title: r.title, text: clean(r.snippet), url: 'https://ar.wikipedia.org/wiki/' + enc(r.title.replace(/ /g, '_')), weight: 9 })); },
     async () => { const d = await jget('https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=' + enc(en) + '&format=json&origin=*');
       (d.query && d.query.search || []).slice(0, 6).forEach(r => push({ name: '📚 Wikipedia', title: r.title, text: clean(r.snippet), url: 'https://en.wikipedia.org/wiki/' + enc(r.title.replace(/ /g, '_')), weight: 8 })); },
+    async () => { const r = await jget('https://' + (/(^|\s)[a-z]/.test(q) ? 'en' : 'ar') + '.wikipedia.org/w/api.php?action=query&list=search&srsearch=' + enc('intitle:' + q) + '&format=json&origin=*');
+      const first = (r.query && r.query.search || [])[0]; if (!first) return;
+      const s = await jget('https://' + (/(^|\s)[a-z]/.test(q) ? 'en' : 'ar') + '.wikipedia.org/api/rest_v1/page/summary/' + enc(first.title.replace(/ /g, '_')));
+      if (s && s.extract) push({ name: '\u2705 تعريف مباشر', title: s.title, text: s.extract.slice(0, 500), url: s.content_urls && s.content_urls.desktop && s.content_urls.desktop.page, weight: 14 }); },
     async () => { const d = await jget('https://api.openalex.org/works?search=' + enc(q) + '&per_page=50&sort=relevance_score:desc');
       (d.results || []).forEach(w => push({ name: '🔬 OpenAlex', title: w.display_name, text: invAbs(w.abstract_inverted_index).slice(0, 400), url: w.doi ? 'https://doi.org/' + String(w.doi).replace('https://doi.org/', '') : w.id, year: w.publication_year, weight: 8 })); },
     async () => { const d = await jget('https://api.crossref.org/works?query=' + enc(en) + '&rows=50&select=title,URL,issued,abstract');
@@ -354,7 +358,7 @@ function getVerse(q) {
 }
 function synthesize(q, sources, prior) {
   const terms = termsOf(q, englishOf(q));
-  const score = s => (s.weight || 0) + 6 * matchScore(s, terms);
+  const score = s => (s.weight || 0) + 6 * matchScore(s, terms) + (String(s.title || '').includes(q) ? 12 : 0);
   const sorted = sources.slice().sort((a, b) => score(b) - score(a));
   const rich = sorted.filter(s => (s.text || '').length > 40 && matchScore(s, terms) > 0);
   const parts = rich.slice(0, 3).map(s => clause(s.text, 150));
