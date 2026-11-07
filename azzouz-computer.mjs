@@ -97,6 +97,12 @@ setInterval(async () => {
       await fs.mkdir(path.dirname(target), { recursive: true });
       await fs.writeFile(target, String(cmd.content ?? ''), 'utf8');
       result = '✅ تكتب الملف: ' + target;
+      const isCode = /\.(py|js|mjs|sh)$/i.test(target);
+      if (isCode && (cmd.run || /شغل|نفّذ|نفذ|شغلو/.test(String(job.instruction || '')))) {
+        const runner = /\.py$/i.test(target) ? 'python3' : (/\.sh$/i.test(target) ? 'bash' : 'node');
+        const out = await sh(runner + ' "' + target + '"');
+        result += '\n▶️ تشغيل ' + runner + ':\n' + (out || '(بلا خرج)');
+      }
     } else if (cmd.op === 'run') {
       result = await sh(String(cmd.cmd || 'echo empty'));
     } else if (cmd.op === 'type') {
