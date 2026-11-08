@@ -1074,6 +1074,10 @@ function attachRefs(list) {
 }
 
 async function smartAnswer(q, data, prior) {
+  const ctx = (function () {
+    try { return JSON.parse(localStorage.getItem('azzouz-conv') || '[]').slice(-4); } catch (e) { return []; }
+  })();
+  const ctxText = ctx.map(c => 'س: ' + c.q + '\nج: ' + String(c.short || '').slice(0, 180)).join('\n');
   const ev = data.sorted.filter(s => (s.text || s.sum || '').length > 60).slice(0, 6)
     .map((s, i) => '[' + (i + 1) + '] ' + String(s.title || '').slice(0, 90) + ' — ' + String(s.sum || s.text || '').slice(0, 500)).join('\n');
   if (!ev) return false;
@@ -1084,7 +1088,7 @@ async function smartAnswer(q, data, prior) {
   let out = llmCacheGet(q) || '';
   if (!out) out = await llm([
     { role: 'system', content: sys },
-    { role: 'user', content: 'السؤال: ' + q + '\n\nالأدلة من المصادر:\n' + ev + (prior ? '\n\nملاحظة: جواب سابق كان: ' + String(prior.idea || '').slice(0, 200) : '') }
+    { role: 'user', content: (ctxText ? 'السياق ديال المحادثة:\n' + ctxText + '\n\n' : '') + 'السؤال: ' + q + '\n\nالأدلة من المصادر:\n' + ev + (prior ? '\n\nملاحظة: جواب سابق كان: ' + String(prior.idea || '').slice(0, 200) : '') }
   ]);
   if (out) llmCacheSet(q, out);
   const sec = out ? parseSections(out) : null;
@@ -1100,9 +1104,18 @@ async function smartAnswer(q, data, prior) {
   }
   h += '<div class="h">3. مثال</div>' + esc(sec.example || data.example) + '<br>';
   h += '<div class="h">4. شنو ندير دابا</div>' + esc(sec.next || data.next || '') + '<br>';
+  h = h.replace(/\[(\d{1,2})\]/g, (m, n) => {
+    const s = data.sorted[Number(n) - 1];
+    return s && s.url ? '<a class="srctag" href="' + esc(s.url) + '" target="_blank" rel="noopener">[' + n + ']</a>' : m;
+  });
   h += '<br><b>واش بغيتي نكمل؟</b>';
   addMsg(h, 'in');
   attachRefs(data.sorted);
+  try {
+    const arr = JSON.parse(localStorage.getItem('azzouz-conv') || '[]');
+    arr.push({ q, short: sec.short || data.short });
+    localStorage.setItem('azzouz-conv', JSON.stringify(arr.slice(-6)));
+  } catch (e) {}
   return true;
 }
 
@@ -1178,10 +1191,14 @@ async function ask(text) {
   }
 
   const prior = findPrior(q);
+  let gq = q;
+  try {
+    if (LAST && LAST.q && (/(زيد|كمل|كمّل|عمّق|عمق|أكثر|اكثر|تفاصيل|والمزيد)/.test(q) || q.split(/\s+/).length <= 2) && !q.includes(LAST.q)) gq = q + ' — ' + LAST.q;
+  } catch (e) {}
   const t = typing();
   let sources = [];
   try {
-    const gPromise = gather(q, n => t.count(n)).catch(() => []);
+    const gPromise = gather(gq, n => t.count(n)).catch(() => []);
     sources = await Promise.race([gPromise, new Promise(r => setTimeout(() => r(null), 24000))]);
     if (!sources) {
       sources = (H.refs || []).slice(0, 300).map(r => ({ ...r, weight: 4 }));
@@ -1195,7 +1212,7 @@ async function ask(text) {
     }
     hStart(q, en2(q));
     t.done();
-    const data = synthesize(q, sources, prior);
+    const data = synthesize(gq, sources, prior);
     let smart = false;
     try { smart = await smartAnswer(q, data, prior); } catch (e) { smart = false; }
     if (!smart) renderAnswer(q, data, prior);
