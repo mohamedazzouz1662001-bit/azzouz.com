@@ -118,6 +118,7 @@ textarea#q{max-height:130px;overflow-y:auto;line-height:1.6}
 .stabs button.on{background:var(--acc);color:#04241c}
 .hread{letter-spacing:.2px}
 .hprog i{box-shadow:0 0 10px rgba(0,168,132,.6)}
+pre.cd{background:#0d1a20;border:1px solid #2a3942;border-radius:10px;padding:10px;dir:ltr;text-align:left;overflow:auto;max-height:340px;font-size:12px;line-height:1.6;white-space:pre;color:#d7f5ea}
 </style>
 </head>
 <body>
@@ -666,10 +667,11 @@ function addMsg(html, who) {
   try { persistMsg(d); } catch (e) {}
   return d;
 }
-function typing() {
+function typing(label) {
+  const lbl = label || 'كنفكك السؤال...';
   const el = document.createElement('div');
   el.className = 'chain';
-  el.innerHTML = '<div class="st"><span class="dot"></span><span class="t">كنفكك السؤال...</span></div>';
+  el.innerHTML = '<div class="st"><span class="dot"></span><span class="t">' + lbl + '</span></div>';
   log.appendChild(el);
   log.scrollTop = log.scrollHeight;
   let step = 0;
@@ -891,6 +893,39 @@ function pcInstruction(text) {
   return JSON.stringify({ op: 'write', path: 'azzouz-' + Date.now() + '.txt', content: t });
 }
 
+
+/* ===== كتابة الكود ===== */
+function wantsCode(t) {
+  const s = String(t).trim();
+  if (!/(كود|برنامج|سكريبت|script|دالة|function|صنع|صايب|برمج)/i.test(s)) return false;
+  return /^(اكتب|كتب|صايب|صنع|دير|عطيني|برمج|أكتب|كتب لي)/i.test(s) || /(اكتب|كتب) لي/i.test(s) || /code/i.test(s);
+}
+function langOf(t) {
+  const s = String(t).toLowerCase();
+  if (/python|بايثون|باثون/.test(s)) return 'python';
+  if (/javascript|جافاسكريبت|js\b|node/.test(s)) return 'javascript';
+  if (/php/.test(s)) return 'php';
+  if (/html|صفحة/.test(s)) return 'html';
+  if (/sql|قاعدة/.test(s)) return 'sql';
+  if (/bash|shell|تيرمينال/.test(s)) return 'bash';
+  return 'python';
+}
+function fileOf(lang) {
+  return lang === 'python' ? 'azzouz-code.py' : lang === 'javascript' ? 'azzouz-code.js' : lang === 'php' ? 'azzouz-code.php'
+    : lang === 'html' ? 'azzouz-code.html' : lang === 'sql' ? 'azzouz-code.sql' : 'azzouz-code.sh';
+}
+async function writeCode(q) {
+  const lang = langOf(q);
+  const txt = await llm([
+    { role: 'system', content: 'أنت مبرمج خبير. رجع غير الكود بلا شرح وبلا مقدمات، داخل بلوك ```' + lang + '. الكود خاصو يخدم مباشرة، وعطي مثال تشغيل فالأخير داخل تعليق.' },
+    { role: 'user', content: q }
+  ], 90000);
+  const m = String(txt).match(/\`\`\`[a-zA-Z]*\n([\s\S]*?)\`\`\`/);
+  const code = m ? m[1].trim() : String(txt || '').trim();
+  if (!code) return '';
+  return { name: fileOf(lang), code, lang };
+}
+
 async function pcWait(id, tries = 12) {
   for (let i = 0; i < tries; i++) {
     await new Promise(r => setTimeout(r, 2500));
@@ -901,6 +936,15 @@ async function pcWait(id, tries = 12) {
 }
 
 async function pcAsk(text) {
+  if (wantsCode(text)) {
+    const t0 = typing();
+    const made = await writeCode(text);
+    t0.done();
+    if (!made) return { ok: false, msg: 'ما قدرتش نكتب الكود دابا، عاود جرب.' };
+    const r0 = await pcCall({ op: 'push', kind: 'write', instruction: JSON.stringify({ op: 'write', path: made.name, content: made.code, run: true }) });
+    if (!r0 || !r0.ok) return { ok: false, msg: (r0 && r0.error) || 'فشل الإرسال' };
+    return { ok: true, id: r0.job_id, code: made.code, name: made.name };
+  }
   let kind = 'write';
   if (/^\/run/i.test(text.trim())) kind = 'run';
   else if (/قائمة الملفات|وريني الملفات/.test(text)) kind = 'list';
@@ -1076,6 +1120,19 @@ async function ask(text) {
 
   const fix = correction(q);
   if (fix) { addMsg(esc(q), 'out'); PENDING_FIX = LAST ? topicOf(LAST.q) : topicOf(q); addMsg('<div class="h">تصحيح</div><b>سمح ليا، فهمت الغلط.</b><br><br>قول ليا آش بالضبط اللي ماشي صحيح، ونصححو ونحفظو باش ما نعاودوش.<br><br><b>واش بغيتي نكمل؟</b>', 'in'); return; }
+  if (wantsCode(q) && !PCMODE) {
+    busy = true; $('send').disabled = true;
+    addMsg(esc(q), 'out');
+    qEl.value = '';
+    const t0 = typing('كنكتب الكود...');
+    const made = await writeCode(q);
+    t0.done();
+    busy = false; $('send').disabled = false;
+    if (!made) { addMsg('ما قدرتش نكتب الكود دابا. عاود جرب بعد شوية ولا وصف ليا شنو بغيتي بالضبط.', 'in'); return; }
+    addMsg('<div class="h">1. الخلاصة</div><b>ها الكود ديالك، جاهز للاستعمال.</b><br><br><div class="h">2. الكود</div><pre class="cd">' + esc(made.code) + '</pre><br><div class="h">3. مثال</div>حطو فملف <b>' + esc(made.name) + '</b> وشغلو، إلا بغيتي نكتبو ونشغلو فالحاسوب ديالك قول «دير فالحاسوب».<br><br><div class="h">4. شنو ندير دابا</div>نسخ الكود، ولا شعل وضع الحاسوب وأنا كنكتبو ونشغلو بوحدي.<br><br><b>واش بغيتي نكمل؟</b>', 'in');
+    return;
+  }
+
   const quick = smallTalk(q);
   if (quick) { addMsg(q, 'out'); addMsg(esc(quick), 'in'); return; }
   if (pcIntent(q)) {
