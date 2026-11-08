@@ -1124,7 +1124,13 @@ async function ask(text) {
   const t = typing();
   let sources = [];
   try {
-    sources = await gather(q, n => t.count(n));
+    const gPromise = gather(q, n => t.count(n)).catch(() => []);
+    sources = await Promise.race([gPromise, new Promise(r => setTimeout(() => r(null), 24000))]);
+    if (!sources) {
+      sources = (H.refs || []).slice(0, 300).map(r => ({ ...r, weight: 4 }));
+      gPromise.then(v => { if (Array.isArray(v) && v.length) H.refs = v.concat(H.refs || []).slice(0, 3000); }).catch(() => {});
+      if (!sources.length) sources = [];
+    }
     if (H.q === q && H.refs.length) {
       const extra = H.refs.slice(0, 400).map(r => ({ ...r, weight: 4 }));
       const seen = new Set(sources.map(s => s.url));
