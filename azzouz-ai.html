@@ -953,6 +953,115 @@ async function renderPC() {
   if (b) b.onclick = () => { PCMODE = !PCMODE; localStorage.setItem('azzouz-pc-mode', PCMODE ? '1' : '0'); renderPC(); };
 }
 
+
+/* ===== عقل لغوي مجاني بلا مفاتيح ===== */
+async function llm(messages, ms = 60000) {
+  const body = JSON.stringify({ model: 'openai', messages, referrer: 'azzouz-ai' });
+  for (let a = 0; a < 3; a++) {
+    try {
+      const r = await fetch('https://text.pollinations.ai/openai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body,
+        signal: AbortSignal.timeout(ms)
+      });
+      if (r.status === 402) {
+        const wait = a === 0 ? 20000 : 35000;
+        if (a < 2) await new Promise(s => setTimeout(s, wait));
+        continue;
+      }
+      if (!r.ok) { await new Promise(s => setTimeout(s, 4000)); continue; }
+      const j = await r.json();
+      const txt = j && j.choices && j.choices[0] && j.choices[0].message ? j.choices[0].message.content : '';
+      if (txt && String(txt).trim().length > 2) return String(txt).trim();
+    } catch (e) { await new Promise(s => setTimeout(s, 3000)); }
+  }
+  return '';
+}
+
+const LLM_FALLBACK = 'https://text.pollinations.ai/';
+
+function llmCacheGet(q) {
+  try {
+    const all = JSON.parse(localStorage.getItem('azzouz-llm-v1') || '{}');
+    const row = all[topicOf(q)];
+    if (!row) return null;
+    if (Date.now() - row.at > 5 * 86400000) return null;
+    return row.text || null;
+  } catch (e) { return null; }
+}
+
+function llmCacheSet(q, text) {
+  try {
+    const all = JSON.parse(localStorage.getItem('azzouz-llm-v1') || '{}');
+    all[topicOf(q)] = { text: String(text || '').slice(0, 4000), at: Date.now() };
+    localStorage.setItem('azzouz-llm-v1', JSON.stringify(all));
+  } catch (e) {}
+}
+
+function parseSections(txt) {
+  const t = String(txt || '').replace(/\*\*/g, '');
+  const pick = re => { const m = t.match(re); return m ? m[1].trim() : ''; };
+  const short = pick(/(?:الخلاصة|خلاصة)\s*[:：]\s*([^\n]+)/i);
+  let body = pick(/(?:الشرح)\s*[:：]?\s*\n?([\s\S]*?)(?:\n\s*(?:مثال|شنو ندير دابا)\s*[:：])/i);
+  const example = pick(/(?:مثال)\s*[:：]\s*([\s\S]*?)(?:\n\s*شنو ندير دابا|$)/i);
+  const next = pick(/(?:شنو ندير دابا|الخطوة الجاية)\s*[:：]\s*([^\n]+)/i);
+  const points = String(body || '').split('\n').map(l => l.replace(/^\s*(?:[-*•]|\d+[).\-])\s*/, '').trim()).filter(l => l.length > 12).slice(0, 5);
+  if (!short && !points.length) return null;
+  return { short, points, example, next };
+}
+
+function attachRefs(list) {
+  if (!Array.isArray(list) || !list.length) return;
+  const btn = document.createElement('span');
+  btn.className = 'exp';
+  btn.textContent = '📚 المراجع (' + list.length + ')';
+  const box = document.createElement('div');
+  box.className = 'refs';
+  box.innerHTML = list.slice(0, 120).map((s, i) =>
+    '<div class="r"><b>' + (i + 1) + '.</b> ' + esc(String(s.name || '').replace(/^\S+\s/, '')) + ' — ' + esc(String(s.title || '').slice(0, 110)) +
+    (s.year ? ' (' + s.year + ')' : '') +
+    (s.sum ? '<div class="rs">' + esc(String(s.sum).slice(0, 180)) + '</div>' : '') +
+    (s.url ? '<a class="lnk" href="' + esc(s.url) + '" target="_blank" rel="noopener">' + esc(String(s.url).slice(0, 70)) + '</a>' : '') + '</div>').join('');
+  btn.onclick = () => { box.classList.toggle('on'); btn.textContent = box.classList.contains('on') ? '🙈 خبي المراجع' : '📚 المراجع (' + list.length + ')'; };
+  log.appendChild(btn);
+  log.appendChild(box);
+  log.scrollTop = log.scrollHeight;
+}
+
+async function smartAnswer(q, data, prior) {
+  const ev = data.sorted.filter(s => (s.text || s.sum || '').length > 60).slice(0, 6)
+    .map((s, i) => '[' + (i + 1) + '] ' + String(s.title || '').slice(0, 90) + ' — ' + String(s.sum || s.text || '').slice(0, 500)).join('\n');
+  if (!ev) return false;
+  const sys = 'أنت AZZOUZ AI PRO، مساعد مغربي ذكي. جاوب ديما بالدارجة المغربية البسيطة، ماشي بالفصحى. ' +
+    'الأساس هو الأدلة اللي كتوصلك: ما تخترعش أرقام ولا أسماء ما كايناش فيها. إلا كان نقص، قول "ما لقيتش" وعطي أقرب حاجة. ' +
+    'الشكل إلزامي: سطر "الخلاصة: …" جملة وحدة؛ من بعد "الشرح:" بنقط مرقمة 1. 2. 3. (3 حتى 5 نقط قصيرة)؛ ' +
+    'من بعد "مثال: …" مثال قصير من الحياة المغربية؛ وصلالآخر "شنو ندير دابا: …" اقتراح واحد. بلا مقدمات وبلا خاتمة زايدة.';
+  let out = llmCacheGet(q) || '';
+  if (!out) out = await llm([
+    { role: 'system', content: sys },
+    { role: 'user', content: 'السؤال: ' + q + '\n\nالأدلة من المصادر:\n' + ev + (prior ? '\n\nملاحظة: جواب سابق كان: ' + String(prior.idea || '').slice(0, 200) : '') }
+  ]);
+  if (out) llmCacheSet(q, out);
+  const sec = out ? parseSections(out) : null;
+  if (!sec) return false;
+  let h = '';
+  const fx = findFix(topicOf(q));
+  if (fx) h += '<div class="h">✍️ تصحيح محفوظ</div>' + esc(String(fx.note).slice(0, 240)) + '<br><br>';
+  h += '<div class="h">1. الخلاصة</div><b>' + esc(sec.short || data.short) + '</b><br><br>';
+  if (sec.points.length) {
+    h += '<div class="h">2. الشرح</div>';
+    sec.points.forEach((p, i) => { h += (i + 1) + '. ' + esc(p) + '<br>'; });
+    h += '<br>';
+  }
+  h += '<div class="h">3. مثال</div>' + esc(sec.example || data.example) + '<br>';
+  h += '<div class="h">4. شنو ندير دابا</div>' + esc(sec.next || data.next || '') + '<br>';
+  h += '<br><b>واش بغيتي نكمل؟</b>';
+  addMsg(h, 'in');
+  attachRefs(data.sorted);
+  return true;
+}
+
 /* ===== السؤال ===== */
 async function ask(text) {
   const q = String(text || '').trim();
@@ -1024,7 +1133,9 @@ async function ask(text) {
     hStart(q, en2(q));
     t.done();
     const data = synthesize(q, sources, prior);
-    renderAnswer(q, data, prior);
+    let smart = false;
+    try { smart = await smartAnswer(q, data, prior); } catch (e) { smart = false; }
+    if (!smart) renderAnswer(q, data, prior);
 
     const rec = {
       q, topic: topicOf(q), idea: data.idea,
