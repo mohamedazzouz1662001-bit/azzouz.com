@@ -71,6 +71,44 @@ function addBox({ host, url, ttl }) {
   return { box: b };
 }
 
+/* ===== Smart Radar ===== */
+function radarKeywords() { const st = setts(); return (st.radarKw || 'maroc,live').split(',').map(x => x.trim()).filter(Boolean); }
+async function tagPool(kw) {
+  try {
+    const r = await fetch('https://r.jina.ai/https://www.tiktok.com/tag/' + encodeURIComponent(kw.replace(/\s+/g, '')), { signal: AbortSignal.timeout(18000) });
+    const t = await r.text();
+    const m = t.match(/tiktok[.]com[/]@[A-Za-z0-9_.]{2,24}/g) || [];
+    return Array.from(new Set(m.map(x => x.split('@')[1]))).slice(0, 40);
+  } catch (e) { return []; }
+}
+async function checkLive(user) {
+  try {
+    const r = await fetch('https://r.jina.ai/https://www.tiktok.com/@' + user + '/live', { signal: AbortSignal.timeout(15000) });
+    const t = await r.text();
+    return { live: !/No LIVE/i.test(t), boxHint: /(treasure|صندوق|كلوفر|clover|gift box)/i.test(t) };
+  } catch (e) { return { live: false, boxHint: false }; }
+}
+let RADAR_BUSY = false;
+async function radarCycle() {
+  const st = setts();
+  if (!st.radar || RADAR_BUSY) return;
+  RADAR_BUSY = true;
+  try {
+    const seen = rd('bh-radar-seen', {});
+    for (const kw of radarKeywords().slice(0, 2)) {
+      const pool = await tagPool(kw);
+      const fresh = pool.filter(u => !seen[u]).slice(0, 4);
+      for (const u of fresh) {
+        seen[u] = Date.now();
+        const r = await checkLive(u);
+        if (r.live) { addBox({ host: '@' + u, url: 'https://www.tiktok.com/@' + u + '/live', ttl: st.ttl }); logIt('radar', 'بث مباشر: @' + u + (r.boxHint ? ' · إشارة صندوق' : '')); }
+      }
+    }
+    wr('bh-radar-seen', seen);
+  } catch (e) { logIt('radar', 'خطأ فالرادار: ' + e.message); }
+  RADAR_BUSY = false;
+}
+
 function tick() {
   const st0 = setts();
   if (!st0.on) return;
@@ -194,6 +232,12 @@ export function render(root) {
       <button class="bh-b g" id="bhOn">${st.on ? '⏸ وقف المراقبة' : '▶ شغل المراقبة'}</button>
       <button class="bh-b r" id="bhStop">⏹ وقف فوري</button>
       ${tkToken() ? '<button class="bh-b g" id="bhTkOut">🔓 فصل حساب TikTok</button>' : '<button class="bh-b" id="bhTkIn">🔗 ربط حساب TikTok</button>'}
+    </div>
+    <div class="bh-row" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:6px">
+      <button class="bh-b" id="bhRadar">${st.radar ? '🛰️ الرادار شاعل' : '🛰️ شغل الرادار'}</button>
+      <button class="bh-b g" id="bhRadarNow">🔍 فحص الآن</button>
+      <input id="bhKw" placeholder="كلمات: maroc, live" value="${esc((st.radarKw || 'maroc,live'))}" style="flex:1;min-width:120px">
+      <span class="bh-t">${RADAR_BUSY ? 'كيقلب…' : 'بحث مرحلي'}</span>
       ${(() => { const n = rd('bh-need', { n: 0 }); return n.n ? '<span class="bh-t bh-warn">🔔 كتحتاج تدخلك: ' + n.n + '</span>' : '<span class="bh-t">ما كاين حتى تدخل مطلوب</span>'; })()}
     </div>
     <div class="bh-t">حالة الحساب: <span class="bh-warn">ماشي مربوط رسميا</span> — TikTok ما كتوفرش API عمومي لصناديق LIVE. الجمع كيتم بيدك.</div>
@@ -246,6 +290,18 @@ export function render(root) {
     msg(r.ok ? (r.treasure ? '✅ الصفحة كتذكر صندوق ولا مكافأة (فحص كلمات).' : 'ℹ️ الصفحة تحملات، ولكن ما لقيتش كلمة صندوق.') : '⚠️ ما قدرتش نقرا الصفحة (TikTok قد يحجب القراءة).');
     render(root);
   });
+  $('#bhRadar')?.addEventListener('click', () => {
+    const s2 = setts(); s2.radar = !s2.radar; wr(K.s, s2);
+    logIt('mode', s2.radar ? 'الرادار شاعل' : 'الرادار مطفي');
+    render(root);
+  });
+  $('#bhRadarNow')?.addEventListener('click', async () => {
+    const kw = document.getElementById('bhKw');
+    if (kw) { const s2 = setts(); s2.radarKw = kw.value; wr(K.s, s2); }
+    msg('🛰️ كنقلب على بثوث مباشرة…');
+    await radarCycle();
+    render(root);
+  });
   $('#bhTkIn')?.addEventListener('click', () => { tkConnect(); });
   $('#bhTkOut')?.addEventListener('click', () => { tkDisconnect(); render(root); });
   $('#bhSilent')?.addEventListener('click', () => {
@@ -291,4 +347,13 @@ export function startWatcher() {
     const pane = document.getElementById('paneHunter');
     if (pane && !pane.hidden && !document.getElementById('bh-busy')) render(pane);
   }, 20000);
+}
+
+export async function initBoxHunter(pane, opts) {
+  const root = pane || document.querySelector('#paneHunter');
+  if (!root) return false;
+  try { await tkFinish(); } catch (e) {}
+  render(root);
+  if (!opts || opts.autoStart !== false) startWatcher();
+  return true;
 }
