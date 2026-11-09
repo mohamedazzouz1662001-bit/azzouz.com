@@ -110,6 +110,47 @@ function collect(id, mode) {
   }
 }
 
+
+/* ===== ربط حساب TikTok رسميا (Login Kit + PKCE) ===== */
+const TK = { key: 'bh-tk-client', tok: 'bh-tk-token', ver: 'bh-tk-ver' };
+const TK_API = 'https://superagent-1906c8e6.base44.app/functions/tiktokAuth';
+export function tkToken() { try { const t = JSON.parse(localStorage.getItem(TK.tok) || 'null'); return t && t.access_token ? t : null; } catch (e) { return null; } }
+export function tkStatus() {
+  const ck = localStorage.getItem(TK.key); const t = tkToken();
+  if (t) return { state: 'linked', label: 'مربوط رسميا', key: ck };
+  if (ck) return { state: 'half', label: 'التطبيق مسجل، الحساب ماشي مربوط', key: ck };
+  return { state: 'none', label: 'ماشي مربوط رسميا', key: '' };
+}
+export async function tkConnect() {
+  let ck = localStorage.getItem(TK.key) || '';
+  if (!ck) { ck = prompt('Client Key ديال تطبيق TikTok (من developers.tiktok.com):') || ''; if (!ck.trim()) return; localStorage.setItem(TK.key, ck.trim()); ck = ck.trim(); }
+  const ver = Array.from(crypto.getRandomValues(new Uint8Array(32))).map(b => b.toString(16).padStart(2, '0')).join('');
+  localStorage.setItem(TK.ver, ver);
+  const d = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(ver));
+  const ch = btoa(String.fromCharCode(...new Uint8Array(d))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  const redirect = location.origin + location.pathname;
+  localStorage.setItem('bh-tk-redirect', redirect);
+  location.href = 'https://www.tiktok.com/v2/auth/authorize/?client_key=' + encodeURIComponent(ck) +
+    '&scope=user.info.basic&response_type=code&redirect_uri=' + encodeURIComponent(redirect) +
+    '&state=azzouz&code_challenge=' + ch + '&code_challenge_method=S256';
+}
+export function tkDisconnect() {
+  localStorage.removeItem(TK.tok);
+  logIt('auth', 'تم فصل حساب TikTok');
+}
+export async function tkFinish() {
+  const q = new URLSearchParams(location.search);
+  const code = q.get('code'); if (!code) return false;
+  try {
+    const r = await fetch(TK_API, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code, code_verifier: localStorage.getItem(TK.ver) || '', redirect_uri: localStorage.getItem('bh-tk-redirect') || location.origin + location.pathname }) });
+    const j = await r.json();
+    if (j && j.access_token) { localStorage.setItem(TK.tok, JSON.stringify({ ...j, at: Date.now() })); logIt('auth', 'تسجل الدخول لـ TikTok'); return true; }
+    logIt('auth', 'فشل الربط: ' + (j && (j.error_description || j.error) || 'خطأ'));
+  } catch (e) {}
+  return false;
+}
+
 export function render(root) {
   if (!root) return;
   if (!document.getElementById('bh-style')) {
@@ -152,6 +193,7 @@ export function render(root) {
       <button class="bh-b g" id="bhSilent">${st.silent ? '🔊 حيد الهدوء' : '🔇 شغل الهدوء'}</button>
       <button class="bh-b g" id="bhOn">${st.on ? '⏸ وقف المراقبة' : '▶ شغل المراقبة'}</button>
       <button class="bh-b r" id="bhStop">⏹ وقف فوري</button>
+      ${tkToken() ? '<button class="bh-b g" id="bhTkOut">🔓 فصل حساب TikTok</button>' : '<button class="bh-b" id="bhTkIn">🔗 ربط حساب TikTok</button>'}
       ${(() => { const n = rd('bh-need', { n: 0 }); return n.n ? '<span class="bh-t bh-warn">🔔 كتحتاج تدخلك: ' + n.n + '</span>' : '<span class="bh-t">ما كاين حتى تدخل مطلوب</span>'; })()}
     </div>
     <div class="bh-t">حالة الحساب: <span class="bh-warn">ماشي مربوط رسميا</span> — TikTok ما كتوفرش API عمومي لصناديق LIVE. الجمع كيتم بيدك.</div>
@@ -204,6 +246,8 @@ export function render(root) {
     msg(r.ok ? (r.treasure ? '✅ الصفحة كتذكر صندوق ولا مكافأة (فحص كلمات).' : 'ℹ️ الصفحة تحملات، ولكن ما لقيتش كلمة صندوق.') : '⚠️ ما قدرتش نقرا الصفحة (TikTok قد يحجب القراءة).');
     render(root);
   });
+  $('#bhTkIn')?.addEventListener('click', () => { tkConnect(); });
+  $('#bhTkOut')?.addEventListener('click', () => { tkDisconnect(); render(root); });
   $('#bhSilent')?.addEventListener('click', () => {
     const s2 = setts(); s2.silent = !s2.silent; wr(K.s, s2);
     logIt('mode', s2.silent ? 'Silent Mode شاعل' : 'Silent Mode مطفي');
