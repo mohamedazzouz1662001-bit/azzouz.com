@@ -144,11 +144,12 @@ pre.cd{background:#0d1a20;border:1px solid #2a3942;border-radius:10px;padding:10
 <div class="sheet" id="sheet">
   <div class="sh"><b>الأدوات</b><button class="icon" id="clearChat" title="مسح المحادثة">🗑️</button>
     <button class="icon" id="expChat" title="تصدير المحادثة">📤</button><button class="icon" id="shclose">✕</button></div>
-  <div class="stabs"><button data-p="report" class="on">آخر جواب</button><button data-p="threads">المحادثات</button><button data-p="pc">الحاسوب</button><button data-p="memory">الذاكرة</button></div>
+  <div class="stabs"><button data-p="report" class="on">آخر جواب</button><button data-p="threads">المحادثات</button><button data-p="pc">الحاسوب</button><button data-p="tiktok">تيك توك</button><button data-p="memory">الذاكرة</button></div>
   <div class="vkey"><input id="vkey" placeholder="مفتاح الرؤية (اختياري)"><button class="mini2" id="vsave">حفظ</button></div>
   <div class="sbody" id="paneReport"></div>
   <div class="sbody" id="paneThreads" hidden></div>
   <div class="sbody" id="panePC" hidden></div>
+  <div class="sbody" id="paneTikTok" hidden></div>
   <div class="sbody" id="paneMemory" hidden></div>
 </div>
 <script>
@@ -1329,12 +1330,64 @@ function openTools(which) {
   $('paneMemory').hidden = which !== 'memory';
   const pt = $('paneThreads'); if (pt) pt.hidden = which !== 'threads';
   const ppc = $('panePC'); if (ppc) ppc.hidden = which !== 'pc';
+  const ptt = $('paneTikTok'); if (ptt) ptt.hidden = which !== 'tiktok';
   document.querySelectorAll('.stabs button').forEach(b => b.classList.toggle('on', b.dataset.p === which));
   if (which === 'memory') renderMemory();
   else if (which === 'threads') renderThreads();
   else if (which === 'pc') renderPC();
+  else if (which === 'tiktok') renderTikTok();
   else renderReport();
 }
+
+/* ===== صندوق TikTok ===== */
+function tkBox() { try { return JSON.parse(localStorage.getItem('azzouz-tk-box') || '[]'); } catch (e) { return []; } }
+function tkSave(l) { try { localStorage.setItem('azzouz-tk-box', JSON.stringify(l.slice(0, 200))); } catch (e) {} }
+
+async function renderTikTok() {
+  const p = $('paneTikTok'); if (!p) return;
+  const items = tkBox();
+  let h = '<div class="hd"><b>🎵 صندوق تيك توك</b></div>';
+  h += '<div class="sb">حط رابط فيديو ولا فكرة، وحللها ولا ولّد كابسيون بالهاشتاغات.</div>';
+  h += '<textarea id="tkIn" rows="2" placeholder="رابط فيديو ولا فكرة فيديو..." style="width:100%;background:#111b21;color:#e9f1f4;border:1px solid #2a3942;border-radius:10px;padding:8px;font-family:inherit"></textarea>';
+  h += '<div class="mrow"><button class="lg" id="tkAdd">➕ زيد</button><button class="lg" id="tkCap">✍️ كابسيون</button><button class="lg" id="tkAna">🔎 تحليل</button></div>';
+  h += '<div class="h">الصندوق (' + items.length + ')</div>';
+  if (!items.length) h += '<div class="sb">خاوي. زيد أول فكرة ولا رابط.</div>';
+  items.forEach((it, i) => {
+    h += '<div class="r">' + (i + 1) + '. ' + esc(String(it.t || '').slice(0, 140)) +
+      (it.u ? '<br><span class="lnk">' + esc(it.u) + '</span>' : '') +
+      '<br><button class="lg" data-del="' + i + '">حيد</button></div>';
+  });
+  p.innerHTML = h;
+
+  const box = p.querySelector('#tkIn');
+  const add = p.querySelector('#tkAdd');
+  const cap = p.querySelector('#tkCap');
+  const ana = p.querySelector('#tkAna');
+  if (add) add.onclick = () => {
+    const t = box.value.trim(); if (!t) return;
+    const u = (t.match(/https?:\/\/\S+/) || [''])[0];
+    const l = tkBox(); l.unshift({ t, u, at: Date.now() }); tkSave(l); box.value = ''; renderTikTok();
+  };
+  if (cap) cap.onclick = async () => {
+    const t = box.value.trim() || (items[0] && items[0].t) || '';
+    if (!t) { addMsg('كتب فكرة الفيديو الأول.', 'in'); return; }
+    cap.disabled = true; cap.textContent = '✍️ كنكتب...';
+    const sys = 'أنت خبير محتوى تيك توك مغربي. عطي 3 كابسيونات قصيرة بالدارجة، كل واحد فسطر، مع 6 هاشتاغات مناسبة فآخر كل سطر. بلا شرح.';
+    const out = await llm([{ role: 'system', content: sys }, { role: 'user', content: 'الفكرة: ' + t }]);
+    cap.disabled = false; cap.textContent = '✍️ كابسيون';
+    p.insertAdjacentHTML('afterbegin', '<div class="h">✍️ كابسيونات</div><div class="r">' + esc(out || 'ما قدرتش نولّد دابا. عاود بعد شوية.').replace(/\n/g, '<br>') + '</div>');
+  };
+  if (ana) ana.onclick = async () => {
+    const t = box.value.trim(); if (!t) return;
+    ana.disabled = true; ana.textContent = '🔎 كنحلل...';
+    const link = await tiktokLink(t).catch(() => null);
+    ana.disabled = false; ana.textContent = '🔎 تحليل';
+    p.insertAdjacentHTML('afterbegin', '<div class="h">🔎 تحليل</div><div class="r">' +
+      (link ? esc(link.title) + '<br>' + esc(String(link.text || '').slice(0, 260)) + '<br><span class="lnk">' + esc(link.url) + '</span>' : 'ما قدرتش نقرا هاد الرابط. تأكد أنه رابط فيديو تيك توك عمومي.') + '</div>');
+  };
+  p.querySelectorAll('[data-del]').forEach(b => { b.onclick = () => { const l = tkBox(); l.splice(Number(b.dataset.del), 1); tkSave(l); renderTikTok(); }; });
+}
+
 function keywordsOf(sources) {
   const stop = new Set(['the', 'and', 'for', 'with', 'from', 'that', 'this', 'على', 'في', 'من', 'إلى', 'عن', 'التي', 'الذي', 'هذا', 'هذه', 'كان', 'كما', 'بين', 'أو', 'ثم', 'كل', 'بعد', 'قبل', 'غير', 'حتى', 'هو', 'هي']);
   const cnt = {};
