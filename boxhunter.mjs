@@ -159,9 +159,18 @@ export function tkStatus() {
   if (ck) return { state: 'half', label: 'التطبيق مسجل، الحساب ماشي مربوط', key: ck };
   return { state: 'none', label: 'ماشي مربوط رسميا', key: '' };
 }
+export function tkClientKey() { return (localStorage.getItem(TK.key) || '').trim(); }
+export function tkSetClientKey(v) {
+  const k = String(v || '').replace(/\s+/g, '');
+  if (!k) { localStorage.removeItem(TK.key); return { ok: false, why: 'فارغ' }; }
+  if (/^\d{12,}$/.test(k)) return { ok: false, why: 'هادا App ID (أرقام فقط). Client Key كيبدا غالبا بـ aw وفيه حروف وأرقام.' };
+  if (k.length < 10 || k.length > 40) return { ok: false, why: 'الطول ماشي صحيح' };
+  localStorage.setItem(TK.key, k);
+  return { ok: true };
+}
 export async function tkConnect() {
-  let ck = localStorage.getItem(TK.key) || '';
-  if (!ck) { ck = prompt('Client Key ديال تطبيق TikTok (من developers.tiktok.com):') || ''; if (!ck.trim()) return; localStorage.setItem(TK.key, ck.trim()); ck = ck.trim(); }
+  const ck = tkClientKey();
+  if (!ck) { msg('دخل Client Key ديال تطبيقك الأول فالخانة اللي فوق، ومن بعد اضغط ربط.'); return false; }
   const ver = Array.from(crypto.getRandomValues(new Uint8Array(32))).map(b => b.toString(16).padStart(2, '0')).join('');
   localStorage.setItem(TK.ver, ver);
   const d = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(ver));
@@ -171,6 +180,7 @@ export async function tkConnect() {
   location.href = 'https://www.tiktok.com/v2/auth/authorize/?client_key=' + encodeURIComponent(ck) +
     '&scope=user.info.basic&response_type=code&redirect_uri=' + encodeURIComponent(redirect) +
     '&state=azzouz&code_challenge=' + ch + '&code_challenge_method=S256';
+  return true;
 }
 export function tkDisconnect() {
   localStorage.removeItem(TK.tok);
@@ -232,6 +242,11 @@ export function render(root) {
       <button class="bh-b g" id="bhOn">${st.on ? '⏸ وقف المراقبة' : '▶ شغل المراقبة'}</button>
       <button class="bh-b r" id="bhStop">⏹ وقف فوري</button>
       ${tkToken() ? '<button class="bh-b g" id="bhTkOut">🔓 فصل حساب TikTok</button>' : '<button class="bh-b" id="bhTkIn">🔗 ربط حساب TikTok</button>'}
+    </div>
+    <div class="bh-row" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:6px">
+      <input id="bhCk" placeholder="Client Key (من Basic information)" value="${esc(tkClientKey())}" style="flex:1;min-width:160px" autocomplete="off">
+      <button class="bh-b g" id="bhCkSave">💾 حفظ</button>
+      <button class="bh-b g" id="bhCkClear">🗑 مسح</button>
     </div>
     <div class="bh-row" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:6px">
       <button class="bh-b" id="bhRadar">${st.radar ? '🛰️ الرادار شاعل' : '🛰️ شغل الرادار'}</button>
@@ -302,6 +317,11 @@ export function render(root) {
     await radarCycle();
     render(root);
   });
+  $('#bhCkSave')?.addEventListener('click', () => {
+    const r = tkSetClientKey(document.getElementById('bhCk')?.value);
+    msg(r.ok ? '✅ تحفظ Client Key. دابا اضغط «ربط حساب TikTok».' : '⚠️ ' + r.why);
+  });
+  $('#bhCkClear')?.addEventListener('click', () => { localStorage.removeItem(TK.key); render(root); msg('تمسحات Client Key.'); });
   $('#bhTkIn')?.addEventListener('click', () => { tkConnect(); });
   $('#bhTkOut')?.addEventListener('click', () => { tkDisconnect(); render(root); });
   $('#bhSilent')?.addEventListener('click', () => {
