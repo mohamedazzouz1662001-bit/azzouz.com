@@ -4,7 +4,7 @@
 */
 
 const K = { b: 'bh-boxes', l: 'bh-logs', s: 'bh-settings' };
-const DEF = { on: true, notify: false, ttl: 15, kinds: { treasure: true, live: true }, lang: 'ar' };
+const DEF = { on: true, silent: true, notify: false, ttl: 15, kinds: { treasure: true, live: true }, lang: 'ar' };
 
 function rd(k, d) { try { return JSON.parse(localStorage.getItem(k) || 'null') ?? d; } catch (e) { return d; } }
 function wr(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
@@ -22,8 +22,21 @@ function fmt(ms) {
   return m + 'د ' + String(s).padStart(2, '0') + 'ث';
 }
 
+function msg(t) {
+  const w = document.querySelector('#paneHunter .bh-wrap');
+  if (!w) return;
+  let d = document.getElementById('bh-msg');
+  if (!d) { d = document.createElement('div'); d.id = 'bh-msg'; d.className = 'bh-toast'; w.appendChild(d); }
+  d.textContent = String(t);
+  clearTimeout(d._t); d._t = setTimeout(() => d.remove(), 7000);
+}
+function need(text) {
+  const n = rd('bh-need', { n: 0 });
+  wr('bh-need', { n: (n.n || 0) + 1, text, at: Date.now() });
+}
 function notify(title, body) {
   const st = setts();
+  if (st.silent) { logIt('quiet', title + ' — ' + body); need(title); return; }
   if (st.notify && 'Notification' in window && Notification.permission === 'granted') {
     try { new Notification(title, { body, icon: 'icon.svg' }); } catch (e) {}
   }
@@ -59,6 +72,8 @@ function addBox({ host, url, ttl }) {
 }
 
 function tick() {
+  const st0 = setts();
+  if (!st0.on) return;
   const B = boxes(); let changed = false;
   B.forEach(b => {
     if (b.status !== 'available') return;
@@ -77,7 +92,8 @@ function collect(id, mode) {
     logIt('open', 'تحل البث باش تجمع بيدك: ' + b.host);
     if (!st.autoNote) { /* auto غير متاح رسميا */ }
     notify('↗️ تحل البث', 'جمع المكافأة كيتم بيدك حيت TikTok ما كتسمحش بالجمع الآلي');
-    if (b.url) window.open(b.url, '_blank', 'noopener');
+    if (b.url && mode === 'open' && !setts().silent) window.open(b.url, '_blank', 'noopener');
+    if (b.url && mode === 'open' && setts().silent) msg('🔇 الهدوء شاعل: الرابط واجد، حلّو بيدك ملي تفرغ. ' + b.url);
     return;
   }
   if (mode === 'done') {
@@ -131,7 +147,13 @@ export function render(root) {
 
   root.innerHTML = `
   <div class="bh-wrap">
-    <div class="bh-hd"><b>🎁 TikTok Box Hunter</b><span class="bh-t">مراقبة مساعدة</span></div>
+    <div class="bh-hd"><b>🎁 TikTok Box Hunter</b><span class="bh-t">${st.silent ? '🔇 Silent Mode' : '🔔 عادي'}</span></div>
+    <div class="bh-row" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+      <button class="bh-b g" id="bhSilent">${st.silent ? '🔊 حيد الهدوء' : '🔇 شغل الهدوء'}</button>
+      <button class="bh-b g" id="bhOn">${st.on ? '⏸ وقف المراقبة' : '▶ شغل المراقبة'}</button>
+      <button class="bh-b r" id="bhStop">⏹ وقف فوري</button>
+      ${(() => { const n = rd('bh-need', { n: 0 }); return n.n ? '<span class="bh-t bh-warn">🔔 كتحتاج تدخلك: ' + n.n + '</span>' : '<span class="bh-t">ما كاين حتى تدخل مطلوب</span>'; })()}
+    </div>
     <div class="bh-t">حالة الحساب: <span class="bh-warn">ماشي مربوط رسميا</span> — TikTok ما كتوفرش API عمومي لصناديق LIVE. الجمع كيتم بيدك.</div>
     <div class="bh-cards">
       <div class="bh-c"><b>${B.length}</b><span>مكتشفة</span></div>
@@ -170,20 +192,34 @@ export function render(root) {
     const url = /^https?:\/\//i.test(raw) ? raw : 'https://www.tiktok.com/@' + raw.replace(/^@/, '');
     const host = (raw.match(/@([\w.]+)/) || [, raw])[1];
     const res = addBox({ host, url, ttl });
-    if (res.dup) { logIt('dup', 'صندوق موجود من قبل: ' + host); alert('هادا الصندوق مسجل من قبل.'); }
+    if (res.dup) { logIt('dup', 'صندوق موجود من قبل: ' + host); msg('هادا الصندوق مسجل من قبل.'); }
     render(root);
   });
   $('#bhScan')?.addEventListener('click', async () => {
     const raw = ($('#bhUrl').value || '').trim();
-    if (!raw) return alert('حط رابط البث ولا الحساب الأول.');
+    if (!raw) return msg('حط رابط البث ولا الحساب الأول.');
     const url = /^https?:\/\//i.test(raw) ? raw : 'https://www.tiktok.com/@' + raw.replace(/^@/, '');
     const r = await probe(url);
     logIt('probe', (r.ok ? 'فحص ناجح' : 'فحص فشل') + ' — ' + url);
-    alert(r.ok ? (r.treasure ? '✅ الصفحة كتذكر صندوق ولا مكافأة (فحص كلمات).' : 'ℹ️ الصفحة تحملات، ولكن ما لقيتش كلمة صندوق.') : '⚠️ ما قدرتش نقرا الصفحة (TikTok قد يحجب القراءة).');
+    msg(r.ok ? (r.treasure ? '✅ الصفحة كتذكر صندوق ولا مكافأة (فحص كلمات).' : 'ℹ️ الصفحة تحملات، ولكن ما لقيتش كلمة صندوق.') : '⚠️ ما قدرتش نقرا الصفحة (TikTok قد يحجب القراءة).');
+    render(root);
+  });
+  $('#bhSilent')?.addEventListener('click', () => {
+    const s2 = setts(); s2.silent = !s2.silent; wr(K.s, s2);
+    logIt('mode', s2.silent ? 'Silent Mode شاعل' : 'Silent Mode مطفي');
+    render(root);
+  });
+  $('#bhOn')?.addEventListener('click', () => {
+    const s2 = setts(); s2.on = !s2.on; wr(K.s, s2);
+    logIt('mode', s2.on ? 'المراقبة شاعلة' : 'المراقبة واقفة');
+    render(root);
+  });
+  $('#bhStop')?.addEventListener('click', () => {
+    stopWatcher();
     render(root);
   });
   $('#bhPerm')?.addEventListener('click', async () => {
-    if (!('Notification' in window)) return alert('المتصفح ما كيدعمش الإشعارات.');
+    if (!('Notification' in window)) return msg('المتصفح ما كيدعمش الإشعارات.');
     const p = await Notification.requestPermission();
     const s2 = setts(); s2.notify = p === 'granted'; wr(K.s, s2);
     render(root);
@@ -197,7 +233,18 @@ export function render(root) {
   root.querySelectorAll('[data-fail]').forEach(el => el.onclick = () => { collect(el.dataset.fail, 'fail'); render(root); });
 }
 
+let BH_TIMER = null;
+export function stopWatcher() {
+  if (BH_TIMER) { clearInterval(BH_TIMER); BH_TIMER = null; }
+  const s = setts(); s.on = false; wr(K.s, s);
+  logIt('stop', 'توقفت المراقبة');
+}
 export function startWatcher() {
   tick();
-  setInterval(tick, 15000);
+  if (BH_TIMER) return;
+  BH_TIMER = setInterval(() => {
+    tick();
+    const pane = document.getElementById('paneHunter');
+    if (pane && !pane.hidden && !document.getElementById('bh-busy')) render(pane);
+  }, 20000);
 }
