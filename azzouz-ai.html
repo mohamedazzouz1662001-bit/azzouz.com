@@ -118,6 +118,9 @@ textarea#q{max-height:130px;overflow-y:auto;line-height:1.6}
 .stabs button.on{background:var(--acc);color:#04241c}
 .hread{letter-spacing:.2px}
 .hprog i{box-shadow:0 0 10px rgba(0,168,132,.6)}
+.arow{display:flex;gap:6px;margin-top:6px;justify-content:flex-start}
+.arow .ab{background:#111b22;color:#cfe9e3;border:1px solid #26343c;border-radius:8px;font-size:11px;padding:4px 8px;cursor:pointer}
+.arow .ab:active{transform:scale(.97)}
 pre.cd{background:#0d1a20;border:1px solid #2a3942;border-radius:10px;padding:10px;dir:ltr;text-align:left;overflow:auto;max-height:340px;font-size:12px;line-height:1.6;white-space:pre;color:#d7f5ea}
 </style>
 </head>
@@ -686,6 +689,25 @@ function smallTalk(q) {
 }
 
 /* ===== واجهة المحادثة ===== */
+function addActions(el, q) {
+  if (!el) return;
+  const bar = document.createElement('div');
+  bar.className = 'arow';
+  bar.innerHTML = '<button class="ab" data-a="cp">\uD83D\uDCCB نسخ</button><button class="ab" data-a="sp">\uD83D\uDD0A سمع</button>';
+  el.appendChild(bar);
+  bar.querySelector('[data-a="cp"]').onclick = () => {
+    const txt = (el.innerText || '').replace(/\nنسخ\nسمع\n?/, '');
+    navigator.clipboard.writeText(txt).then(() => { bar.querySelector('[data-a="cp"]').textContent = '\u2705 تنسخ'; }).catch(() => {});
+  };
+  bar.querySelector('[data-a="sp"]').onclick = () => {
+    try {
+      speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance((el.innerText || '').replace(/\nنسخ\nسمع\n?/, ''));
+      u.lang = 'ar-MA'; u.rate = 1; speechSynthesis.speak(u);
+    } catch (e) {}
+  };
+}
+
 function addMsg(html, who) {
   const d = document.createElement('div');
   d.className = 'msg ' + who;
@@ -1137,7 +1159,8 @@ async function smartAnswer(q, data, prior) {
     return s && s.url ? '<a class="srctag" href="' + esc(s.url) + '" target="_blank" rel="noopener">[' + n + ']</a>' : m;
   });
   h += '<br><b>واش بغيتي نكمل؟</b>';
-  addMsg(h, 'in');
+  const card = addMsg(h, 'in');
+  addActions(card, q);
   attachRefs(data.sorted);
   try {
     const arr = JSON.parse(localStorage.getItem('azzouz-conv') || '[]');
@@ -1208,6 +1231,12 @@ async function ask(text) {
     return;
   }
   statusEl.textContent = 'كنبحث...';
+  CANCEL = false;
+  const stopBtn = document.createElement('button');
+  stopBtn.className = 'ab'; stopBtn.textContent = '\u23F9 \u0648\u0642\u0641';
+  stopBtn.style.marginInlineStart = '8px';
+  stopBtn.onclick = () => { CANCEL = true; statusEl.textContent = '\u0643\u0646\u062A\u0648\u0642\u0641...'; };
+  statusEl.appendChild(stopBtn);
 
   if (/^[0-9+\-*/(). ]+$/.test(q)) {
     try {
@@ -1242,6 +1271,13 @@ async function ask(text) {
     t.done();
     const tk = await tiktokLink(q).catch(() => null);
     if (tk) sources.unshift(tk);
+    if (CANCEL) {
+      try { stopBtn.remove(); } catch (e) {}
+      busy = false; $('send').disabled = false; statusEl.textContent = 'توقف البحث';
+      addMsg('<div class="h">1. الخلاصة</div><b>وقفت البحث اللي طلبتي.</b><br><br><div class="h">2. الشرح</div>ما كملتش القراية، والمواضيع اللي جمعت بقاو فالذاكرة.<br><br><div class="h">3. مثال</div>تقدر تعاود بنفس السؤال ملي تسهّل، ولا تكتب «زيد عمّق» باش نكمل.<br><br><div class="h">4. شنو ندير دابا</div>قول ليا نكمل إلا بغيتي.<br><br><b>واش بغيتي نكمل؟</b>', 'in');
+      return;
+    }
+    try { stopBtn.remove(); } catch (e) {}
     const data = synthesize(gq, sources, prior);
     let smart = false;
     try { smart = await smartAnswer(q, data, prior); } catch (e) { smart = false; }
