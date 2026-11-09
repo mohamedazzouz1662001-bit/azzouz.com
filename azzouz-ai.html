@@ -325,6 +325,16 @@ async function gather(q, tickFn) {
       (d.search || []).forEach(e => push({ name: '🧩 Wikidata', title: e.label || e.id, text: clean(e.description), url: 'https://www.wikidata.org/wiki/' + e.id, weight: 5 })); },
     async () => { const d = await jget('https://api.duckduckgo.com/?q=' + enc(en) + '&format=json&no_html=1&skip_disambig=1');
       if (d.AbstractText) push({ name: '🌐 DuckDuckGo', title: d.Heading || en, text: d.AbstractText.slice(0, 350), url: d.AbstractURL || ('https://duckduckgo.com/?q=' + enc(en)), weight: 7 }); },
+    async () => { const md = await jtxt('https://r.jina.ai/https://www.tiktok.com/tag/' + enc((q || en || '').replace(/\s+/g, '')), 16000);
+      const lines = String(md || '').split('\n').map(l => l.trim())
+        .filter(l => /^\d+\.\s|@[\w.]+|views|likes|إعجاب|مشاهدة/i.test(l) && l.length > 18 && l.length < 240)
+        .filter(l => !/TikTok Shop|Log in|For You|Following|Explore|Search/i.test(l))
+        .slice(0, 12);
+      lines.forEach((l, i) => { const u = (l.match(/https:\/\/www\.tiktok\.com\/[^\s)]+/) || [])[0]; push({ name: '🎵 TikTok', title: clean(l).slice(0, 90), text: clean(l).slice(0, 220), url: u || ('https://www.tiktok.com/tag/' + enc((q || en || '').replace(/\s+/g, ''))), weight: 6 }); }); },
+    async () => { const md = await jtxt('https://r.jina.ai/https://www.bing.com/search?q=' + enc('site:tiktok.com ' + (en || q)), 16000);
+      const links = [];
+      String(md || '').split('\n').forEach(l => { const m = l.match(/https:\/\/www\.tiktok\.com\/@[\w.]+\/video\/\d+/); if (m && !links.includes(m[0])) links.push(m[0]); });
+      links.slice(0, 10).forEach((u, i) => push({ name: '🎵 TikTok', title: 'فيديو تيك توك ' + (i + 1), text: '', url: u, weight: 5 })); },
     async () => { const d = await jget('https://itunes.apple.com/search?term=' + enc(en || q) + '&entity=software&limit=15&country=ma');
       (d.results || []).forEach(a => push({ name: '📱 متجر التطبيقات', title: a.trackName, text: clean(a.description).slice(0, 260) || (a.primaryGenreName + ' · ' + (a.sellerName || '')), url: a.trackViewUrl, weight: 7 })); },
     async () => { const d = await jget('https://itunes.apple.com/search?term=' + enc(en || q) + '&entity=podcast&limit=10');
@@ -1212,6 +1222,8 @@ async function ask(text) {
     }
     hStart(q, en2(q));
     t.done();
+    const tk = await tiktokLink(q).catch(() => null);
+    if (tk) sources.unshift(tk);
     const data = synthesize(gq, sources, prior);
     let smart = false;
     try { smart = await smartAnswer(q, data, prior); } catch (e) { smart = false; }
