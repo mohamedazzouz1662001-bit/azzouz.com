@@ -144,12 +144,13 @@ pre.cd{background:#0d1a20;border:1px solid #2a3942;border-radius:10px;padding:10
 <div class="sheet" id="sheet">
   <div class="sh"><b>الأدوات</b><button class="icon" id="clearChat" title="مسح المحادثة">🗑️</button>
     <button class="icon" id="expChat" title="تصدير المحادثة">📤</button><button class="icon" id="shclose">✕</button></div>
-  <div class="stabs"><button data-p="report" class="on">آخر جواب</button><button data-p="threads">المحادثات</button><button data-p="pc">الحاسوب</button><button data-p="tiktok">تيك توك</button><button data-p="memory">الذاكرة</button></div>
+  <div class="stabs"><button data-p="report" class="on">آخر جواب</button><button data-p="threads">المحادثات</button><button data-p="pc">الحاسوب</button><button data-p="tiktok">تيك توك</button><button data-p="hunter">🎁 Hunter</button><button data-p="memory">الذاكرة</button></div>
   <div class="vkey"><input id="vkey" placeholder="مفتاح الرؤية (اختياري)"><button class="mini2" id="vsave">حفظ</button></div>
   <div class="sbody" id="paneReport"></div>
   <div class="sbody" id="paneThreads" hidden></div>
   <div class="sbody" id="panePC" hidden></div>
   <div class="sbody" id="paneTikTok" hidden></div>
+  <div class="sbody" id="paneHunter" hidden></div>
   <div class="sbody" id="paneMemory" hidden></div>
 </div>
 <script>
@@ -1331,11 +1332,13 @@ function openTools(which) {
   const pt = $('paneThreads'); if (pt) pt.hidden = which !== 'threads';
   const ppc = $('panePC'); if (ppc) ppc.hidden = which !== 'pc';
   const ptt = $('paneTikTok'); if (ptt) ptt.hidden = which !== 'tiktok';
+  const phu = $('paneHunter'); if (phu) phu.hidden = which !== 'hunter';
   document.querySelectorAll('.stabs button').forEach(b => b.classList.toggle('on', b.dataset.p === which));
   if (which === 'memory') renderMemory();
   else if (which === 'threads') renderThreads();
   else if (which === 'pc') renderPC();
   else if (which === 'tiktok') renderTikTok();
+  else if (which === 'hunter') import('./boxhunter.mjs?v=1').then(m => { m.render($('paneHunter')); m.startWatcher(); }).catch(() => {});
   else renderReport();
 }
 
