@@ -1,0 +1,28 @@
+<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>تحديث Azzouz</title>
+<style>body{margin:0;background:#04060b;color:#e8f1ff;font-family:system-ui,Tahoma,sans-serif;display:flex;min-height:100vh;align-items:center;justify-content:center;text-align:center;padding:24px}
+.box{max-width:520px}a{display:inline-block;margin-top:16px;background:#00e5a0;color:#04120c;font-weight:700;padding:12px 18px;border-radius:10px;text-decoration:none}
+#s{color:#00b3ff;font-size:14px;margin-top:12px}</style></head><body><div class="box">
+<h2>كنحدّث Azzouz</h2>
+<div id="s">كنمسح الكاش القديم...</div>
+<a id="go" href="./azzouz-ai.html">دخل لـAzzouz</a>
+<script>
+(async () => {
+  const s = document.getElementById('s');
+  try {
+    if ('serviceWorker' in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      for (const r of regs) { await r.unregister(); }
+      s.textContent = 'تمسحو ' + regs.length + ' service worker.';
+    }
+    if (window.caches) {
+      const keys = await caches.keys();
+      for (const k of keys) { await caches.delete(k); }
+      s.textContent += ' و' + keys.length + ' كاش.';
+    }
+    try { localStorage.removeItem('azzouz-threads-v1'); } catch (e) {}
+    s.textContent += ' دابا غادي ندخلك.';
+    setTimeout(() => { location.replace('./azzouz-ai.html?v=' + Date.now()); }, 1200);
+  } catch (e) { s.textContent = 'وقع خطأ: ' + e.message; }
+})();
+</script></div></body></html>

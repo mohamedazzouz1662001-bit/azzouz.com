@@ -931,7 +931,7 @@ function renderAnswer(q, data, prior) {
   if (SHOW_REFS && data.sorted.length) {
     const btn = document.createElement('span');
     btn.className = 'exp';
-    btn.textContent = '📚 المراجع (' + data.sorted.length + ')';
+    btn.textContent = '📚 المصادر (' + data.sorted.length + ')';
     const box = document.createElement('div');
     box.className = 'refs';
     box.innerHTML = groupRefsHTML(data.sorted, 40);
