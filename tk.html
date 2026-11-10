@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ربط TikTok — AZZOUZ AI</title>
+<style>
+body{background:#0b141a;color:#e9edef;font-family:-apple-system,'Segoe UI',Tahoma,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;text-align:center;padding:24px}
+.b{max-width:420px}
+h1{font-size:19px;color:#00d0a0;margin-bottom:10px}
+p{font-size:14px;color:#cfd8dc;line-height:1.8}
+a.btn{display:inline-block;margin-top:16px;background:#00a884;color:#04241d;font-weight:700;padding:12px 22px;border-radius:10px;text-decoration:none}
+code{background:#111b22;padding:2px 6px;border-radius:6px;font-size:12px;color:#7fd7ff}
+</style></head><body>
+<div class="b">
+<h1>ربط حساب TikTok</h1>
+<p id="st">كنحضر الطلب…</p>
+<p id="dbg" style="font-size:11px;color:#8696a0"></p>
+<a class="btn" id="go" href="#" style="display:none">اضغط للمتابعة</a>
+</div>
+<script>
+const KEY = 'awga3m8eepkt0ikr';
+const RED = 'https://mohamedazzouz1662001-bit.github.io/azzouz.com/azzouz-ai.html';
+function b64(buf){return btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');}
+async function go(){
+  const v = b64(crypto.getRandomValues(new Uint8Array(48)));
+  const d = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(v));
+  localStorage.setItem('bh-tk-ver', v);
+  localStorage.setItem('bh-tk-client', KEY);
+  localStorage.setItem('bh-tk-redirect', RED);
+  const url = 'https://www.tiktok.com/v2/auth/authorize/?client_key=' + encodeURIComponent(KEY) +
+    '&scope=user.info.basic&response_type=code&redirect_uri=' + encodeURIComponent(RED) +
+    '&state=azzouz&code_challenge=' + b64(d) + '&code_challenge_method=S256';
+  document.getElementById('dbg').textContent = 'client_key=' + KEY;
+  document.getElementById('st').textContent = 'تحويل لـ TikTok…';
+  const a = document.getElementById('go'); a.href = url; a.style.display = 'inline-block';
+  location.href = url;
+}
+go();
+</script>
+</body></html>
