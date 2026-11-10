@@ -43,6 +43,7 @@ header{display:flex;align-items:center;gap:10px;padding:9px 12px;background:var(
 .h{font-weight:700;color:#9be0c6;margin-bottom:3px;font-size:13px}
 .lnk{color:#7fd9ff;text-decoration:none;word-break:break-all;font-size:12px;display:block;margin-top:2px}
 .exp{display:inline-block;margin-top:7px;font-size:12px;color:#9be0c6;background:#1b2b28;border:1px solid #2c4a44;border-radius:8px;padding:6px 10px;cursor:pointer}
+.msg{content-visibility:auto;contain-intrinsic-size:auto 140px}
 .refs{display:none;margin-top:7px;border-top:1px solid #2f4048;padding-top:6px;max-height:250px;overflow-y:auto}
 .refs.on{display:block}
 .rs{color:#9fb3bd;font-size:11px;line-height:1.6;margin:2px 0 6px}
@@ -774,7 +775,15 @@ function thid() {
 }
 function setThid(id) { localStorage.setItem('azzouz-thread-v1', id); }
 function allThreads() { try { return JSON.parse(localStorage.getItem('azzouz-threads-v1') || '[{"id":"main","title":"المحادثة الأولى","at":0}]'); } catch (e) { return [{ id: 'main', title: 'المحادثة الأولى', at: 0 }]; } }
-function saveThreads(list) { localStorage.setItem('azzouz-threads-v1', JSON.stringify(list.slice(-60))); }
+function slimThread(t) {
+  const c = { ...t };
+  delete c.refs; delete c.sources;
+  if (Array.isArray(c.msgs)) c.msgs = c.msgs.slice(-40).map(m => (m && m.refs ? { ...m, refs: [] } : m));
+  return c;
+}
+function saveThreads(list) {
+  try { localStorage.setItem('azzouz-threads-v1', JSON.stringify(list.slice(-30).map(slimThread))); } catch (e) {}
+}
 function noteThread(q) {
   const list = allThreads(), id = thid();
   let t = list.find(x => x.id === id);
@@ -909,7 +918,7 @@ function renderAnswer(q, data, prior) {
   const el = addMsg(h, 'in');
   try { turboRead(data.sorted, 30, 8); } catch (e) {}
 
-  if (data.sorted.length) {
+  if (SHOW_REFS && data.sorted.length) {
     const btn = document.createElement('span');
     btn.className = 'exp';
     btn.textContent = '📚 المراجع (' + data.sorted.length + ')';
@@ -1132,7 +1141,9 @@ function parseSections(txt) {
   return { short, points, example, next };
 }
 
+const SHOW_REFS = false; // المراجع مطفيين: المحادثة خفيفة
 function attachRefs(list) {
+  if (!SHOW_REFS) return;
   if (!Array.isArray(list) || !list.length) return;
   const btn = document.createElement('span');
   btn.className = 'exp';
