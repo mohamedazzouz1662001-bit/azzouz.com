@@ -934,7 +934,7 @@ function renderAnswer(q, data, prior) {
     btn.textContent = '📚 المراجع (' + data.sorted.length + ')';
     const box = document.createElement('div');
     box.className = 'refs';
-    box.innerHTML = data.sorted.slice(0, 200).map((s, i) =>
+    box.innerHTML = data.sorted.slice(0, 80).map((s, i) =>
       '<div class="r"><b>' + (i + 1) + '.</b> ' + esc(s.name.replace(/^\S+\s/, '')) + ' — ' + esc(String(s.title).slice(0, 110)) +
       (s.year ? ' (' + s.year + ')' : '') +
       (s.sum ? '<div class="rs">' + esc(s.sum) + '</div>' : '') +
@@ -1151,24 +1151,89 @@ function parseSections(txt) {
   return { short, points, example, next };
 }
 
-const SHOW_REFS = false; // المراجع مطفيين: المحادثة خفيفة
-function attachRefs(list) {
+const SHOW_REFS = true; // المراجع رجعو، ولكن كيترسمو غير ملّي تفتحهم
+function attachRefs(list, q) {
   if (!SHOW_REFS) return;
   if (!Array.isArray(list) || !list.length) return;
+  const qq = String(q || '').trim();
   const btn = document.createElement('span');
   btn.className = 'exp';
-  btn.textContent = '📚 المراجع (' + list.length + ')';
+  let items = list.slice(0, 200);
   const box = document.createElement('div');
   box.className = 'refs';
-  box.innerHTML = list.slice(0, 120).map((s, i) =>
-    '<div class="r"><b>' + (i + 1) + '.</b> ' + esc(String(s.name || '').replace(/^\S+\s/, '')) + ' — ' + esc(String(s.title || '').slice(0, 110)) +
-    (s.year ? ' (' + s.year + ')' : '') +
-    (s.sum ? '<div class="rs">' + esc(String(s.sum).slice(0, 180)) + '</div>' : '') +
-    (s.url ? '<a class="lnk" href="' + esc(s.url) + '" target="_blank" rel="noopener">' + esc(String(s.url).slice(0, 70)) + '</a>' : '') + '</div>').join('');
-  btn.onclick = () => { box.classList.toggle('on'); btn.textContent = box.classList.contains('on') ? '🙈 خبي المراجع' : '📚 المراجع (' + list.length + ')'; };
+  let built = false;
+  let more = null;
+
+  function row(s, i) {
+    return '<div class="r"><b>' + (i + 1) + '.</b> ' + esc(String(s.name || '').replace(/^\S+\s/, '')) + ' — ' + esc(String(s.title || '').slice(0, 110)) +
+      (s.year ? ' (' + s.year + ')' : '') +
+      (s.sum ? '<div class="rs">' + esc(String(s.sum).slice(0, 150)) + '</div>' : '') +
+      (s.url ? '<a class="lnk" href="' + esc(s.url) + '" target="_blank" rel="noopener">' + esc(String(s.url).slice(0, 70)) + '</a>' : '') + '</div>';
+  }
+
+  function draw() {
+    box.innerHTML = items.map(row).join('');
+    more = document.createElement('div');
+    more.className = 'r';
+    more.style.textAlign = 'center';
+    box.appendChild(more);
+    paintMore();
+  }
+
+  function paintMore(text) {
+    if (!more) return;
+    more.innerHTML = '';
+    if (!qq) { more.textContent = 'المجموع: ' + items.length + ' مرجع'; return; }
+    const b = document.createElement('span');
+    b.className = 'exp';
+    b.textContent = text || ('➕ وسّع البحث (المجموع: ' + items.length + ')');
+    b.onclick = async () => {
+      b.textContent = 'كنقلب فمصادر أكثر...';
+      const got = await bulkSources(qq, 6, n => { b.textContent = 'كنقلب... زدت ' + n; });
+      const seen = new Set(items.map(x => x.url || x.title));
+      let added = 0;
+      got.forEach(g => { const k = g.url || g.title; if (k && !seen.has(k)) { seen.add(k); items.push(g); added++; } });
+      draw();
+      paintMore('➕ زيد (زدت ' + added + ' · المجموع: ' + items.length + ')');
+    };
+    more.appendChild(b);
+  }
+
+  btn.textContent = '📚 المراجع (' + list.length + ')';
+  btn.onclick = () => {
+    const on = box.classList.toggle('on');
+    btn.textContent = on ? '🙈 خبي المراجع' : '📚 المراجع (' + list.length + ')';
+    if (on && !built) { built = true; draw(); }
+    log.scrollTop = log.scrollHeight;
+  };
   log.appendChild(btn);
   log.appendChild(box);
   log.scrollTop = log.scrollHeight;
+}
+
+/* بحث موسع: كيجيب بالآلاف من OpenAlex (بدون مفتاح) */
+async function bulkSources(q, pages, onCount) {
+  const out = [];
+  let cursor = '*';
+  for (let i = 0; i < (pages || 6) && cursor; i++) {
+    const url = 'https://api.openalex.org/works?search=' + encodeURIComponent(q) + '&per-page=200&cursor=' + encodeURIComponent(cursor);
+    let d = null;
+    try { d = await jget(url, 15000); } catch (e) { break; }
+    const res = (d && d.results) || [];
+    if (!res.length) break;
+    res.forEach(w => {
+      const id = String(w.id || '').split('/').pop();
+      out.push({
+        name: '📊 OpenAlex',
+        title: w.title || w.display_name || '',
+        year: w.publication_year || '',
+        url: w.doi || (w.primary_location && w.primary_location.landing_page_url) || (id ? 'https://openalex.org/works/' + id : '')
+      });
+    });
+    cursor = d && d.meta && d.meta.next_cursor;
+    if (onCount) onCount(out.length);
+  }
+  return out;
 }
 
 async function smartAnswer(q, data, prior) {
@@ -1209,7 +1274,7 @@ async function smartAnswer(q, data, prior) {
   h += '<br><b>واش بغيتي نكمل؟</b>';
   const card = addMsg(h, 'in');
   addActions(card, q);
-  attachRefs(data.sorted);
+  attachRefs(data.sorted, q);
   try {
     const arr = JSON.parse(localStorage.getItem('azzouz-conv') || '[]');
     arr.push({ q, short: sec.short || data.short });
