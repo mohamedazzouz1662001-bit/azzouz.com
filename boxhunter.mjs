@@ -201,7 +201,18 @@ export async function tkFinish() {
     const r = await fetch(TK_API, { method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ code, code_verifier: localStorage.getItem(TK.ver) || '', redirect_uri: localStorage.getItem('bh-tk-redirect') || location.origin + location.pathname }) });
     const j = await r.json();
-    if (j && j.access_token) { localStorage.setItem(TK.tok, JSON.stringify({ ...j, at: Date.now() })); logIt('auth', 'تسجل الدخول لـ TikTok'); return true; }
+    if (j && j.access_token) {
+      let me = null;
+      try {
+        const u = await fetch('https://open.tiktokapis.com/v2/user/info/?fields=open_id,display_name,avatar_url', { headers: { Authorization: 'Bearer ' + j.access_token } });
+        const uj = await u.json();
+        me = uj?.data?.user || null;
+      } catch (e) {}
+      localStorage.setItem(TK.tok, JSON.stringify({ ...j, me, at: Date.now() }));
+      logIt('auth', 'تسجل الدخول لـ TikTok' + (me && me.display_name ? ' (' + me.display_name + ')' : ''));
+      history.replaceState({}, '', location.pathname);
+      return true;
+    }
     logIt('auth', 'فشل الربط: ' + (j && (j.error_description || j.error) || 'خطأ'));
   } catch (e) {}
   return false;
@@ -264,7 +275,7 @@ export function render(root) {
       <span class="bh-t">${RADAR_BUSY ? 'كيقلب…' : 'بحث مرحلي'}</span>
       ${(() => { const n = rd('bh-need', { n: 0 }); return n.n ? '<span class="bh-t bh-warn">🔔 كتحتاج تدخلك: ' + n.n + '</span>' : '<span class="bh-t">ما كاين حتى تدخل مطلوب</span>'; })()}
     </div>
-    <div class="bh-t">حالة الحساب: <span class="bh-warn">ماشي مربوط رسميا</span> — TikTok ما كتوفرش API عمومي لصناديق LIVE. الجمع كيتم بيدك.</div>
+    <div class="bh-t">حالة الحساب: ${(() => { const t = tkToken(); if (!t) return '<span class="bh-warn">ماشي مربوط رسميا</span>'; const nm = (t.me && t.me.display_name) || 'مربوط'; return '<b>' + esc(nm) + '</b> مربوط رسميا'; })()} — TikTok ما كتوفرش API عمومي لصناديق LIVE. الجمع كيتم بيدك.</div>
     <div class="bh-cards">
       <div class="bh-c"><b>${B.length}</b><span>مكتشفة</span></div>
       <div class="bh-c"><b>${avail.length}</b><span>متاحة دابا</span></div>
