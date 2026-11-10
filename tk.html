@@ -36,8 +36,13 @@ async function start(){
     '&state=azzouz&code_challenge=' + b64(d) + '&code_challenge_method=S256';
   $('dbg').textContent = 'client_key=' + KEY + ' · redirect=' + SELF;
   $('st').textContent = 'تحويل لـ TikTok…';
-  const a = $('go'); a.href = url; a.style.display = 'inline-block';
-  setTimeout(() => { location.href = url; }, 300);
+  const a = $('go'); a.href = url; a.style.display = 'none';
+  $('st').innerHTML = 'الدخول الرسمي متوقف مؤقتا: TikTok ما كيقبلش التطبيق قبل المراجعة (Sandbox). استعمل الربط المباشر من الصفحة الرئيسية.';
+  const main = document.getElementById('back') || document.createElement('a');
+  main.href = 'https://mohamedazzouz1662001-bit.github.io/azzouz.com/azzouz-ai.html?p=hunter&tk=1';
+  main.style.display = 'inline-block';
+  if (!main.id) { main.id = 'back'; main.className = 'b g'; main.textContent = '↩ رجع للربط المباشر'; document.body.appendChild(main); }
+  return;
 }
 
 async function finish(code, err){
