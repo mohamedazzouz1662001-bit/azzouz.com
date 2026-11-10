@@ -8,7 +8,7 @@
  * authorized AZZOUZ backend/provider endpoint. Collection is always user-confirmed.
  */
 
-export const BOXHUNTER_VERSION = '21.0.0';
+export const BOXHUNTER_VERSION = '21.2.0';
 
 const STORE = {
   boxes: 'bh-boxes', logs: 'bh-logs', settings: 'bh-settings',
@@ -20,7 +20,7 @@ const STORE = {
 const REGISTERED_REDIRECT = 'https://mohamedazzouz1662001-bit.github.io/azzouz.com/azzouz-ai.html';
 const DEFAULTS = {
   on: true, silent: true, notify: false, ttl: 15, pollSeconds: 45,
-  radarEndpoint: '', authEndpoint: '', clientKey: '',
+  radarEndpoint: '', authEndpoint: 'https://superagent-1906c8e6.base44.app/functions/tiktokAuth', clientKey: 'awga3m8eepkt0ikr',
   kinds: { treasure: true, live: true }, lang: 'ar', maxBoxes: 400
 };
 const AUTH_URL = 'https://www.tiktok.com/v2/auth/authorize/';
