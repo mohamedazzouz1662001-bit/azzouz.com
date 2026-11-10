@@ -1,459 +1,496 @@
-/* boxhunter.mjs — TikTok Box Hunter داخل AZZOUZ AI
-   ملاحظة صريحة: TikTok ما كتوفرش API عمومي لصناديق LIVE ولا جمع العملات.
-   لهذا: الاكتشاف مساعد (رابط/بث + فحص الكلمات)، والجمع كيتم بفتح البث بيد المستخدم.
-*/
+/*
+ * TikTok Box Hunter PRO v21 — AZZOUZ AI
+ * Browser ES module. Backward-compatible exports: render, startWatcher, stopWatcher,
+ * tkToken, tkStatus, tkConnect, tkDisconnect, tkFinish.
+ *
+ * IMPORTANT: TikTok does not expose a general public LIVE reward-box discovery or
+ * collection API. Radar therefore consumes only an explicitly configured,
+ * authorized AZZOUZ backend/provider endpoint. Collection is always user-confirmed.
+ */
 
-const K = { b: 'bh-boxes', l: 'bh-logs', s: 'bh-settings' };
-const DEF = { on: true, silent: true, notify: false, ttl: 15, kinds: { treasure: true, live: true }, lang: 'ar' };
+export const BOXHUNTER_VERSION = '21.0.0';
 
-function rd(k, d) { try { return JSON.parse(localStorage.getItem(k) || 'null') ?? d; } catch (e) { return d; } }
-function wr(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
-const boxes = () => rd(K.b, []);
-const logs = () => rd(K.l, []);
-const setts = () => ({ ...DEF, ...rd(K.s, {}) });
-
-function logIt(kind, text) {
-  const L = logs(); L.unshift({ at: Date.now(), kind, text }); wr(K.l, L.slice(0, 300));
-}
-function esc(s) { return String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
-function fmt(ms) {
-  if (ms <= 0) return 'سالا';
-  const m = Math.floor(ms / 60000), s = Math.floor((ms % 60000) / 1000);
-  return m + 'د ' + String(s).padStart(2, '0') + 'ث';
-}
-
-function msg(t) {
-  const w = document.querySelector('#paneHunter .bh-wrap');
-  if (!w) return;
-  let d = document.getElementById('bh-msg');
-  if (!d) { d = document.createElement('div'); d.id = 'bh-msg'; d.className = 'bh-toast'; w.appendChild(d); }
-  d.textContent = String(t);
-  clearTimeout(d._t); d._t = setTimeout(() => d.remove(), 7000);
-}
-function need(text) {
-  const n = rd('bh-need', { n: 0 });
-  wr('bh-need', { n: (n.n || 0) + 1, text, at: Date.now() });
-}
-function notify(title, body) {
-  const st = setts();
-  if (st.silent) { logIt('quiet', title + ' — ' + body); need(title); return; }
-  if (st.notify && 'Notification' in window && Notification.permission === 'granted') {
-    try { new Notification(title, { body, icon: 'icon.svg' }); } catch (e) {}
-  }
-  const host = document.getElementById('bh-toast');
-  if (host) {
-    const d = document.createElement('div');
-    d.className = 'bh-toast';
-    d.textContent = title + ' — ' + body;
-    host.appendChild(d);
-    setTimeout(() => d.remove(), 6000);
-  }
-}
-
-async function probe(url) {
-  try {
-    const r = await fetch('https://r.jina.ai/' + url, { signal: AbortSignal.timeout(14000) });
-    const t = await r.text();
-    const hit = /(treasure\s*box|صندوق|كلوفر|clover|gift\s*box|مكافأة|reward)/i.test(t);
-    return { ok: true, treasure: hit, size: t.length };
-  } catch (e) { return { ok: false, treasure: false, size: 0 }; }
-}
-
-function addBox({ host, url, ttl }) {
-  const st = setts();
-  const B = boxes();
-  const id = (url || host || '').toLowerCase().replace(/[^a-z0-9]+/g, '').slice(-24) || 'b' + Date.now();
-  if (B.some(b => b.id === id && b.status === 'available')) return { dup: true };
-  const b = { id, host: host || 'بث', url: url || '', at: Date.now(), ttl: (ttl || st.ttl) * 60000, status: 'available', coins: 0, confirmed: false, tries: 0 };
-  B.unshift(b); wr(K.b, B.slice(0, 400));
-  logIt('detect', 'صندوق جديد: ' + (host || url));
-  notify('🎁 صندوق جديد', (host || 'بث') + ' — عندك ' + Math.round(b.ttl / 60000) + ' دقيقة');
-  return { box: b };
-}
-
-/* ===== Smart Radar ===== */
-function radarKeywords() { const st = setts(); return (st.radarKw || 'maroc,live').split(',').map(x => x.trim()).filter(Boolean); }
-async function tagPool(kw) {
-  try {
-    const r = await fetch('https://r.jina.ai/https://www.tiktok.com/tag/' + encodeURIComponent(kw.replace(/\s+/g, '')), { signal: AbortSignal.timeout(18000) });
-    const t = await r.text();
-    const m = t.match(/tiktok[.]com[/]@[A-Za-z0-9_.]{2,24}/g) || [];
-    return Array.from(new Set(m.map(x => x.split('@')[1]))).slice(0, 40);
-  } catch (e) { return []; }
-}
-async function checkLive(user) {
-  try {
-    const r = await fetch('https://r.jina.ai/https://www.tiktok.com/@' + user + '/live', { signal: AbortSignal.timeout(15000) });
-    const t = await r.text();
-    return { live: !/No LIVE/i.test(t), boxHint: /(treasure|صندوق|كلوفر|clover|gift box)/i.test(t) };
-  } catch (e) { return { live: false, boxHint: false }; }
-}
+const STORE = {
+  boxes: 'bh-boxes', logs: 'bh-logs', settings: 'bh-settings',
+  needs: 'bh-need', auth: 'bh-tk-session', verifier: 'bh-tk-verifier',
+  state: 'bh-tk-state', redirect: 'bh-tk-redirect', returnQuery: 'bh-tk-return-query',
+  manual: 'bh-tk-manual'
+};
+// الـRedirect المسجل بالحرف فبوابة TikTok
+const REGISTERED_REDIRECT = 'https://mohamedazzouz1662001-bit.github.io/azzouz.com/azzouz-ai.html';
+const DEFAULTS = {
+  on: true, silent: true, notify: false, ttl: 15, pollSeconds: 45,
+  radarEndpoint: '', authEndpoint: '', clientKey: '',
+  kinds: { treasure: true, live: true }, lang: 'ar', maxBoxes: 400
+};
+const AUTH_URL = 'https://www.tiktok.com/v2/auth/authorize/';
+let TIMER = null;
 let RADAR_BUSY = false;
-async function radarCycle() {
-  const st = setts();
-  if (!st.radar || RADAR_BUSY) return;
-  RADAR_BUSY = true;
+let ROOT = null;
+let LAST_RADAR_AT = 0;
+
+const read = (key, fallback) => {
+  try { const value = JSON.parse(localStorage.getItem(key) || 'null'); return value ?? fallback; }
+  catch { return fallback; }
+};
+const write = (key, value) => { try { localStorage.setItem(key, JSON.stringify(value)); return true; } catch { return false; } };
+const getBoxes = () => { const value = read(STORE.boxes, []); return Array.isArray(value) ? value : []; };
+const getLogs = () => { const value = read(STORE.logs, []); return Array.isArray(value) ? value : []; };
+const settings = () => ({ ...DEFAULTS, ...read(STORE.settings, {}), kinds: { ...DEFAULTS.kinds, ...(read(STORE.settings, {}).kinds || {}) } });
+const safeText = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+const fmt = ms => ms <= 0 ? 'انتهى' : `${Math.floor(ms / 60000)}د ${String(Math.floor(ms % 60000 / 1000)).padStart(2, '0')}ث`;
+const makeId = value => (String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, '').slice(-32) || `bh${Date.now()}${Math.random().toString(36).slice(2, 7)}`);
+
+function log(kind, message, meta = {}) {
+  const rows = getLogs(); rows.unshift({ at: Date.now(), kind, text: String(message), ...meta });
+  write(STORE.logs, rows.slice(0, 500));
+}
+function requestAttention(message) {
+  const old = read(STORE.needs, { n: 0 });
+  write(STORE.needs, { n: (old.n || 0) + 1, text: String(message), at: Date.now() });
+}
+function toast(message) {
+  const host = ROOT?.querySelector('#bh-toast');
+  if (!host) return;
+  host.textContent = String(message);
+  host.classList.add('show');
+  clearTimeout(host._timer);
+  host._timer = setTimeout(() => host.classList.remove('show'), 6500);
+}
+function announce(title, body) {
+  const s = settings();
+  if (s.silent) { log('silent', `${title} — ${body}`); requestAttention(title); return; }
+  if (s.notify && 'Notification' in window && Notification.permission === 'granted') {
+    try { new Notification(title, { body }); } catch { /* browser notification unavailable */ }
+  }
+  toast(`${title} — ${body}`);
+}
+function validEndpoint(raw) {
+  if (!raw) return '';
   try {
-    const seen = rd('bh-radar-seen', {});
-    for (const kw of radarKeywords().slice(0, 2)) {
-      const pool = await tagPool(kw);
-      const fresh = pool.filter(u => !seen[u]).slice(0, 4);
-      for (const u of fresh) {
-        seen[u] = Date.now();
-        const r = await checkLive(u);
-        if (r.live) { addBox({ host: '@' + u, url: 'https://www.tiktok.com/@' + u + '/live', ttl: st.ttl }); logIt('radar', 'بث مباشر: @' + u + (r.boxHint ? ' · إشارة صندوق' : '')); }
-      }
+    const u = new URL(raw, location.href);
+    if (u.protocol !== 'https:' && !(u.protocol === 'http:' && ['localhost', '127.0.0.1'].includes(u.hostname))) return '';
+    return u.href;
+  } catch { return ''; }
+}
+function makeTikTokUrl(raw) {
+  const value = String(raw || '').trim();
+  let url;
+  if (/^@?[\w.]{2,24}$/.test(value)) {
+    const username = value.replace(/^@/, '');
+    return `https://www.tiktok.com/@${username}/live`;
+  }
+  try { url = new URL(value); } catch { return ''; }
+  if (url.protocol !== 'https:' || !['tiktok.com', 'www.tiktok.com'].includes(url.hostname.toLowerCase())) return '';
+  const match = url.pathname.match(/^\/@([\w.]{2,24})(?:\/live)?\/?$/i);
+  if (!match) return '';
+  return `https://www.tiktok.com/@${match[1]}/live`;
+}
+function hostFrom(raw) {
+  const m = String(raw || '').match(/@([\w.]+)/);
+  return m?.[1] || String(raw || '').replace(/^https?:\/\//, '').slice(0, 80) || 'TikTok LIVE';
+}
+
+function saveBox(box) {
+  const all = getBoxes();
+  const existing = all.find(x => (x.id === box.id || x.url === box.url) && ['candidate', 'available'].includes(x.status));
+  if (existing) return { duplicate: true, box: existing };
+  all.unshift(box);
+  if (!write(STORE.boxes, all.slice(0, Math.max(50, Number(settings().maxBoxes) || 400)))) {
+    return { error: 'تعذر حفظ البيانات محلياً؛ تحقق من مساحة التخزين وإعدادات المتصفح.' };
+  }
+  return { duplicate: false, box };
+}
+function addManual({ host, url, ttl }) {
+  const id = makeId(url || host);
+  const result = saveBox({ id, host: host || 'بث TikTok', url, at: Date.now(), ttl: Math.min(180, Math.max(1, Number(ttl) || settings().ttl)) * 60000,
+    status: 'available', source: 'manual', evidence: 'أضيف يدوياً', coins: 0, confirmed: false, tries: 0 });
+  if (!result.duplicate) { log('manual', `تمت إضافة ${result.box.host}`); announce('📡 بث مضاف', result.box.host); }
+  return result;
+}
+
+function expireAndWarn() {
+  const s = settings(); if (!s.on) return;
+  const all = getBoxes(); let changed = false;
+  for (const b of all) {
+    if (!['candidate', 'available'].includes(b.status)) continue;
+    const left = Number(b.at) + Number(b.ttl) - Date.now();
+    if (left <= 0) {
+      const wasCandidate = b.status === 'candidate';
+      b.status = 'expired'; changed = true;
+      log('expire', `${wasCandidate ? 'انتهت صلاحية المرشح' : 'انتهى وقت'}: ${b.host}`);
+      if (!wasCandidate) announce('⌛ انتهى الوقت', b.host);
+    } else if (b.status === 'available' && left <= 180000 && !b.warned) {
+      b.warned = true; changed = true;
+      log('warning', `باقي أقل من 3 دقائق: ${b.host}`);
+      announce('⏳ اقترب الانتهاء', `${b.host} — ${fmt(left)}`);
     }
-    wr('bh-radar-seen', seen);
-  } catch (e) { logIt('radar', 'خطأ فالرادار: ' + e.message); }
-  RADAR_BUSY = false;
-}
-
-function tick() {
-  const st0 = setts();
-  if (!st0.on) return;
-  const B = boxes(); let changed = false;
-  B.forEach(b => {
-    if (b.status !== 'available') return;
-    const left = b.at + b.ttl - Date.now();
-    if (left <= 0) { b.status = 'expired'; changed = true; logIt('expire', 'انتهى صندوق ' + b.host); notify('⌛ صندوق سالا', b.host); }
-    else if (left < 180000 && !b.warned) { b.warned = true; changed = true; logIt('warn', 'قرب يسالي: ' + b.host); notify('⏳ قرب يسالي', b.host + ' — ' + fmt(left)); }
-  });
-  if (changed) wr(K.b, B);
-}
-
-function collect(id, mode) {
-  const B = boxes(); const b = B.find(x => x.id === id); if (!b) return;
-  const st = setts();
-  if (mode === 'open') {
-    b.tries = (b.tries || 0) + 1; b.lastTry = Date.now(); wr(K.b, B);
-    logIt('open', 'تحل البث باش تجمع بيدك: ' + b.host);
-    if (!st.autoNote) { /* auto غير متاح رسميا */ }
-    notify('↗️ تحل البث', 'جمع المكافأة كيتم بيدك حيت TikTok ما كتسمحش بالجمع الآلي');
-    if (b.url && mode === 'open' && !setts().silent) window.open(b.url, '_blank', 'noopener');
-    if (b.url && mode === 'open' && setts().silent) msg('🔇 الهدوء شاعل: الرابط واجد، حلّو بيدك ملي تفرغ. ' + b.url);
-    return;
   }
-  if (mode === 'done') {
-    const v = prompt('شحال ديال العملات ولا المكافآت تأكدو؟ (رقم)', '0');
-    const coins = Math.max(0, parseInt(String(v || '0').replace(/[^\d]/g, ''), 10) || 0);
-    b.status = 'collected'; b.coins = coins; b.confirmed = coins > 0; b.doneAt = Date.now();
-    wr(K.b, B); logIt('collect', 'تسجل جمع: ' + b.host + ' — ' + coins + ' عملة');
-    notify('✅ تسجل الجمع', b.host + (coins ? ' — ' + coins + ' عملة مؤكدة' : ' — بلا رقم مؤكد'));
-    return;
-  }
-  if (mode === 'fail') {
-    b.status = 'expired'; b.failed = true; wr(K.b, B);
-    logIt('fail', 'فشل الجمع: ' + b.host); notify('⚠️ فشل الجمع', b.host);
-  }
+  if (changed) write(STORE.boxes, all);
 }
 
-
-/* ===== ربط حساب TikTok رسميا (Login Kit + PKCE) ===== */
-const TK = { key: 'bh-tk-client', tok: 'bh-tk-token', ver: 'bh-tk-ver', user: 'bh-tk-user' };
-const TK_API = 'https://superagent-1906c8e6.base44.app/functions/tiktokAuth';
-export function tkToken() { try { const t = JSON.parse(localStorage.getItem(TK.tok) || 'null'); return t && t.access_token ? t : null; } catch (e) { return null; } }
-export function tkUser() { return (localStorage.getItem(TK.user) || '').replace(/^@+/, '').trim(); }
-export function tkSetUser(u) {
-  const v = String(u || '').replace(/^@+/, '').replace(/[^A-Za-z0-9._]/g, '').trim();
-  if (!v) { localStorage.removeItem(TK.user); return false; }
-  localStorage.setItem(TK.user, v); return true;
+// Radar API contract: GET configured endpoint; optional ?q=...&limit=50.
+// JSON: { streams: [{ id?, host, url, live:true, rewardSignal:true, evidence?, ttlMinutes? }] }
+// A stream is only surfaced as a candidate; the user must confirm it before countdown.
+export async function radarSearch(query = '') {
+  const endpoint = validEndpoint(settings().radarEndpoint);
+  if (!endpoint) throw new Error('خاصك تضبط رابط Radar API ديال AZZOUZ backend أولاً.');
+  const u = new URL(endpoint);
+  if (query) u.searchParams.set('q', String(query).slice(0, 120));
+  u.searchParams.set('limit', '50');
+  const response = await fetch(u.href, { method: 'GET', credentials: 'include', headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(15000) });
+  if (!response.ok) throw new Error(`Radar API رجع HTTP ${response.status}`);
+  const data = await response.json();
+  const streams = data?.streams;
+  if (!Array.isArray(streams)) throw new Error('صيغة Radar API غير صحيحة: خاص streams[].');
+  let added = 0;
+  for (const item of streams.slice(0, 100)) {
+    if (!item || item.live !== true || item.rewardSignal !== true) continue;
+    const url = makeTikTokUrl(item.url || (item.host ? `@${item.host}` : ''));
+    if (!url || typeof item.id !== 'string' || !item.id.trim() || typeof item.evidence !== 'string' || !item.evidence.trim()) continue;
+    const host = String(item.host || hostFrom(url)).slice(0, 80);
+    const id = makeId(item.id);
+    const result = saveBox({ id, host, url, at: Date.now(), ttl: Math.min(180, Math.max(1, Number(item.ttlMinutes) || settings().ttl)) * 60000,
+      status: 'candidate', source: 'authorized-radar', evidence: item.evidence.slice(0, 300), coins: 0, confirmed: false, tries: 0 });
+    if (result.error) throw new Error(result.error);
+    if (result.error) throw new Error(result.error);
+    if (!result.duplicate) { added++; log('candidate', `مرشح صندوق: ${host}`, { evidence: result.box.evidence }); }
+  }
+  LAST_RADAR_AT = Date.now();
+  log('radar', `اكتمل البحث؛ نتائج جديدة: ${added}`);
+  if (added) announce('🎁 مرشحو مكافآت', `تم العثور على ${added} بث/بثوث تحتاج التأكيد`);
+  return { received: streams.length, added };
+}
+async function radarPoll() {
+  const s = settings();
+  if (!s.on || RADAR_BUSY || !validEndpoint(s.radarEndpoint)) return;
+  RADAR_BUSY = true;
+  try { await radarSearch(''); }
+  catch (error) { log('radar-error', error.message); }
+  finally { RADAR_BUSY = false; }
 }
 
+export function confirmCandidate(id) {
+  const all = getBoxes(); const box = all.find(x => x.id === id && x.status === 'candidate');
+  if (!box || Number(box.at) + Number(box.ttl) <= Date.now()) return false;
+  box.status = 'available'; box.at = Date.now(); box.ttl = Math.min(180, Math.max(1, Number(box.ttl) / 60000 || settings().ttl)) * 60000;
+  box.confirmedByUser = true; write(STORE.boxes, all);
+  log('confirmed', `تم تأكيد المرشح يدوياً: ${box.host}`); announce('⏱️ بدأ العد التنازلي', box.host);
+  render(ROOT); return true;
+}
+export function markCollected(id, coins = 0) {
+  const all = getBoxes(); const box = all.find(x => x.id === id && x.status === 'available'); if (!box) return false;
+  const amount = Math.max(0, Math.floor(Number(coins) || 0));
+  box.status = 'collected'; box.coins = amount; box.confirmed = amount > 0; box.doneAt = Date.now();
+  write(STORE.boxes, all); log('collected', `تسجيل جمع يدوي: ${box.host} — ${amount} عملة`);
+  announce('✅ تم تسجيل الجمع', `${box.host}${amount ? ` — ${amount} عملة` : ''}`); render(ROOT); return true;
+}
+export function openLive(id) {
+  const box = getBoxes().find(x => x.id === id && x.status === 'available'); if (!box?.url) return false;
+  box.tries = (box.tries || 0) + 1; box.lastTry = Date.now();
+  const all = getBoxes(); const index = all.findIndex(x => x.id === id); if (index >= 0) all[index] = box;
+  write(STORE.boxes, all); log('open', `فتح البث يدوياً: ${box.host}`);
+  // Explicit click opens a new tab; never auto-open tabs from background polling.
+  window.open(box.url, '_blank', 'noopener,noreferrer'); return true;
+}
+export function markFailed(id) {
+  const all = getBoxes(); const box = all.find(x => x.id === id && ['candidate', 'available'].includes(x.status)); if (!box) return false;
+  box.status = 'expired'; box.failed = true; write(STORE.boxes, all);
+  log('failed', `تعذر الجمع: ${box.host}`); render(ROOT); return true;
+}
+
+/* TikTok OAuth 2.0 + PKCE.
+ * The backend must exchange the code, validate redirect_uri/verifier, keep secrets server-side,
+ * and set an HttpOnly Secure SameSite cookie. The browser never stores access_token.
+ */
+function randomUrlSafe(bytes = 32) {
+  const data = crypto.getRandomValues(new Uint8Array(bytes));
+  return btoa(String.fromCharCode(...data)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+async function pkceChallenge(verifier) {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier));
+  return btoa(String.fromCharCode(...new Uint8Array(digest))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+export function tkUser() { return String(read(STORE.manual, '') || '').replace(/^@+/, '').trim(); }
+export function tkSetUser(value) {
+  const u = String(value || '').replace(/^@+/, '').replace(/[^A-Za-z0-9._]/g, '').trim();
+  if (!u) { try { localStorage.removeItem(STORE.manual); } catch {} return ''; }
+  write(STORE.manual, u); return u;
+}
+export function tkToken() {
+  // Legacy API name retained for compatibility. This is connection metadata only,
+  // never an OAuth access/refresh token.
+  return read(STORE.auth, null);
+}
 export function tkStatus() {
-  const ck = localStorage.getItem(TK.key); const t = tkToken();
-  if (t) return { state: 'linked', label: 'مربوط رسميا', key: ck };
-  if (ck) return { state: 'half', label: 'التطبيق مسجل، الحساب ماشي مربوط', key: ck };
-  return { state: 'none', label: 'ماشي مربوط رسميا', key: '' };
+  const session = tkToken();
+  if (session?.connected) return {
+    state: 'linked',
+    label: 'آخر ربط ناجح؛ جلسة الخادم هي المرجع',
+    profile: session.profile || null
+  };
+  const manual = tkUser();
+  if (manual) return { state: 'linked', label: `@${manual} مربوط يدويا (بلا OAuth)`, profile: { username: manual }, manual: true };
+  const key = settings().clientKey;
+  return { state: key ? 'configured' : 'none', label: key ? 'Client Key مضبوط؛ الحساب غير مربوط' : 'مازال ما تضبطش الربط' };
 }
-const TK_DEFAULT = 'awga3m8eepkt0ikr';
-export function tkClientKey() {
+function authTempGet(key) {
+  try { return sessionStorage.getItem(key); } catch { return localStorage.getItem(key); }
+}
+function authTempSet(key, value) {
+  try { sessionStorage.setItem(key, value); } catch { localStorage.setItem(key, value); }
+}
+function authTempRemove(key) {
+  try { sessionStorage.removeItem(key); } catch {}
+  try { localStorage.removeItem(key); } catch {}
+}
+function cleanOAuthParams(returnTo = '') {
   try {
-    const fromUrl = new URLSearchParams(location.search).get('ck') || '';
-    if (fromUrl) { const u = fromUrl.replace(/[^A-Za-z0-9]/g, ''); if (/^aw/i.test(u) && u.length >= 12) { localStorage.setItem(TK.key, u); } }
-  } catch (e) {}
-  const raw = (localStorage.getItem(TK.key) || '').replace(/[^A-Za-z0-9]/g, '');
-  const ok = raw.length >= 12 && raw.length <= 24 && /^aw/i.test(raw);
-  if (raw && !ok) { try { localStorage.removeItem(TK.key); } catch (e) {} }
-  return ok ? raw : TK_DEFAULT;
+    const current = new URL(location.href);
+    current.searchParams.delete('code');
+    current.searchParams.delete('state');
+    current.searchParams.delete('error');
+    current.searchParams.delete('error_description');
+    const preserved = returnTo ? new URL(returnTo, location.origin) : current;
+    // Keep the original app deep-link query (for example p=hunter), never OAuth credentials.
+    const target = `${preserved.pathname}${preserved.search}${preserved.hash}`;
+    history.replaceState({}, document.title, target);
+  } catch {}
 }
-export function tkSetClientKey(v) {
-  const k = String(v || '').replace(/\s+/g, '');
-  if (!k) { localStorage.removeItem(TK.key); return { ok: false, why: 'فارغ' }; }
-  if (/^\d{12,}$/.test(k)) return { ok: false, why: 'هادا App ID (أرقام فقط). Client Key كيبدا غالبا بـ aw وفيه حروف وأرقام.' };
-  if (k.length < 10 || k.length > 40) return { ok: false, why: 'الطول ماشي صحيح' };
-  localStorage.setItem(TK.key, k);
-  return { ok: true };
+function clearOAuthTemp() {
+  authTempRemove(STORE.verifier);
+  authTempRemove(STORE.state);
+  authTempRemove(STORE.redirect);
+  authTempRemove(STORE.returnQuery);
 }
 export async function tkConnect() {
-  const ck = tkClientKey();
-  if (!ck) { msg('دخل Client Key ديال تطبيقك الأول فالخانة اللي فوق، ومن بعد اضغط ربط.'); return false; }
-  const ver = Array.from(crypto.getRandomValues(new Uint8Array(32))).map(b => b.toString(16).padStart(2, '0')).join('');
-  localStorage.setItem(TK.ver, ver);
-  const d = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(ver));
-  const ch = btoa(String.fromCharCode(...new Uint8Array(d))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-  const redirect = location.origin + location.pathname;
-  localStorage.setItem('bh-tk-redirect', redirect);
-  location.href = 'https://www.tiktok.com/v2/auth/authorize/?client_key=' + encodeURIComponent(ck) +
-    '&scope=user.info.basic&response_type=code&redirect_uri=' + encodeURIComponent(redirect) +
-    '&state=azzouz&code_challenge=' + ch + '&code_challenge_method=S256';
-  return true;
+  const s = settings(); const clientKey = String(s.clientKey || '').trim();
+  if (!clientKey) throw new Error('دخل TikTok Client Key في إعدادات Box Hunter.');
+  if (!validEndpoint(s.authEndpoint)) throw new Error('ضبط OAuth backend endpoint أولاً.');
+  const verifier = randomUrlSafe(48);
+  const state = randomUrlSafe(24);
+  const challenge = await pkceChallenge(verifier);
+  const redirect = REGISTERED_REDIRECT;
+  authTempSet(STORE.verifier, verifier);
+  authTempSet(STORE.state, state);
+  authTempSet(STORE.redirect, redirect);
+  authTempSet(STORE.returnQuery, location.search || '');
+  const u = new URL(AUTH_URL);
+  u.search = new URLSearchParams({
+    client_key: clientKey,
+    scope: 'user.info.basic',
+    response_type: 'code',
+    redirect_uri: redirect,
+    state,
+    code_challenge: challenge,
+    code_challenge_method: 'S256'
+  }).toString();
+  location.assign(u.href);
 }
-export function tkDisconnect() {
-  localStorage.removeItem(TK.tok);
-  logIt('auth', 'تم فصل حساب TikTok');
+export async function tkDisconnect() {
+  write(STORE.auth, null);
+  clearOAuthTemp();
+  const endpoint = validEndpoint(settings().authEndpoint);
+  if (endpoint) {
+    try {
+      const response = await fetch(endpoint, { method: 'DELETE', credentials: 'include', headers: { Accept: 'application/json' } });
+      if (!response.ok && response.status !== 204) throw new Error(`HTTP ${response.status}`);
+      log('auth', 'تم فصل جلسة TikTok من الخادم.');
+    } catch (error) {
+      log('auth-error', `تعذر تأكيد فصل جلسة الخادم: ${error.message}`);
+      throw new Error('تم مسح حالة الربط محلياً، لكن تعذر تأكيد فصل جلسة الخادم.');
+    }
+  } else {
+    log('auth', 'تم مسح حالة الربط المحلية؛ لم يتم ضبط رابط الخادم لإبطال الجلسة.');
+  }
 }
 export async function tkFinish() {
-  const q = new URLSearchParams(location.search);
-  const err = q.get('error');
-  if (err) {
-    logIt('auth', 'TikTok رفض الربط: ' + err + ' ' + (q.get('error_description') || ''));
-    setTimeout(() => msg('TikTok رفض الربط: ' + err + '. تحقق من Client Key و Redirect URI فـ Login Kit.'), 1200);
-    history.replaceState({}, '', location.pathname);
+  const params = new URLSearchParams(location.search);
+  const code = params.get('code');
+  const oauthError = params.get('error');
+  if (oauthError) {
+    log('auth-error', `رفض TikTok تسجيل الدخول: ${String(oauthError).slice(0, 120)}`);
+    const returnQuery = authTempGet(STORE.returnQuery) || '';
+    cleanOAuthParams(`${location.pathname}${returnQuery}`);
+    clearOAuthTemp();
     return false;
   }
-  const code = q.get('code'); if (!code) return false;
-  try {
-    const r = await fetch(TK_API, { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code, code_verifier: localStorage.getItem(TK.ver) || '', redirect_uri: localStorage.getItem('bh-tk-redirect') || location.origin + location.pathname }) });
-    const j = await r.json();
-    if (j && j.access_token) {
-      let me = null;
-      try {
-        const u = await fetch('https://open.tiktokapis.com/v2/user/info/?fields=open_id,display_name,avatar_url', { headers: { Authorization: 'Bearer ' + j.access_token } });
-        const uj = await u.json();
-        me = uj?.data?.user || null;
-      } catch (e) {}
-      localStorage.setItem(TK.tok, JSON.stringify({ ...j, me, at: Date.now() }));
-      logIt('auth', 'تسجل الدخول لـ TikTok' + (me && me.display_name ? ' (' + me.display_name + ')' : ''));
-      history.replaceState({}, '', location.pathname);
-      return true;
-    }
-    logIt('auth', 'فشل الربط: ' + (j && (j.error_description || j.error) || 'خطأ'));
-  } catch (e) {}
-  return false;
-}
+  if (!code) return false;
 
-export async function tkRefresh() {
-  const t = tkToken();
-  if (!t || !t.refresh_token) return false;
-  const age = (Date.now() - (t.at || 0)) / 1000;
-  if (age < (t.expires_in || 86400) - 600) return true;
+  const returnedState = params.get('state');
+  const expectedState = authTempGet(STORE.state);
+  const verifier = authTempGet(STORE.verifier);
+  const redirect = authTempGet(STORE.redirect);
+  const returnQuery = authTempGet(STORE.returnQuery) || '';
+
+  if (!returnedState || !expectedState || returnedState !== expectedState || !verifier || !redirect) {
+    log('auth-error', 'رفض OAuth: state/verifier غير صالح.');
+    cleanOAuthParams(`${location.pathname}${returnQuery}`);
+    clearOAuthTemp();
+    return false;
+  }
+
+  const endpoint = validEndpoint(settings().authEndpoint);
+  if (!endpoint) {
+    log('auth-error', 'OAuth backend endpoint غير مضبوط.');
+    cleanOAuthParams(`${location.pathname}${returnQuery}`);
+    clearOAuthTemp();
+    return false;
+  }
+
   try {
-    const r = await fetch('https://open.tiktokapis.com/v2/oauth/token/', {
-      method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({ client_key: tkClientKey(), grant_type: 'refresh_token', refresh_token: t.refresh_token })
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({
+        action: 'exchange',
+        code,
+        code_verifier: verifier,
+        redirect_uri: redirect,
+        state: returnedState
+      })
     });
-    const j = await r.json();
-    if (j && j.access_token) {
-      localStorage.setItem(TK.tok, JSON.stringify({ ...t, ...j, at: Date.now() }));
-      logIt('auth', 'تجدد التوكن');
-      return true;
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok || result.connected !== true) {
+      throw new Error(result.error_description || result.error || `HTTP ${response.status}`);
     }
-    logIt('auth', 'فشل تجديد التوكن: ' + (j.error_description || j.error || 'خطأ'));
-  } catch (e) {}
-  return false;
+    if (!write(STORE.auth, { connected: true, profile: result.profile || null, connectedAt: Date.now() })) {
+      throw new Error('تعذر حفظ حالة الربط محلياً.');
+    }
+    log('auth', 'نجح ربط TikTok؛ التوكن محفوظ في جلسة backend الآمنة.');
+    cleanOAuthParams(`${location.pathname}${returnQuery}`);
+    clearOAuthTemp();
+    return true;
+  } catch (error) {
+    log('auth-error', `فشل OAuth: ${String(error.message || 'خطأ غير معروف').slice(0, 200)}`);
+    cleanOAuthParams(`${location.pathname}${returnQuery}`);
+    clearOAuthTemp();
+    return false;
+  }
 }
 
-export const BHV = 'v16';
+function card(box, now) {
+  const left = box.at + box.ttl - now;
+  const status = box.status === 'candidate' ? '<span class="bh-warn">● مرشح يحتاج التأكيد</span>' : box.status === 'available' ? '<span class="bh-live">● مؤكد / متاح</span>' : '';
+  const controls = box.status === 'candidate'
+    ? `<button class="bh-b" data-confirm="${safeText(box.id)}">تأكيد الصندوق وبدء العد</button>`
+    : `<button class="bh-b" data-open="${safeText(box.id)}">فتح البث</button><button class="bh-b g" data-done="${safeText(box.id)}">تسجيل الجمع</button><button class="bh-b r" data-fail="${safeText(box.id)}">فشل</button>`;
+  return `<article class="bh-row"><b>${safeText(box.host)}</b> ${status}<div class="bh-t">${box.status === 'candidate' ? 'الدليل: ' + safeText(box.evidence || 'إشارة رصد') : 'الوقت المتبقي: ' + fmt(left)} · ${safeText(box.source || '')}</div>${controls}</article>`;
+}
+
 export function render(root) {
   if (!root) return;
+  ROOT = root;
   if (!document.getElementById('bh-style')) {
-    const s = document.createElement('style'); s.id = 'bh-style';
-    s.textContent = `
-    #paneHunter{--bh1:#0a0710;--bh2:#140b22;--pp:#a06bff;--bl:#4cc2ff}
-    .bh-wrap{background:linear-gradient(160deg,#0a0710,#140b22 60%,#0b1220);border-radius:14px;padding:12px;color:#e9e4ff}
-    .bh-hd{display:flex;align-items:center;gap:8px;margin-bottom:8px}
-    .bh-hd b{font-size:15px;background:linear-gradient(90deg,#a06bff,#4cc2ff);-webkit-background-clip:text;background-clip:text;color:transparent}
-    .bh-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:8px 0}
-    .bh-c{background:#170f26;border:1px solid #2a1d42;border-radius:10px;padding:7px}
-    .bh-c b{display:block;font-size:16px;color:#c9b3ff}.bh-c span{font-size:10.5px;color:#9d93b8}
-    .bh-in{width:100%;background:#120d1d;border:1px solid #2a1d42;color:#e9e4ff;border-radius:9px;padding:8px;font-family:inherit;font-size:12.5px}
-    .bh-b{background:linear-gradient(90deg,#7a3cff,#2f9bff);color:#fff;border:0;border-radius:9px;padding:8px 11px;font-size:12px;font-family:inherit;cursor:pointer;margin:3px 3px 0 0}
-    .bh-b.g{background:#1c1430;border:1px solid #3a2a5e;color:#cfc2f5}
-    .bh-b.r{background:#2a1020;border:1px solid #5a2340;color:#ffb3cf}
-    .bh-row{background:#150f22;border:1px solid #2a1d42;border-radius:10px;padding:8px;margin-top:6px}
-    .bh-row b{font-size:12.5px}.bh-t{font-size:11px;color:#9d93b8}
-    .bh-live{color:#59f2b2}.bh-warn{color:#ffd166}.bh-dead{color:#ff7b7b}
-    .bh-toast{background:#1d1330;border:1px solid #a06bff;padding:7px 9px;border-radius:8px;font-size:11.5px;margin-top:5px}
-    .bh-lg{max-height:150px;overflow:auto;font-size:11px;color:#a99fc4}
+    const style = document.createElement('style'); style.id = 'bh-style';
+    style.textContent = `
+      .bh-wrap{background:linear-gradient(155deg,#0a0710,#171027 62%,#0b1724);border:1px solid #30234a;border-radius:15px;padding:13px;color:#eee8ff;font:13px/1.5 system-ui,sans-serif}
+      .bh-hd{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}.bh-hd b{font-size:16px;color:#c6a8ff}
+      .bh-t{font-size:11px;color:#a99fc4}.bh-row{background:#150f22;border:1px solid #302348;border-radius:10px;padding:9px;margin-top:7px}
+      .bh-actions{display:flex;gap:5px;flex-wrap:wrap;margin:8px 0}.bh-b{background:linear-gradient(90deg,#783cff,#238ee9);color:white;border:0;border-radius:8px;padding:8px 10px;font-size:12px;cursor:pointer;margin:3px 3px 0 0}
+      .bh-b.g{background:#211833;border:1px solid #493567;color:#ded2ff}.bh-b.r{background:#321625;border:1px solid #65334d;color:#ffc2d4}
+      .bh-in{box-sizing:border-box;width:100%;background:#100b19;border:1px solid #493567;color:#fff;border-radius:8px;padding:9px;margin:4px 0;font:inherit}
+      .bh-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:9px 0}.bh-stat{background:#1b1329;border:1px solid #302348;border-radius:9px;padding:8px}.bh-stat b{display:block;color:#cbb4ff;font-size:17px}.bh-stat span{font-size:10px;color:#a99fc4}
+      .bh-live{color:#59e8ad}.bh-warn{color:#ffd166}.bh-dead{color:#ff8181}.bh-toast{display:none;background:#291b3d;border:1px solid #a06bff;border-radius:8px;padding:8px;margin-top:7px}.bh-toast.show{display:block}
+      .bh-log{max-height:145px;overflow:auto;font-size:11px;color:#b8adce}.bh-section{font-weight:700;color:#d7c7ff;margin-top:12px}.bh-settings{display:grid;grid-template-columns:1fr;gap:4px}
+      @media(min-width:650px){.bh-settings{grid-template-columns:1fr 1fr}.bh-grid{grid-template-columns:repeat(6,minmax(0,1fr))}}
     `;
-    document.head.appendChild(s);
+    document.head.appendChild(style);
   }
-  const st = setts();
-  tick();
-  const B = boxes();
-  const now = Date.now();
-  const avail = B.filter(b => b.status === 'available' && b.at + b.ttl > now);
-  const done = B.filter(b => b.status === 'collected');
-  const expired = B.filter(b => b.status === 'expired');
-  const coins = done.reduce((s, b) => s + (b.confirmed ? b.coins || 0 : 0), 0);
-  const last = done.sort((a, b) => (b.doneAt || 0) - (a.doneAt || 0))[0];
-  avail.sort((a, b) => (a.at + a.ttl) - (b.at + b.ttl));
-
-  root.innerHTML = `
-  <div class="bh-wrap">
-    <div class="bh-hd"><b>🎁 TikTok Box Hunter</b><span class="bh-t">${st.silent ? '🔇 Silent Mode' : '🔔 عادي'}</span></div>
-    <div class="bh-row" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
-      <button class="bh-b g" id="bhSilent">${st.silent ? '🔊 حيد الهدوء' : '🔇 شغل الهدوء'}</button>
-      <button class="bh-b g" id="bhOn">${st.on ? '⏸ وقف المراقبة' : '▶ شغل المراقبة'}</button>
-      <button class="bh-b r" id="bhStop">⏹ وقف فوري</button>
-      ${tkToken() ? '<button class="bh-b g" id="bhTkOut">🔓 فصل حساب TikTok</button>' : '<button class="bh-b" id="bhTkIn">🔗 ربط حساب TikTok</button>'}
+  expireAndWarn();
+  const s = settings(); const all = getBoxes(); const now = Date.now();
+  const candidates = all.filter(x => x.status === 'candidate');
+  const available = all.filter(x => x.status === 'available' && x.at + x.ttl > now).sort((a,b) => a.at+a.ttl-b.at-b.ttl);
+  const done = all.filter(x => x.status === 'collected'); const expired = all.filter(x => x.status === 'expired');
+  const coins = done.reduce((sum, x) => sum + (x.confirmed ? Number(x.coins || 0) : 0), 0);
+  const auth = tkStatus(); const need = read(STORE.needs, { n: 0 });
+  root.innerHTML = `<div class="bh-wrap">
+    <div class="bh-hd"><b>🎁 TikTok Box Hunter PRO v21</b><span class="bh-t">${s.silent ? '🔇 Silent Mode' : '🔔 الإشعارات العادية'} · ${s.on ? 'المراقبة مفعلة' : 'المراقبة متوقفة'}</span></div>
+    <div class="bh-actions">
+      <button class="bh-b g" id="bhSilent">${s.silent ? 'تشغيل الإشعارات' : 'تفعيل الهدوء'}</button>
+      <button class="bh-b g" id="bhToggle">${s.on ? 'إيقاف المراقبة' : 'تشغيل المراقبة'}</button>
+      <button class="bh-b r" id="bhStop">إيقاف فوري</button>
+      <button class="bh-b" id="bhRadar">🔎 ابحث الآن</button>
+      <button class="bh-b g" id="bhNotify">${s.notify ? 'الإشعارات مفعلة' : 'تفعيل إشعارات الجهاز'}</button>
+      <button class="bh-b g" id="bhAuth">${auth.state === 'linked' ? 'الحساب مربوط' : 'ربط TikTok'}</button>
+      ${auth.state === 'linked' ? '<button class="bh-b r" id="bhUnlink">فصل الحساب</button>' : ''}
     </div>
-    <div class="bh-row" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:6px">
-      <input id="bhCk" placeholder="Client Key (من Basic information)" value="${esc(tkClientKey())}" style="flex:1;min-width:160px" autocomplete="off">
-      <button class="bh-b g" id="bhCkSave">💾 حفظ</button>
-      <button class="bh-b g" id="bhCkClear">🗑 مسح</button>
+    <div class="bh-actions">
+      <input class="bh-in" id="bhManualUser" value="${safeText(tkUser() || (new URLSearchParams(location.search).get('tk')||'').replace(/[@]/g,''))}" placeholder="اسم حساب TikTok بلا @" autocomplete="off" />
+      <button class="bh-b g" id="bhManualBind">💾 ربط يدوي</button>
+      ${tkUser() ? '<button class="bh-b r" id="bhManualClear">مسح الربط</button>' : ''}
     </div>
-    <div class="bh-row" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:6px">
-      <input id="bhUser" placeholder="اسم حساب TikTok @" value="${esc(tkUser())}" style="flex:1;min-width:120px">
-      <button class="bh-b g" id="bhUserSave">💾 ربط يدوي</button>
-      ${tkUser() ? '<a class="bh-b" href="https://www.tiktok.com/@' + esc(tkUser()) + '" target="_blank" rel="noopener">↗ الحساب</a>' : ''}
+    <div class="bh-t">حالة الحساب: ${safeText(auth.label)}. جمع المكافآت يتم يدوياً. آخر فحص: ${LAST_RADAR_AT ? new Date(LAST_RADAR_AT).toLocaleTimeString('ar-MA') : 'لم يبدأ بعد'}.</div>
+    <div class="bh-grid">
+      <div class="bh-stat"><b>${all.length}</b><span>إجمالي السجلات</span></div><div class="bh-stat"><b>${candidates.length}</b><span>مرشحو المكافآت</span></div><div class="bh-stat"><b>${available.length}</b><span>متاحة بعد التأكيد</span></div><div class="bh-stat"><b>${done.length}</b><span>تم جمعها</span></div><div class="bh-stat"><b>${coins}</b><span>عملات مؤكدة</span></div><div class="bh-stat"><b>${expired.length}</b><span>منتهية / فاشلة</span></div>
     </div>
-    <div class="bh-t">📌 المفتاح كيبدا بحروف وأرقام (بحال aw1234abcd)، وماشي App ID. كاين فـ Basic information ← Client key، والسر Client secret. ما كتحتاجش السر هنا، كيبقى فالسيرفر.</div>
-    <div class="bh-row" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:6px">
-      <button class="bh-b" id="bhRadar">${st.radar ? '🛰️ الرادار شاعل' : '🛰️ شغل الرادار'}</button>
-      <button class="bh-b g" id="bhRadarNow">🔍 فحص الآن</button>
-      <input id="bhKw" placeholder="كلمات: maroc, live" value="${esc((st.radarKw || 'maroc,live'))}" style="flex:1;min-width:120px">
-      <span class="bh-t">${RADAR_BUSY ? 'كيقلب…' : 'بحث مرحلي'}</span>
-      ${(() => { const n = rd('bh-need', { n: 0 }); return n.n ? '<span class="bh-t bh-warn">🔔 كتحتاج تدخلك: ' + n.n + '</span>' : '<span class="bh-t">ما كاين حتى تدخل مطلوب</span>'; })()}
+    <div class="bh-section">رادار البثوث</div>
+    <input class="bh-in" id="bhQuery" placeholder="بحث اختياري عن حساب أو كلمة مفتاحية" />
+    <div class="bh-t">الرادار يحتاج API endpoint موثوقاً من AZZOUZ backend؛ لا يتم فحص TikTok عبر مواقع وسيطة ولا اعتبار الكلمات دليلاً مؤكداً على وجود صندوق.</div>
+    <div class="bh-section">إضافة بث يدوياً</div>
+    <input class="bh-in" id="bhUrl" placeholder="رابط LIVE أو @اسم الحساب" />
+    <input class="bh-in" id="bhTtl" type="number" min="1" max="180" value="${Number(s.ttl)}" placeholder="مدة الصندوق بالدقائق" />
+    <button class="bh-b" id="bhAdd">إضافة البث</button>
+    <div class="bh-section">الإعدادات والربط</div>
+    <div class="bh-settings">
+      <label class="bh-t">TikTok Client Key<input class="bh-in" id="bhClientKey" value="${safeText(s.clientKey)}" autocomplete="off" /></label>
+      <label class="bh-t">OAuth Backend HTTPS URL<input class="bh-in" id="bhAuthEndpoint" value="${safeText(s.authEndpoint)}" placeholder="https://your-backend.example/auth" /></label>
+      <label class="bh-t">Radar Backend HTTPS URL<input class="bh-in" id="bhRadarEndpoint" value="${safeText(s.radarEndpoint)}" placeholder="https://your-backend.example/radar" /></label>
+      <label class="bh-t">مدة الفحص بالثواني<input class="bh-in" id="bhPoll" type="number" min="20" max="600" value="${Number(s.pollSeconds)}" /></label>
     </div>
-    <div class="bh-t">حالة الحساب: ${(() => { const t = tkToken(); if (!t) { const mu = tkUser(); return mu ? '<b>@' + esc(mu) + '</b> مربوط يدويا (بلا OAuth)' : '<span class="bh-warn">ماشي مربوط</span>'; } const nm = (t.me && t.me.display_name) || 'مربوط'; return '<b>' + esc(nm) + '</b> مربوط رسميا'; })()} — TikTok ما كتوفرش API عمومي لصناديق LIVE. الجمع كيتم بيدك.</div>
-    <div class="bh-cards">
-      <div class="bh-c"><b>${B.length}</b><span>مكتشفة</span></div>
-      <div class="bh-c"><b>${avail.length}</b><span>متاحة دابا</span></div>
-      <div class="bh-c"><b>${done.length}</b><span>مجمعة</span></div>
-      <div class="bh-c"><b>${coins}</b><span>عملات مؤكدة</span></div>
-      <div class="bh-c"><b>${expired.length}</b><span>سالاو</span></div>
-      <div class="bh-c"><b>${last ? fmt(now - (last.doneAt || now)) : '—'}</b><span>آخر جمع</span></div>
-    </div>
-    <input class="bh-in" id="bhUrl" placeholder="رابط البث ولا @اسم_الحساب" />
-    <input class="bh-in" id="bhTtl" type="number" min="1" max="180" value="${st.ttl}" placeholder="مدة الصندوق بالدقايق" style="margin-top:5px" />
-    <button class="bh-b" id="bhAdd">➕ زيد وراقب</button>
-    <button class="bh-b g" id="bhScan">🔎 فحص الصفحة</button>
-    <button class="bh-b g" id="bhPerm">${st.notify ? '🔔 الإشعارات شاعلة' : '🔕 شعل الإشعارات'}</button>
-    <button class="bh-b r" id="bhClear">🧹 نظف المسالي</button>
-    <div id="bh-toast"></div>
-    ${avail.length ? '<div class="bh-t" style="margin-top:8px">⬇️ مرتبة حسب الوقت اللي باقي</div>' : ''}
-    ${avail.map(b => `
-      <div class="bh-row">
-        <b>${esc(b.host)}</b> <span class="bh-live">● متاح</span>
-        <div class="bh-t">باقي: ${fmt(b.at + b.ttl - now)} · تسجل ${new Date(b.at).toLocaleTimeString('ar-MA')}</div>
-        <button class="bh-b" data-open="${b.id}">↗️ حل وجمع</button>
-        <button class="bh-b g" data-done="${b.id}">✅ تسجل الجمع</button>
-        <button class="bh-b r" data-fail="${b.id}">⚠️ فشل</button>
-      </div>`).join('')}
-    ${done.length ? '<div class="bh-t" style="margin-top:8px">📦 تاريخ الجمع</div>' + done.slice(0, 6).map(b => `<div class="bh-t">• ${esc(b.host)} — ${b.confirmed ? b.coins + ' عملة مؤكدة' : 'بلا رقم'} · ${new Date(b.doneAt || b.at).toLocaleDateString('ar-MA')}</div>`).join('') : ''}
-    <div class="bh-t" style="margin-top:10px">📋 آخر الأحداث</div>
-    <div class="bh-lg">${logs().slice(0, 12).map(l => `<div>${new Date(l.at).toLocaleTimeString('ar-MA')} — ${esc(l.text)}</div>`).join('') || '<div>ما كاين حتى حدث.</div>'}</div>
+    <div class="bh-actions"><button class="bh-b" id="bhSave">حفظ الإعدادات</button><button class="bh-b r" id="bhClear">مسح السجل والصناديق</button><button class="bh-b g" id="bhClearNeed">تصفير التنبيهات المعلقة (${Number(need.n || 0)})</button></div>
+    <div id="bh-toast" class="bh-toast" role="status" aria-live="polite"></div>
+    ${candidates.length ? '<div class="bh-section">مرشحو الصناديق — راجع الدليل وأكد يدوياً</div>' + candidates.map(b => card(b, now)).join('') : ''}
+    ${available.length ? '<div class="bh-section">الصناديق المؤكدة حسب أقرب انتهاء</div>' + available.map(b => card(b, now)).join('') : ''}
+    ${done.length ? '<div class="bh-section">آخر عمليات الجمع</div>' + done.slice(0,8).map(b => `<div class="bh-t">✓ ${safeText(b.host)} — ${b.confirmed ? `${b.coins} عملة مؤكدة` : 'تم التسجيل دون عدد مؤكد'}</div>`).join('') : ''}
+    <div class="bh-section">آخر الأحداث</div><div class="bh-log">${getLogs().slice(0,20).map(x => `<div>${new Date(x.at).toLocaleTimeString('ar-MA')} — ${safeText(x.text)}</div>`).join('') || 'لا توجد أحداث بعد.'}</div>
   </div>`;
 
-  const $ = s => root.querySelector(s);
-  $('#bhAdd')?.addEventListener('click', async () => {
-    const raw = ($('#bhUrl').value || '').trim();
-    if (!raw) return;
-    const ttl = parseInt($('#bhTtl').value, 10) || st.ttl;
-    const url = /^https?:\/\//i.test(raw) ? raw : 'https://www.tiktok.com/@' + raw.replace(/^@/, '');
-    const host = (raw.match(/@([\w.]+)/) || [, raw])[1];
-    const res = addBox({ host, url, ttl });
-    if (res.dup) { logIt('dup', 'صندوق موجود من قبل: ' + host); msg('هادا الصندوق مسجل من قبل.'); }
-    render(root);
+  const $ = selector => root.querySelector(selector);
+  $('#bhSilent')?.addEventListener('click', () => { const x=settings(); x.silent=!x.silent; write(STORE.settings,x); log('settings', x.silent?'تم تفعيل Silent Mode':'تم إيقاف Silent Mode'); render(root); });
+  $('#bhToggle')?.addEventListener('click', () => { const x=settings(); x.on=!x.on; write(STORE.settings,x); if(x.on) startWatcher(); else stopWatcher(); render(root); });
+  $('#bhStop')?.addEventListener('click', () => { stopWatcher(); toast('تم إيقاف المراقبة.'); render(root); });
+  $('#bhRadar')?.addEventListener('click', async () => { const button=$('#bhRadar'); button.disabled=true; button.textContent='جاري البحث…'; try { const result=await radarSearch($('#bhQuery')?.value || ''); toast(`انتهى البحث: ${result.added} نتيجة جديدة من ${result.received}.`); } catch(e) { toast(e.message); } finally { render(root); } });
+  $('#bhAdd')?.addEventListener('click', () => { const raw=$('#bhUrl')?.value || ''; const url=makeTikTokUrl(raw); if(!url) return toast('أدخل رابط TikTok صحيحاً أو اسم حساب صالحاً.'); const result=addManual({host:hostFrom(raw),url,ttl:$('#bhTtl')?.value}); toast(result.duplicate?'هذا البث مسجل من قبل.':'تمت إضافة البث.'); render(root); });
+  $('#bhSave')?.addEventListener('click', () => { const x=settings(); x.clientKey=$('#bhClientKey').value.trim(); x.authEndpoint=$('#bhAuthEndpoint').value.trim(); x.radarEndpoint=$('#bhRadarEndpoint').value.trim(); x.pollSeconds=Math.min(600,Math.max(20,Number($('#bhPoll').value)||45));
+    if(x.authEndpoint && !validEndpoint(x.authEndpoint)) return toast('OAuth URL يجب أن يكون HTTPS صحيحاً.'); if(x.radarEndpoint && !validEndpoint(x.radarEndpoint)) return toast('Radar URL يجب أن يكون HTTPS صحيحاً.'); write(STORE.settings,x); log('settings','تم حفظ إعدادات الرادار والربط.'); toast('تم حفظ الإعدادات.'); render(root); });
+  $('#bhNotify')?.addEventListener('click', async () => { if(!('Notification' in window)) return toast('المتصفح لا يدعم إشعارات الجهاز.'); const permission=await Notification.requestPermission(); const x=settings(); x.notify=permission==='granted'; x.silent=false; write(STORE.settings,x); render(root); });
+  $('#bhManualBind')?.addEventListener('click', () => { const u = tkSetUser($('#bhManualUser')?.value || ''); toast(u ? `تم ربط @${u} يدويا.` : 'كتب اسم حساب TikTok.'); render(root); });
+  $('#bhManualClear')?.addEventListener('click', () => { tkSetUser(''); toast('تم مسح الربط اليدوي.'); render(root); });
+  $('#bhAuth')?.addEventListener('click', async () => { try { await tkConnect(); } catch(e) { toast(e.message); } });
+  $('#bhUnlink')?.addEventListener('click', async () => {
+    const button = $('#bhUnlink'); if (button) button.disabled = true;
+    try { await tkDisconnect(); toast('تم طلب فصل حساب TikTok.'); }
+    catch (error) { toast(error.message); }
+    finally { render(root); }
   });
-  $('#bhScan')?.addEventListener('click', async () => {
-    const raw = ($('#bhUrl').value || '').trim();
-    if (!raw) return msg('حط رابط البث ولا الحساب الأول.');
-    const url = /^https?:\/\//i.test(raw) ? raw : 'https://www.tiktok.com/@' + raw.replace(/^@/, '');
-    const r = await probe(url);
-    logIt('probe', (r.ok ? 'فحص ناجح' : 'فحص فشل') + ' — ' + url);
-    msg(r.ok ? (r.treasure ? '✅ الصفحة كتذكر صندوق ولا مكافأة (فحص كلمات).' : 'ℹ️ الصفحة تحملات، ولكن ما لقيتش كلمة صندوق.') : '⚠️ ما قدرتش نقرا الصفحة (TikTok قد يحجب القراءة).');
-    render(root);
-  });
-  $('#bhRadar')?.addEventListener('click', () => {
-    const s2 = setts(); s2.radar = !s2.radar; wr(K.s, s2);
-    logIt('mode', s2.radar ? 'الرادار شاعل' : 'الرادار مطفي');
-    render(root);
-  });
-  $('#bhRadarNow')?.addEventListener('click', async () => {
-    const kw = document.getElementById('bhKw');
-    if (kw) { const s2 = setts(); s2.radarKw = kw.value; wr(K.s, s2); }
-    msg('🛰️ كنقلب على بثوث مباشرة…');
-    await radarCycle();
-    render(root);
-  });
-  $('#bhCkSave')?.addEventListener('click', () => {
-    const r = tkSetClientKey(document.getElementById('bhCk')?.value);
-    msg(r.ok ? '✅ تحفظ Client Key. دابا اضغط «ربط حساب TikTok».' : '⚠️ ' + r.why);
-  });
-  $('#bhCkClear')?.addEventListener('click', () => { localStorage.removeItem(TK.key); render(root); msg('تمسحات Client Key.'); });
-  $('#bhUserSave')?.addEventListener('click', () => {
-    const el = document.getElementById('bhUser');
-    const ok = tkSetUser(el ? el.value : '');
-    render(root);
-    msg(ok ? 'تربط الحساب يدويا: @' + tkUser() : 'كتب اسم حساب صحيح.');
-  });
-  $('#bhTkIn')?.addEventListener('click', () => { tkConnect(); });
-  $('#bhTkOut')?.addEventListener('click', () => { tkDisconnect(); render(root); });
-  $('#bhSilent')?.addEventListener('click', () => {
-    const s2 = setts(); s2.silent = !s2.silent; wr(K.s, s2);
-    logIt('mode', s2.silent ? 'Silent Mode شاعل' : 'Silent Mode مطفي');
-    render(root);
-  });
-  $('#bhOn')?.addEventListener('click', () => {
-    const s2 = setts(); s2.on = !s2.on; wr(K.s, s2);
-    logIt('mode', s2.on ? 'المراقبة شاعلة' : 'المراقبة واقفة');
-    render(root);
-  });
-  $('#bhStop')?.addEventListener('click', () => {
-    stopWatcher();
-    render(root);
-  });
-  $('#bhPerm')?.addEventListener('click', async () => {
-    if (!('Notification' in window)) return msg('المتصفح ما كيدعمش الإشعارات.');
-    const p = await Notification.requestPermission();
-    const s2 = setts(); s2.notify = p === 'granted'; wr(K.s, s2);
-    render(root);
-  });
-  $('#bhClear')?.addEventListener('click', () => {
-    if (!confirm('تحيد كل الصناديق والسجل؟')) return;
-    wr(K.b, []); wr(K.l, []); render(root);
-  });
-  root.querySelectorAll('[data-open]').forEach(el => el.onclick = () => { collect(el.dataset.open, 'open'); });
-  root.querySelectorAll('[data-done]').forEach(el => el.onclick = () => { collect(el.dataset.done, 'done'); render(root); });
-  root.querySelectorAll('[data-fail]').forEach(el => el.onclick = () => { collect(el.dataset.fail, 'fail'); render(root); });
+  $('#bhClear')?.addEventListener('click', () => { if(!confirm('هل تريد مسح كل الصناديق والسجل؟')) return; write(STORE.boxes,[]); write(STORE.logs,[]); render(root); });
+  $('#bhClearNeed')?.addEventListener('click', () => { write(STORE.needs,{n:0}); render(root); });
+  root.querySelectorAll('[data-confirm]').forEach(el=>el.addEventListener('click',()=>confirmCandidate(el.dataset.confirm)));
+  root.querySelectorAll('[data-open]').forEach(el=>el.addEventListener('click',()=>openLive(el.dataset.open)));
+  root.querySelectorAll('[data-done]').forEach(el=>el.addEventListener('click',()=>{ const value=prompt('عدد العملات المؤكدة (اتركه 0 إذا غير معروف):','0'); if(value!==null) markCollected(el.dataset.done, value); }));
+  root.querySelectorAll('[data-fail]').forEach(el=>el.addEventListener('click',()=>markFailed(el.dataset.fail)));
 }
 
-let BH_TIMER = null;
 export function stopWatcher() {
-  if (BH_TIMER) { clearInterval(BH_TIMER); BH_TIMER = null; }
-  const s = setts(); s.on = false; wr(K.s, s);
-  logIt('stop', 'توقفت المراقبة');
+  if (TIMER) { clearInterval(TIMER); TIMER=null; }
+  const s=settings(); s.on=false; write(STORE.settings,s); log('stop','توقفت المراقبة.');
 }
 export function startWatcher() {
-  tick();
-  if (BH_TIMER) return;
-  BH_TIMER = setInterval(() => {
-    try { tkRefresh(); } catch (e) {}
-    tick();
-    const pane = document.getElementById('paneHunter');
-    if (pane && !pane.hidden && !document.getElementById('bh-busy')) render(pane);
-  }, 20000);
+  const s=settings(); s.on=true; write(STORE.settings,s);
+  expireAndWarn();
+  if (TIMER) clearInterval(TIMER);
+  radarPoll();
+  TIMER=setInterval(() => { expireAndWarn(); radarPoll(); if(ROOT?.isConnected) render(ROOT); }, Math.max(20,Number(s.pollSeconds)||45)*1000);
+  log('start',`بدأت المراقبة؛ فحص كل ${s.pollSeconds} ثانية.`);
 }
 
-export async function initBoxHunter(pane, opts) {
-  const root = pane || document.querySelector('#paneHunter');
-  if (!root) return false;
-  const done = await tkFinish().catch(() => false);
-  render(root);
-  if (!opts || opts.autoStart !== false) startWatcher();
-  const qs = new URLSearchParams(location.search);
-  if (qs.get('dbg') === '1') { msg('🔎 المفتاح المستعمل: ' + tkClientKey() + ' · النسخة: ' + BHV); }
-  if (!done && qs.get('tk') === '1' && !tkToken()) { return true; }
-  if (done) msg('تأكدت من الربط، شوف الحالة فـ Hunter 👇');
-  return true;
+// Optional one-time startup helper for AZZOUZ AI. Call after mounting #paneHunter.
+export async function initBoxHunter(root, { autoStart = true } = {}) {
+  if (root) render(root);
+  const callback = await tkFinish();
+  if (callback && root) render(root);
+  if (autoStart && settings().on) startWatcher();
+  return { authCompleted: callback, status: tkStatus() };
 }
-
-/* ربط مباشر من الرابط: ?tk=username */
-try {
-  const _p = new URLSearchParams(location.search).get('tk') || '';
-  if (/^[A-Za-z0-9._]{2,24}$/.test(_p)) tkSetUser(_p.replace(/^@/, ''));
-} catch (e) {}
