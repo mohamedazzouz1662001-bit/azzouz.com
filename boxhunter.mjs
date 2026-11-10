@@ -189,6 +189,13 @@ export function tkDisconnect() {
 }
 export async function tkFinish() {
   const q = new URLSearchParams(location.search);
+  const err = q.get('error');
+  if (err) {
+    logIt('auth', 'TikTok رفض الربط: ' + err + ' ' + (q.get('error_description') || ''));
+    setTimeout(() => msg('TikTok رفض الربط: ' + err + '. تحقق من Client Key و Redirect URI فـ Login Kit.'), 1200);
+    history.replaceState({}, '', location.pathname);
+    return false;
+  }
   const code = q.get('code'); if (!code) return false;
   try {
     const r = await fetch(TK_API, { method: 'POST', headers: { 'Content-Type': 'application/json' },
