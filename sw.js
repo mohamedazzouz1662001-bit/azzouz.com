@@ -1,5 +1,5 @@
 /* AZZOUZ AI — service worker: يتنصب فالهاتف ويخدم أوفلاين */
-const CACHE = 'azzouz-v1';
+const CACHE = 'azzouz-v3';
 const SHELL = ['./azzouz-ai.html', './manifest.json', './icon.svg', './data/memory.json'];
 
 self.addEventListener('install', e => {

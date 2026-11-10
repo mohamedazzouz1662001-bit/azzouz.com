@@ -174,7 +174,7 @@ pre.cd{background:#0d1a20;border:1px solid #2a3942;border-radius:10px;padding:10
 <div class="sheet" id="sheet">
   <div class="sh"><b>الأدوات</b><button class="icon" id="clearChat" title="مسح المحادثة">🗑️</button>
     <button class="icon" id="expChat" title="تصدير المحادثة">📤</button><button class="icon" id="shclose">✕</button></div>
-  <div class="stabs"><button data-p="report" class="on">آخر جواب</button><button data-p="threads">المحادثات</button><button data-p="pc">الحاسوب</button><button data-p="tiktok">تيك توك</button><button data-p="hunter">🎁 Hunter</button><button data-p="account">👤 حسابي</button><button data-p="memory">الذاكرة</button></div>
+  <div class="stabs"><button data-p="report" class="on">آخر جواب</button><button data-p="threads">المحادثات</button><button data-p="pc">الحاسوب</button><button data-p="tiktok"><svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" style="vertical-align:-2px" aria-hidden="true"><path d="M16.6 3c.3 2.2 1.6 3.7 3.7 4v2.7c-1.4.1-2.7-.3-3.9-1v5.9c0 3.1-2.5 5.7-5.6 5.7S5.2 17.6 5.2 14.5c0-3 2.3-5.4 5.3-5.7v2.8c-1.5.2-2.6 1.5-2.6 3 0 1.7 1.4 3 3 3s3-1.3 3-3V3h2.7z"/></svg> تيك توك</button><button data-p="hunter">🎁 Hunter</button><button data-p="account">👤 حسابي</button><button data-p="memory">الذاكرة</button></div>
   <div class="vkey"><input id="vkey" placeholder="مفتاح الرؤية (اختياري)"><button class="mini2" id="vsave">حفظ</button></div>
   <div class="sbody" id="paneReport"></div>
   <div class="sbody" id="paneThreads" hidden></div>
@@ -934,14 +934,12 @@ function renderAnswer(q, data, prior) {
     btn.textContent = '📚 المراجع (' + data.sorted.length + ')';
     const box = document.createElement('div');
     box.className = 'refs';
-    box.innerHTML = data.sorted.slice(0, 80).map((s, i) =>
-      '<div class="r"><b>' + (i + 1) + '.</b> ' + esc(s.name.replace(/^\S+\s/, '')) + ' — ' + esc(String(s.title).slice(0, 110)) +
-      (s.year ? ' (' + s.year + ')' : '') +
-      (s.sum ? '<div class="rs">' + esc(s.sum) + '</div>' : '') +
-      (s.url ? '<a class="lnk" href="' + esc(s.url) + '" target="_blank" rel="noopener">' + esc(s.url.slice(0, 70)) + '</a>' : '') + '</div>').join('');
+    box.innerHTML = groupRefsHTML(data.sorted, 40);
+    box.classList.add('on');
+    btn.textContent = '📚 المصادر (' + data.sorted.length + ')';
     btn.onclick = () => {
       box.classList.toggle('on');
-      btn.textContent = box.classList.contains('on') ? '🙈 خبي المراجع' : '📚 المراجع (' + data.sorted.length + ')';
+      btn.textContent = box.classList.contains('on') ? '🙈 خبي المصادر' : '📚 المصادر (' + data.sorted.length + ')';
       log.scrollTop = log.scrollHeight;
     };
     el.appendChild(btn);
@@ -1152,6 +1150,55 @@ function parseSections(txt) {
 }
 
 const SHOW_REFS = true; // المراجع رجعو، ولكن كيترسمو غير ملّي تفتحهم
+
+/* ===== تصنيف المصادر حسب النوع ===== */
+const REF_GROUPS = [
+  { key: 'video',    label: '🎬 فيديوهات' },
+  { key: 'audio',    label: '🎧 صوت وبودكاست' },
+  { key: 'research', label: '🔬 بحوث ودراسات' },
+  { key: 'code',     label: '💻 كود ومصادر تقنية' },
+  { key: 'books',    label: '📚 كتب وأرشيف' },
+  { key: 'news',     label: '📰 أخبار' },
+  { key: 'wiki',     label: '📖 موسوعات' },
+  { key: 'web',      label: '🌐 مواقع ومقالات' }
+];
+function refKind(s) {
+  const u = String((s && s.url) || '').toLowerCase();
+  const t = String((s && (s.title || s.name)) || '').toLowerCase();
+  const all = u + ' ' + t;
+  if (/youtube|youtu\.be|vimeo|dailymotion|tiktok\.com|\.mp4/.test(all)) return 'video';
+  if (/spotify|soundcloud|podcast|anchor\.fm|\.mp3|\.wav|deezer/.test(all)) return 'audio';
+  if (/arxiv|pubmed|semanticscholar|openalex|doi\.org|springer|scielo|researchgate|ncbi|jstor|ieee|acm\.org|nature\.com|sciencedirect/.test(all)) return 'research';
+  if (/github|gitlab|stackoverflow|npmjs|pypi|huggingface|kaggle|dev\.to|mdn\.io/.test(all)) return 'code';
+  if (/openlibrary|gutenberg|archive\.org|books\.google|pdf|\.pdf/.test(all)) return 'books';
+  if (/reuters|bbc\.|aljazeera|hespress|lemonde|nytimes|guardian|cnn|skynews|france24|alarabiya/.test(all)) return 'news';
+  if (/wikipedia|wikidata|wikimedia|britannica/.test(all)) return 'wiki';
+  return 'web';
+}
+function refRow(s, n) {
+  const title = String(s.title || s.name || '').slice(0, 120);
+  const src = String(s.name || '').replace(/^\S+\s*/, '').slice(0, 30);
+  const url = String(s.url || '');
+  return '<div class="r"><b>' + n + '.</b> ' + (src ? '<i style="opacity:.7;font-style:normal">' + esc(src) + '</i> — ' : '') + esc(title) +
+    (s.year ? ' (' + esc(String(s.year)) + ')' : '') +
+    (s.sum ? '<div class="rs">' + esc(String(s.sum).slice(0, 150)) + '</div>' : '') +
+    (url ? '<a class="lnk" href="' + esc(url) + '" target="_blank" rel="noopener">' + esc(url.slice(0, 68)) + '</a>' : '') + '</div>';
+}
+function groupRefsHTML(list, perGroup) {
+  const cap = perGroup || 40;
+  const bags = {};
+  (list || []).forEach(s => { const k = refKind(s); (bags[k] = bags[k] || []).push(s); });
+  let out = '';
+  REF_GROUPS.forEach(g => {
+    const arr = bags[g.key] || [];
+    if (!arr.length) return;
+    out += '<div class="gh" style="margin:6px 0 4px;font-size:12px;color:#00e5a0;font-weight:700">' + g.label + ' (' + arr.length + ')</div>';
+    arr.slice(0, cap).forEach((s, i) => { out += refRow(s, i + 1); });
+    if (arr.length > cap) out += '<div class="rs" style="opacity:.7">و ' + (arr.length - cap) + ' مصدر آخر فهاد النوع</div>';
+  });
+  return out || '<div class="rs">ما لقيتش مصادر دابا.</div>';
+}
+
 function attachRefs(list, q) {
   if (!SHOW_REFS) return;
   if (!Array.isArray(list) || !list.length) return;
@@ -1172,7 +1219,7 @@ function attachRefs(list, q) {
   }
 
   function draw() {
-    box.innerHTML = items.map(row).join('');
+    box.innerHTML = groupRefsHTML(list, 40);
     more = document.createElement('div');
     more.className = 'r';
     more.style.textAlign = 'center';
@@ -1199,11 +1246,13 @@ function attachRefs(list, q) {
     more.appendChild(b);
   }
 
-  btn.textContent = '📚 المراجع (' + list.length + ')';
+  btn.textContent = '📚 المصادر (' + list.length + ')';
+  box.innerHTML = groupRefsHTML(list, 40);
+  box.classList.add('on');
+  built = true;
   btn.onclick = () => {
     const on = box.classList.toggle('on');
-    btn.textContent = on ? '🙈 خبي المراجع' : '📚 المراجع (' + list.length + ')';
-    if (on && !built) { built = true; draw(); }
+    btn.textContent = on ? '🙈 خبي المصادر' : '📚 المصادر (' + list.length + ')';
     log.scrollTop = log.scrollHeight;
   };
   log.appendChild(btn);
@@ -1493,7 +1542,7 @@ function openTools(which) {
   else if (which === 'pc') renderPC();
   else if (which === 'tiktok') renderTikTok();
   else if (which === 'account') renderAccount();
-  else if (which === 'hunter') import('./boxhunter.mjs?v=25').then(m => { (m.initBoxHunter ? m.initBoxHunter($('paneHunter'), { autoStart: true }) : (m.render($('paneHunter')), m.startWatcher())); }).catch(() => {});
+  else if (which === 'hunter') import('./boxhunter.mjs?v=26').then(m => { (m.initBoxHunter ? m.initBoxHunter($('paneHunter'), { autoStart: true }) : (m.render($('paneHunter')), m.startWatcher())); }).catch(() => {});
   else renderReport();
 }
 
@@ -1502,7 +1551,7 @@ async function renderAccount() {
   const p = $('paneAccount'); if (!p) return;
   p.innerHTML = '<div class="hd"><b>👤 حسابي</b></div><div class="sb">كنقرا الحساب من TikTok الرسمي... </div>';
   let m = null;
-  try { m = await import('./boxhunter.mjs?v=25'); } catch (e) { m = null; }
+  try { m = await import('./boxhunter.mjs?v=26'); } catch (e) { m = null; }
   if (!m) { p.innerHTML = '<div class="hd"><b>👤 حسابي</b></div><div class="sb">تعذر تحميل وحدة الحساب.</div>'; return; }
   const st = m.tkStatus ? m.tkStatus() : { state: 'none', label: 'غير مضبوط' };
   const sess = m.tkToken ? (m.tkToken() || {}) : {};

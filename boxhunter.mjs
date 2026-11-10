@@ -420,7 +420,7 @@ export function render(root) {
       <button class="bh-b r" id="bhStop">إيقاف فوري</button>
       <button class="bh-b" id="bhRadar">🔎 ابحث الآن</button>
       <button class="bh-b g" id="bhNotify">${s.notify ? 'الإشعارات مفعلة' : 'تفعيل إشعارات الجهاز'}</button>
-      <button class="bh-b g" id="bhAuth">${auth.state === 'linked' ? 'الحساب مربوط' : 'ربط TikTok'}</button>
+      <button class="bh-b g" id="bhAuth" style="display:inline-flex;gap:6px;align-items:center"><svg viewBox=\"0 0 24 24\" width=\"15\" height=\"15\" fill=\"currentColor\" style=\"vertical-align:-2px\" aria-hidden=\"true\"><path d=\"M16.6 3c.3 2.2 1.6 3.7 3.7 4v2.7c-1.4.1-2.7-.3-3.9-1v5.9c0 3.1-2.5 5.7-5.6 5.7S5.2 17.6 5.2 14.5c0-3 2.3-5.4 5.3-5.7v2.8c-1.5.2-2.6 1.5-2.6 3 0 1.7 1.4 3 3 3s3-1.3 3-3V3h2.7z\"/></svg> ${auth.state === 'linked' ? 'الحساب مربوط' : 'ربط TikTok'}</button>
       ${auth.state === 'linked' ? '<button class="bh-b r" id="bhUnlink">فصل الحساب</button>' : ''}
     </div>
     <div class="bh-actions">
