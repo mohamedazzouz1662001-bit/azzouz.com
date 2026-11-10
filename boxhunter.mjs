@@ -160,7 +160,12 @@ export function tkStatus() {
   return { state: 'none', label: 'ماشي مربوط رسميا', key: '' };
 }
 const TK_DEFAULT = 'awga3m8eepkt0ikr';
-export function tkClientKey() { return (localStorage.getItem(TK.key) || TK_DEFAULT).trim(); }
+export function tkClientKey() {
+  const raw = (localStorage.getItem(TK.key) || '').replace(/[^A-Za-z0-9]/g, '');
+  const ok = raw.length >= 12 && raw.length <= 24 && /^aw/i.test(raw);
+  if (raw && !ok) { try { localStorage.removeItem(TK.key); } catch (e) {} }
+  return ok ? raw : TK_DEFAULT;
+}
 export function tkSetClientKey(v) {
   const k = String(v || '').replace(/\s+/g, '');
   if (!k) { localStorage.removeItem(TK.key); return { ok: false, why: 'فارغ' }; }
