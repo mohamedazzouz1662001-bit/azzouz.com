@@ -159,7 +159,8 @@ export function tkStatus() {
   if (ck) return { state: 'half', label: 'التطبيق مسجل، الحساب ماشي مربوط', key: ck };
   return { state: 'none', label: 'ماشي مربوط رسميا', key: '' };
 }
-export function tkClientKey() { return (localStorage.getItem(TK.key) || '').trim(); }
+const TK_DEFAULT = 'awga3m8eepkt0ikr';
+export function tkClientKey() { return (localStorage.getItem(TK.key) || TK_DEFAULT).trim(); }
 export function tkSetClientKey(v) {
   const k = String(v || '').replace(/\s+/g, '');
   if (!k) { localStorage.removeItem(TK.key); return { ok: false, why: 'فارغ' }; }
