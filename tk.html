@@ -5,36 +5,79 @@
 <title>ربط TikTok — AZZOUZ AI</title>
 <style>
 body{background:#0b141a;color:#e9edef;font-family:-apple-system,'Segoe UI',Tahoma,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;text-align:center;padding:24px}
-.b{max-width:420px}
+.b{max-width:440px}
 h1{font-size:19px;color:#00d0a0;margin-bottom:10px}
-p{font-size:14px;color:#cfd8dc;line-height:1.8}
+p{font-size:14px;color:#cfd8dc;line-height:1.9}
 a.btn{display:inline-block;margin-top:16px;background:#00a884;color:#04241d;font-weight:700;padding:12px 22px;border-radius:10px;text-decoration:none}
-code{background:#111b22;padding:2px 6px;border-radius:6px;font-size:12px;color:#7fd7ff}
+small{color:#8696a0;font-size:11px;word-break:break-all}
 </style></head><body>
 <div class="b">
-<h1>ربط حساب TikTok</h1>
+<h1 id="h">ربط حساب TikTok</h1>
 <p id="st">كنحضر الطلب…</p>
-<p id="dbg" style="font-size:11px;color:#8696a0"></p>
+<p><small id="dbg"></small></p>
 <a class="btn" id="go" href="#" style="display:none">اضغط للمتابعة</a>
+<a class="btn" id="back" href="https://mohamedazzouz1662001-bit.github.io/azzouz.com/azzouz-ai.html" style="display:none">رجع للموقع</a>
 </div>
 <script>
 const KEY = 'awga3m8eepkt0ikr';
-const RED = 'https://mohamedazzouz1662001-bit.github.io/azzouz.com/azzouz-ai.html';
+const SELF = location.origin + location.pathname;
+const API = 'https://superagent-1906c8e6.base44.app/functions/tiktokAuth';
+const $ = id => document.getElementById(id);
 function b64(buf){return btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');}
-async function go(){
+
+async function start(){
   const v = b64(crypto.getRandomValues(new Uint8Array(48)));
   const d = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(v));
   localStorage.setItem('bh-tk-ver', v);
   localStorage.setItem('bh-tk-client', KEY);
-  localStorage.setItem('bh-tk-redirect', RED);
+  localStorage.setItem('bh-tk-redirect', SELF);
   const url = 'https://www.tiktok.com/v2/auth/authorize/?client_key=' + encodeURIComponent(KEY) +
-    '&scope=user.info.basic&response_type=code&redirect_uri=' + encodeURIComponent(RED) +
+    '&scope=user.info.basic&response_type=code&redirect_uri=' + encodeURIComponent(SELF) +
     '&state=azzouz&code_challenge=' + b64(d) + '&code_challenge_method=S256';
-  document.getElementById('dbg').textContent = 'client_key=' + KEY;
-  document.getElementById('st').textContent = 'تحويل لـ TikTok…';
-  const a = document.getElementById('go'); a.href = url; a.style.display = 'inline-block';
-  location.href = url;
+  $('dbg').textContent = 'client_key=' + KEY + ' · redirect=' + SELF;
+  $('st').textContent = 'تحويل لـ TikTok…';
+  const a = $('go'); a.href = url; a.style.display = 'inline-block';
+  setTimeout(() => { location.href = url; }, 300);
 }
-go();
+
+async function finish(code, err){
+  if (err) {
+    $('h').textContent = 'TikTok رفض الربط';
+    $('st').textContent = 'الخطأ: ' + err + ' — عاود جرب، وإلا كان التطبيق باقي Sandbox زيد حسابك فـTest users.';
+    $('go').style.display = 'none'; $('back').style.display = 'inline-block';
+    return;
+  }
+  $('st').textContent = 'كنبدل الكود بالتوكن…';
+  try {
+    const r = await fetch(API, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code, code_verifier: localStorage.getItem('bh-tk-ver') || '', redirect_uri: localStorage.getItem('bh-tk-redirect') || SELF }) });
+    const j = await r.json();
+    if (j && j.access_token) {
+      let me = null;
+      try {
+        const u = await fetch('https://open.tiktokapis.com/v2/user/info/?fields=open_id,display_name,avatar_url', { headers: { Authorization: 'Bearer ' + j.access_token } });
+        me = (await u.json())?.data?.user || null;
+      } catch (e) {}
+      localStorage.setItem('bh-tk-token', JSON.stringify({ ...j, me, at: Date.now() }));
+      $('h').textContent = 'تم الربط ✅';
+      $('st').textContent = 'الحساب تربط' + (me && me.display_name ? ': ' + me.display_name : '') + '. دابا رجع للموقع وشوف 🎁 Hunter.';
+      $('dbg').textContent = 'open_id: ' + (j.open_id || '') + ' · expires_in: ' + (j.expires_in || '');
+      $('go').style.display = 'none'; $('back').style.display = 'inline-block';
+      return;
+    }
+    $('h').textContent = 'ما تمش تبديل الكود';
+    $('st').textContent = 'TikTok رجع: ' + (j.error_description || j.error || JSON.stringify(j).slice(0, 160));
+    $('back').style.display = 'inline-block';
+  } catch (e) {
+    $('h').textContent = 'مشكل فالاتصال';
+    $('st').textContent = String(e && e.message || e);
+    $('back').style.display = 'inline-block';
+  }
+}
+
+const q = new URLSearchParams(location.search);
+if (q.get('code')) finish(q.get('code'));
+else if (q.get('error')) finish(null, q.get('error') + ' ' + (q.get('error_description') || ''));
+else start();
 </script>
 </body></html>
