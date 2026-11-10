@@ -414,8 +414,11 @@ export function startWatcher() {
 export async function initBoxHunter(pane, opts) {
   const root = pane || document.querySelector('#paneHunter');
   if (!root) return false;
-  try { await tkFinish(); } catch (e) {}
+  const done = await tkFinish().catch(() => false);
   render(root);
   if (!opts || opts.autoStart !== false) startWatcher();
+  const qs = new URLSearchParams(location.search);
+  if (!done && qs.get('tk') === '1' && !tkToken()) { tkConnect(); return true; }
+  if (done) msg('تأكدت من الربط، شوف الحالة فـ Hunter 👇');
   return true;
 }
