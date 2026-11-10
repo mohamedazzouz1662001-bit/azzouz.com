@@ -248,6 +248,7 @@ export function render(root) {
       <button class="bh-b g" id="bhCkSave">💾 حفظ</button>
       <button class="bh-b g" id="bhCkClear">🗑 مسح</button>
     </div>
+    <div class="bh-t">📌 المفتاح كيبدا بحروف وأرقام (بحال aw1234abcd)، وماشي App ID. كاين فـ Basic information ← Client key، والسر Client secret. ما كتحتاجش السر هنا، كيبقى فالسيرفر.</div>
     <div class="bh-row" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:6px">
       <button class="bh-b" id="bhRadar">${st.radar ? '🛰️ الرادار شاعل' : '🛰️ شغل الرادار'}</button>
       <button class="bh-b g" id="bhRadarNow">🔍 فحص الآن</button>
