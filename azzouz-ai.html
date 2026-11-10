@@ -1388,7 +1388,7 @@ function openTools(which) {
   else if (which === 'threads') renderThreads();
   else if (which === 'pc') renderPC();
   else if (which === 'tiktok') renderTikTok();
-  else if (which === 'hunter') import('./boxhunter.mjs?v=9').then(m => { (m.initBoxHunter ? m.initBoxHunter($('paneHunter'), { autoStart: true }) : (m.render($('paneHunter')), m.startWatcher())); }).catch(() => {});
+  else if (which === 'hunter') import('./boxhunter.mjs?v=10').then(m => { (m.initBoxHunter ? m.initBoxHunter($('paneHunter'), { autoStart: true }) : (m.render($('paneHunter')), m.startWatcher())); }).catch(() => {});
   else renderReport();
 }
 
