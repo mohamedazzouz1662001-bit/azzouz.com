@@ -298,7 +298,7 @@ export function render(root) {
       <button class="bh-b g" id="bhSilent">${st.silent ? '🔊 حيد الهدوء' : '🔇 شغل الهدوء'}</button>
       <button class="bh-b g" id="bhOn">${st.on ? '⏸ وقف المراقبة' : '▶ شغل المراقبة'}</button>
       <button class="bh-b r" id="bhStop">⏹ وقف فوري</button>
-      ${tkToken() ? '<button class="bh-b g" id="bhTkOut">🔓 فصل حساب TikTok</button>' : '<button class="bh-b" id="bhTkIn">🔗 ربط حساب TikTok</button>'}
+      ${tkToken() ? '<button class="bh-b g" id="bhTkOut">🔓 فصل حساب TikTok</button>' : '<button class="bh-b" id="bhTkIn" disabled title="الدخول الرسمي معطل مؤقتا: TikTok ما كيقبلش التطبيق قبل المراجعة. استعمل الربط اليدوي تحت.">🔗 ربط حساب TikTok (معطل مؤقتا)</button>'}
     </div>
     <div class="bh-row" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:6px">
       <input id="bhCk" placeholder="Client Key (من Basic information)" value="${esc(tkClientKey())}" style="flex:1;min-width:160px" autocomplete="off">
@@ -391,7 +391,7 @@ export function render(root) {
     render(root);
     msg(ok ? 'تربط الحساب يدويا: @' + tkUser() : 'كتب اسم حساب صحيح.');
   });
-  $('#bhTkIn')?.addEventListener('click', () => { tkConnect(); });
+  $('#bhTkIn')?.addEventListener('click', (e) => { e.preventDefault(); msg('الدخول الرسمي معطل مؤقتا حتى تقبل TikTok التطبيق. استعمل «ربط يدوي» تحت.'); });
   $('#bhTkOut')?.addEventListener('click', () => { tkDisconnect(); render(root); });
   $('#bhSilent')?.addEventListener('click', () => {
     const s2 = setts(); s2.silent = !s2.silent; wr(K.s, s2);
@@ -447,7 +447,7 @@ export async function initBoxHunter(pane, opts) {
   if (!opts || opts.autoStart !== false) startWatcher();
   const qs = new URLSearchParams(location.search);
   if (qs.get('dbg') === '1') { msg('🔎 المفتاح المستعمل: ' + tkClientKey() + ' · النسخة: ' + BHV); }
-  if (!done && qs.get('tk') === '1' && !tkToken()) { tkConnect(); return true; }
+  if (!done && qs.get('tk') === '1' && !tkToken()) { return true; }
   if (done) msg('تأكدت من الربط، شوف الحالة فـ Hunter 👇');
   return true;
 }
