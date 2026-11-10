@@ -1200,64 +1200,99 @@ function groupRefsHTML(list, perGroup) {
 }
 
 function attachRefs(list, q) {
-  if (!SHOW_REFS) return;
   if (!Array.isArray(list) || !list.length) return;
   const qq = String(q || '').trim();
   const btn = document.createElement('span');
   btn.className = 'exp';
-  let items = list.slice(0, 200);
-  const box = document.createElement('div');
-  box.className = 'refs';
-  let built = false;
-  let more = null;
-
-  function row(s, i) {
-    return '<div class="r"><b>' + (i + 1) + '.</b> ' + esc(String(s.name || '').replace(/^\S+\s/, '')) + ' — ' + esc(String(s.title || '').slice(0, 110)) +
-      (s.year ? ' (' + s.year + ')' : '') +
-      (s.sum ? '<div class="rs">' + esc(String(s.sum).slice(0, 150)) + '</div>' : '') +
-      (s.url ? '<a class="lnk" href="' + esc(s.url) + '" target="_blank" rel="noopener">' + esc(String(s.url).slice(0, 70)) + '</a>' : '') + '</div>';
-  }
-
-  function draw() {
-    box.innerHTML = groupRefsHTML(list, 40);
-    more = document.createElement('div');
-    more.className = 'r';
-    more.style.textAlign = 'center';
-    box.appendChild(more);
-    paintMore();
-  }
-
-  function paintMore(text) {
-    if (!more) return;
-    more.innerHTML = '';
-    if (!qq) { more.textContent = 'المجموع: ' + items.length + ' مرجع'; return; }
-    const b = document.createElement('span');
-    b.className = 'exp';
-    b.textContent = text || ('➕ وسّع البحث (المجموع: ' + items.length + ')');
-    b.onclick = async () => {
-      b.textContent = 'كنقلب فمصادر أكثر...';
-      const got = await bulkSources(qq, 6, n => { b.textContent = 'كنقلب... زدت ' + n; });
-      const seen = new Set(items.map(x => x.url || x.title));
-      let added = 0;
-      got.forEach(g => { const k = g.url || g.title; if (k && !seen.has(k)) { seen.add(k); items.push(g); added++; } });
-      draw();
-      paintMore('➕ زيد (زدت ' + added + ' · المجموع: ' + items.length + ')');
-    };
-    more.appendChild(b);
-  }
-
   btn.textContent = '📚 المصادر (' + list.length + ')';
-  box.innerHTML = groupRefsHTML(list, 40);
-  box.classList.add('on');
-  built = true;
+  const box = document.createElement('div');
+  box.className = 'refs on';
+  let all = list.slice();
+
+  function bagsOf(arr) {
+    const b = {};
+    arr.forEach(x => { const k = refKind(x); (b[k] = b[k] || []).push(x); });
+    return b;
+  }
+
+  function render() {
+    box.innerHTML = '';
+    const bags = bagsOf(all);
+
+    // شريط التحكم
+    const bar = document.createElement('div');
+    bar.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap;margin:4px 0 8px';
+    const b10 = document.createElement('span');
+    b10.className = 'exp';
+    b10.textContent = '⚡ جيب 10 آلاف مصدر';
+    b10.onclick = async () => {
+      if (!qq) { toastMsg('ما كاينش سؤال مرتبط باش نوسّع.'); return; }
+      let total = 0;
+      b10.textContent = 'كنقلب... 0';
+      const got = await bulkSources(qq, 50, n => { total = n; b10.textContent = 'كنقلب... ' + n; });
+      const seen = new Set(all.map(x => (x.url || x.title || '').toLowerCase()));
+      got.forEach(g => { const k = (g.url || g.title || '').toLowerCase(); if (k && !seen.has(k)) { seen.add(k); all.push(g); } });
+      btn.textContent = '📚 المصادر (' + all.length + ')';
+      render();
+    };
+    const bAll = document.createElement('span');
+    bAll.className = 'exp';
+    bAll.textContent = '👁️ عرض كلشي';
+    bAll.onclick = () => { box.querySelectorAll('.grp-more').forEach(m => m.click()); };
+    bar.appendChild(b10); bar.appendChild(bAll);
+    box.appendChild(bar);
+
+    REF_GROUPS.forEach(g => {
+      const arr = bags[g.key] || [];
+      if (!arr.length) return;
+      const head = document.createElement('div');
+      head.className = 'gh';
+      head.style.cssText = 'margin:8px 0 4px;font-size:12px;color:#00e5a0;font-weight:700';
+      head.textContent = g.label + ' (' + arr.length + ')';
+      box.appendChild(head);
+
+      const holder = document.createElement('div');
+      box.appendChild(holder);
+      const more = document.createElement('div');
+      more.className = 'grp-more';
+      more.style.cssText = 'text-align:center;margin:2px 0 6px';
+      let shown = 0;
+      const CHUNK = 120;
+      const paint = () => {
+        holder.insertAdjacentHTML('beforeend', arr.slice(shown, shown + CHUNK).map((s, i) => refRow(s, shown + i + 1)).join(''));
+        shown = Math.min(arr.length, shown + CHUNK);
+        more.innerHTML = '';
+        if (shown < arr.length) {
+          const b = document.createElement('span');
+          b.className = 'exp';
+          b.textContent = '➕ عرض ' + Math.min(CHUNK, arr.length - shown) + ' · باقي ' + (arr.length - shown);
+          b.onclick = paint;
+          more.appendChild(b);
+        }
+      };
+      paint();
+      box.appendChild(more);
+    });
+    if (!all.length) box.innerHTML = '<div class="rs">ما لقيتش مصادر.</div>';
+  }
+
+  render();
   btn.onclick = () => {
     const on = box.classList.toggle('on');
-    btn.textContent = on ? '🙈 خبي المصادر' : '📚 المصادر (' + list.length + ')';
+    btn.textContent = on ? '🙈 خبي المصادر (' + all.length + ')' : '📚 المصادر (' + all.length + ')';
     log.scrollTop = log.scrollHeight;
   };
   log.appendChild(btn);
   log.appendChild(box);
   log.scrollTop = log.scrollHeight;
+}
+
+function toastMsg(t) {
+  const d = document.createElement('div');
+  d.textContent = t;
+  d.style.cssText = 'position:fixed;bottom:82px;right:16px;left:16px;max-width:360px;margin:auto;background:#0c1119;border:1px solid #00e5a0;color:#e8f1ff;padding:10px 14px;border-radius:12px;font-size:13px;z-index:9999';
+  document.body.appendChild(d);
+  setTimeout(() => d.remove(), 3200);
 }
 
 /* بحث موسع: كيجيب بالآلاف من OpenAlex (بدون مفتاح) */
