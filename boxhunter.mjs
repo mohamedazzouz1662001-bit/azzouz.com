@@ -248,6 +248,7 @@ export async function tkRefresh() {
   return false;
 }
 
+export const BHV = 'v16';
 export function render(root) {
   if (!root) return;
   if (!document.getElementById('bh-style')) {
@@ -427,6 +428,7 @@ export async function initBoxHunter(pane, opts) {
   render(root);
   if (!opts || opts.autoStart !== false) startWatcher();
   const qs = new URLSearchParams(location.search);
+  if (qs.get('dbg') === '1') { msg('🔎 المفتاح المستعمل: ' + tkClientKey() + ' · النسخة: ' + BHV); }
   if (!done && qs.get('tk') === '1' && !tkToken()) { tkConnect(); return true; }
   if (done) msg('تأكدت من الربط، شوف الحالة فـ Hunter 👇');
   return true;
