@@ -31,8 +31,11 @@ async function start(){
   localStorage.setItem('bh-tk-ver', v);
   localStorage.setItem('bh-tk-client', KEY);
   localStorage.setItem('bh-tk-redirect', SELF);
+  const REG = 'https://mohamedazzouz1662001-bit.github.io/azzouz.com/azzouz-ai.html';
+  const ret = (new URLSearchParams(location.search).get('redirect') || REG);
+  localStorage.setItem('bh-tk-redirect', ret);
   const url = 'https://www.tiktok.com/v2/auth/authorize/?client_key=' + encodeURIComponent(KEY) +
-    '&scope=user.info.basic&response_type=code&redirect_uri=' + encodeURIComponent(SELF) +
+    '&scope=user.info.basic&response_type=code&redirect_uri=' + encodeURIComponent(ret) +
     '&state=azzouz&code_challenge=' + b64(d) + '&code_challenge_method=S256';
   $('dbg').textContent = 'client_key=' + KEY + ' · redirect=' + SELF;
   $('st').textContent = 'تحويل لـ TikTok…';
