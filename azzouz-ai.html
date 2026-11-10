@@ -915,6 +915,43 @@ async function readFast(texts) {
   return { items: out, total: total, sec: sec, rate: Math.round(total / Math.max(sec, 0.01)) };
 }
 
+
+/* ===== المصادر ولوائح الزيارات داخل نص الجواب (بلا JS) ===== */
+function sourcesInlineHTML(list) {
+  const arr = Array.isArray(list) ? list : [];
+  if (!arr.length) return '';
+  const bags = {};
+  arr.forEach(x => { const k = refKind(x); (bags[k] = bags[k] || []).push(x); });
+  let out = '<div data-srcblock="1" style="margin-top:10px;border-top:1px solid #1b2430;padding-top:8px">';
+  out += '<div class="h">📚 المصادر (' + arr.length + ')</div>';
+  REF_GROUPS.forEach(g => {
+    const a = bags[g.key] || [];
+    if (!a.length) return;
+    out += '<details open style="margin:4px 0"><summary style="cursor:pointer;color:#00e5a0;font-size:12px;font-weight:700">' + g.label + ' (' + a.length + ')</summary>';
+    a.slice(0, 1200).forEach((x, i) => { out += refRow(x, i + 1); });
+    if (a.length > 1200) out += '<div class="rs">و ' + (a.length - 1200) + ' مصدر آخر فهاد القسم</div>';
+    out += '</details>';
+  });
+  out += '</div>';
+  return out;
+}
+function visitsInlineHTML() {
+  const vs = (VISITS || []).slice();
+  if (!vs.length) return '';
+  const okN = vs.filter(v => v.state === 'ok').length;
+  let out = '<div style="margin-top:10px;border-top:1px solid #1b2430;padding-top:8px">';
+  out += '<div class="h">🌐 المواقع اللي دخلت ليها (' + vs.length + ' · نجح ' + okN + ')</div>';
+  out += '<details open><summary style="cursor:pointer;color:#00b3ff;font-size:12px;font-weight:700">شوف اللائحة كاملة</summary>';
+  vs.slice(0, 1500).forEach((v, i) => {
+    out += '<div class="r"><b>' + (i + 1) + '.</b> ' + (v.state === 'ok' ? '✅ ' : '⛔ ') +
+      '<a class="lnk" href="' + esc(v.url) + '" target="_blank" rel="noopener">' + esc(v.url.slice(0, 80)) + '</a>' +
+      (v.chars ? ' <span class="rs" style="display:inline;opacity:.6">' + (Math.round(v.chars / 100) / 10) + 'k</span>' : '') + '</div>';
+  });
+  if (vs.length > 1500) out += '<div class="rs">و ' + (vs.length - 1500) + ' رابط آخر</div>';
+  out += '</details></div>';
+  return out;
+}
+
 function renderAnswer(q, data, prior) {
   let h = '';
   const fx = findFix(topicOf(q));
@@ -941,28 +978,23 @@ function renderAnswer(q, data, prior) {
 
   if (prior && data.fresh.length) h += '<br>🆕 زدت ' + data.fresh.length + ' مصدر جديد هاد المرة.<br>';
 
+  h += sourcesInlineHTML(data.sorted);
+  h += visitsInlineHTML();
   h += '<br><b>واش بغيتي نكمل؟</b>';
 
   const el = addMsg(h, 'in');
-  try { turboRead(data.sorted, 30, 8); } catch (e) {}
-
-  if (SHOW_REFS && data.sorted.length) {
-    const btn = document.createElement('span');
-    btn.className = 'exp';
-    btn.textContent = '📚 المصادر (' + data.sorted.length + ')';
-    const box = document.createElement('div');
-    box.className = 'refs';
-    box.innerHTML = groupRefsHTML(data.sorted, 40);
-    box.classList.add('on');
-    btn.textContent = '📚 المصادر (' + data.sorted.length + ')';
-    btn.onclick = () => {
-      box.classList.toggle('on');
-      btn.textContent = box.classList.contains('on') ? '🙈 خبي المصادر' : '📚 المصادر (' + data.sorted.length + ')';
-      log.scrollTop = log.scrollHeight;
-    };
-    el.appendChild(btn);
-    el.appendChild(box);
-  }
+  try {
+    turboRead(data.sorted, 30, 8).then(() => {
+      try {
+        const v = visitsInlineHTML();
+        if (v) el.insertAdjacentHTML('beforeend', v);
+        const src = sourcesInlineHTML(data.sorted);
+        const old = el.querySelector('[data-srcblock]');
+        if (old) old.remove();
+        if (src) el.insertAdjacentHTML('beforeend', src);
+      } catch (e) {}
+    }).catch(() => {});
+  } catch (e) {}
 
   LAST = { q, data, prior, at: Date.now() };
   log.scrollTop = log.scrollHeight;
@@ -1418,11 +1450,11 @@ async function smartAnswer(q, data, prior) {
     const s = data.sorted[Number(n) - 1];
     return s && s.url ? '<a class="srctag" href="' + esc(s.url) + '" target="_blank" rel="noopener">[' + n + ']</a>' : m;
   });
+  h += sourcesInlineHTML(data.sorted);
+  h += visitsInlineHTML();
   h += '<br><b>واش بغيتي نكمل؟</b>';
   const card = addMsg(h, 'in');
   addActions(card, q);
-  attachRefs(data.sorted, q);
-  attachVisits();
   try {
     const arr = JSON.parse(localStorage.getItem('azzouz-conv') || '[]');
     arr.push({ q, short: sec.short || data.short });
