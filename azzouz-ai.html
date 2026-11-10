@@ -173,13 +173,14 @@ pre.cd{background:#0d1a20;border:1px solid #2a3942;border-radius:10px;padding:10
 <div class="sheet" id="sheet">
   <div class="sh"><b>الأدوات</b><button class="icon" id="clearChat" title="مسح المحادثة">🗑️</button>
     <button class="icon" id="expChat" title="تصدير المحادثة">📤</button><button class="icon" id="shclose">✕</button></div>
-  <div class="stabs"><button data-p="report" class="on">آخر جواب</button><button data-p="threads">المحادثات</button><button data-p="pc">الحاسوب</button><button data-p="tiktok">تيك توك</button><button data-p="hunter">🎁 Hunter</button><button data-p="memory">الذاكرة</button></div>
+  <div class="stabs"><button data-p="report" class="on">آخر جواب</button><button data-p="threads">المحادثات</button><button data-p="pc">الحاسوب</button><button data-p="tiktok">تيك توك</button><button data-p="hunter">🎁 Hunter</button><button data-p="account">👤 حسابي</button><button data-p="memory">الذاكرة</button></div>
   <div class="vkey"><input id="vkey" placeholder="مفتاح الرؤية (اختياري)"><button class="mini2" id="vsave">حفظ</button></div>
   <div class="sbody" id="paneReport"></div>
   <div class="sbody" id="paneThreads" hidden></div>
   <div class="sbody" id="panePC" hidden></div>
   <div class="sbody" id="paneTikTok" hidden></div>
   <div class="sbody" id="paneHunter" hidden></div>
+  <div class="sbody" id="paneAccount" hidden></div>
   <div class="sbody" id="paneMemory" hidden></div>
 </div>
 <script>
@@ -1399,13 +1400,49 @@ function openTools(which) {
   const ppc = $('panePC'); if (ppc) ppc.hidden = which !== 'pc';
   const ptt = $('paneTikTok'); if (ptt) ptt.hidden = which !== 'tiktok';
   const phu = $('paneHunter'); if (phu) phu.hidden = which !== 'hunter';
+  const pac = $('paneAccount'); if (pac) pac.hidden = which !== 'account';
   document.querySelectorAll('.stabs button').forEach(b => b.classList.toggle('on', b.dataset.p === which));
   if (which === 'memory') renderMemory();
   else if (which === 'threads') renderThreads();
   else if (which === 'pc') renderPC();
   else if (which === 'tiktok') renderTikTok();
-  else if (which === 'hunter') import('./boxhunter.mjs?v=23').then(m => { (m.initBoxHunter ? m.initBoxHunter($('paneHunter'), { autoStart: true }) : (m.render($('paneHunter')), m.startWatcher())); }).catch(() => {});
+  else if (which === 'account') renderAccount();
+  else if (which === 'hunter') import('./boxhunter.mjs?v=24').then(m => { (m.initBoxHunter ? m.initBoxHunter($('paneHunter'), { autoStart: true }) : (m.render($('paneHunter')), m.startWatcher())); }).catch(() => {});
   else renderReport();
+}
+
+/* ===== حسابي (TikTok الرسمي) ===== */
+async function renderAccount() {
+  const p = $('paneAccount'); if (!p) return;
+  p.innerHTML = '<div class="hd"><b>👤 حسابي</b></div><div class="sb">كنقرا الحساب من TikTok الرسمي... </div>';
+  let m = null;
+  try { m = await import('./boxhunter.mjs?v=24'); } catch (e) { m = null; }
+  if (!m) { p.innerHTML = '<div class="hd"><b>👤 حسابي</b></div><div class="sb">تعذر تحميل وحدة الحساب.</div>'; return; }
+  const st = m.tkStatus ? m.tkStatus() : { state: 'none', label: 'غير مضبوط' };
+  const sess = m.tkToken ? (m.tkToken() || {}) : {};
+  const pr = (sess && sess.profile) || null;
+  const u = pr && (pr.username || '') || (m.tkUser ? m.tkUser() : '');
+  const name = pr && (pr.display_name || pr.nickname || '') || '';
+  const av = pr && pr.avatar_url || '';
+  let h = '<div class="hd"><b>👤 حسابي</b></div>';
+  h += '<div class="sb">الحالة: ' + esc(st.label || 'غير مضبوط') + '</div>';
+  if (u) {
+    h += '<div style="display:flex;gap:12px;align-items:center;background:#0c1119;border:1px solid #1b2430;border-radius:12px;padding:12px;margin:8px 0">';
+    if (av) h += '<img src="' + esc(av) + '" alt="" style="width:52px;height:52px;border-radius:50%;object-fit:cover">';
+    h += '<div><b style="color:#00e5a0">@' + esc(u) + '</b>' + (name ? '<div class="sb" style="margin:2px 0 0">' + esc(name) + '</div>' : '') + '</div></div>';
+  } else {
+    h += '<div class="sb">مازال ما مربوطش. اضغط «ربط رسمي» ودوز من TikTok.</div>';
+  }
+  h += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0">'
+     + '<button class="tb" id="acConnect">' + (u ? 'تحديث الربط' : '🔗 ربط رسمي') + '</button>'
+     + (u ? '<button class="tb" id="acUnlink">فصل الحساب</button>' : '') + '</div>';
+  h += '<div class="sb" style="border-top:1px solid #1b2430;padding-top:10px">';
+  h += '<b>اللايف:</b> TikTok ما كتوفّرش API عام لمعلومات البثوث (id, viewer_count). هادشي خاصو شراكة Live API من عندهم، وإلا كاين غير الحساب والفيديوهات ديالك من Display API.<br>';
+  h += 'المصدر الرسمي: https://developers.tiktok.com/doc/display-api-overview';
+  h += '</div>';
+  p.innerHTML = h;
+  $('acConnect')?.addEventListener('click', async () => { try { await m.tkConnect(); } catch (e) { alert(e.message); } });
+  $('acUnlink')?.addEventListener('click', async () => { try { await m.tkDisconnect(); } catch (e) { alert(e.message); } renderAccount(); });
 }
 
 /* ===== صندوق TikTok ===== */
