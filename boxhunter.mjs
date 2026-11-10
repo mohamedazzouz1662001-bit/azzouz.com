@@ -451,3 +451,9 @@ export async function initBoxHunter(pane, opts) {
   if (done) msg('تأكدت من الربط، شوف الحالة فـ Hunter 👇');
   return true;
 }
+
+/* ربط مباشر من الرابط: ?tk=username */
+try {
+  const _p = new URLSearchParams(location.search).get('tk') || '';
+  if (/^[A-Za-z0-9._]{2,24}$/.test(_p)) tkSetUser(_p.replace(/^@/, ''));
+} catch (e) {}
