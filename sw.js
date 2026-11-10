@@ -1,26 +1,46 @@
-/* AZZOUZ AI — service worker: يتنصب فالهاتف ويخدم أوفلاين */
-const CACHE = 'azzouz-v3';
-const SHELL = ['./azzouz-ai.html', './manifest.json', './icon.svg', './data/memory.json'];
+/* AZZOUZ service worker — الصفحات دايما من الشبكة، الملفات الثابتة من الكاش */
+const CACHE = 'azzouz-v4';
+const SHELL = ['./azzouz-ai.html', './manifest.json', './icon.svg'];
 
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL).catch(() => {})).then(() => self.skipWaiting()));
+  self.skipWaiting();
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL).catch(() => {})));
 });
 
 self.addEventListener('activate', e => {
-  e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim()));
+  e.waitUntil(
+    caches.keys()
+      .then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k))))
+      .then(() => self.clients.claim())
+  );
 });
 
+self.addEventListener('message', e => { if (e.data === 'skip') self.skipWaiting(); });
+
 self.addEventListener('fetch', e => {
-  const u = e.request.url;
-  if (e.request.method !== 'GET' || !u.startsWith(self.location.origin)) return;
+  const req = e.request;
+  if (req.method !== 'GET') return;
+  const url = new URL(req.url);
+  if (url.origin !== location.origin) return; // APIs خارجية: بلا كاش
+
+  const isDoc = req.mode === 'navigate' || /\.html?$/i.test(url.pathname) || url.pathname.endsWith('/');
+
+  if (isDoc) {
+    // شبكة أولاً: باش التحديثات توصل دغيا
+    e.respondWith(
+      fetch(req, { cache: 'no-store' })
+        .then(res => { const cp = res.clone(); caches.open(CACHE).then(c => c.put(req, cp)).catch(() => {}); return res; })
+        .catch(() => caches.match(req).then(hit => hit || caches.match('./azzouz-ai.html')))
+    );
+    return;
+  }
+
+  // ملفات ثابتة (.mjs, css, صور): الكاش أولاً ثم الشبكة
   e.respondWith(
-    caches.match(e.request).then(hit => {
-      const net = fetch(e.request).then(r => {
-        const cp = r.clone();
-        caches.open(CACHE).then(c => c.put(e.request, cp)).catch(() => {});
-        return r;
-      }).catch(() => hit);
-      return hit || net;
-    })
+    caches.match(req).then(hit => hit || fetch(req).then(res => {
+      const cp = res.clone();
+      caches.open(CACHE).then(c => c.put(req, cp)).catch(() => {});
+      return res;
+    }).catch(() => hit))
   );
 });

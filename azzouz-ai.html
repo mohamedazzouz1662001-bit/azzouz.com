@@ -2046,7 +2046,22 @@ function uploadAnswer(f) {
   });
 }
 
-if ('serviceWorker' in navigator) { navigator.serviceWorker.register('sw.js').catch(() => {}); }
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(reg => {
+    reg.update().catch(() => {});
+    // إلا كان تحديث جديد، حدّث الصفحة مرة وحدة
+    reg.addEventListener('updatefound', () => {
+      const w = reg.installing;
+      if (!w) return;
+      w.addEventListener('statechange', () => {
+        if (w.state === 'installed' && navigator.serviceWorker.controller && !sessionStorage.getItem('azzouz-reloaded')) {
+          sessionStorage.setItem('azzouz-reloaded', '1');
+          location.reload();
+        }
+      });
+    });
+  }).catch(() => {});
+}
 document.addEventListener('DOMContentLoaded', () => {
   const ta = document.getElementById('q');
   if (ta) {
