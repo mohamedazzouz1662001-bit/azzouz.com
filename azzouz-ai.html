@@ -781,6 +781,16 @@ function slimThread(t) {
   if (Array.isArray(c.msgs)) c.msgs = c.msgs.slice(-40).map(m => (m && m.refs ? { ...m, refs: [] } : m));
   return c;
 }
+// تنظيف الذاكرة المحلية القديمة: كحيّد المراجع المخزنة باش المحادثة تبقى خفيفة
+(function cleanStored() {
+  try {
+    const raw = localStorage.getItem('azzouz-threads-v1') || '';
+    if (raw.length < 400000) return;
+    const list = JSON.parse(raw);
+    if (!Array.isArray(list)) return;
+    localStorage.setItem('azzouz-threads-v1', JSON.stringify(list.map(slimThread)));
+  } catch (e) {}
+})();
 function saveThreads(list) {
   try { localStorage.setItem('azzouz-threads-v1', JSON.stringify(list.slice(-30).map(slimThread))); } catch (e) {}
 }
