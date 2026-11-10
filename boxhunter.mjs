@@ -161,6 +161,10 @@ export function tkStatus() {
 }
 const TK_DEFAULT = 'awga3m8eepkt0ikr';
 export function tkClientKey() {
+  try {
+    const fromUrl = new URLSearchParams(location.search).get('ck') || '';
+    if (fromUrl) { const u = fromUrl.replace(/[^A-Za-z0-9]/g, ''); if (/^aw/i.test(u) && u.length >= 12) { localStorage.setItem(TK.key, u); } }
+  } catch (e) {}
   const raw = (localStorage.getItem(TK.key) || '').replace(/[^A-Za-z0-9]/g, '');
   const ok = raw.length >= 12 && raw.length <= 24 && /^aw/i.test(raw);
   if (raw && !ok) { try { localStorage.removeItem(TK.key); } catch (e) {} }
