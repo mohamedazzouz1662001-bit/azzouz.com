@@ -198,6 +198,15 @@ function clean(h) { return String(h || '').replace(/<[^>]*>/g, ' ').replace(/\s+
 function now() { const d = new Date(); return d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0'); }
 function tick() { return '✓✓'; }
 
+let VISITS = [];
+function logVisit(url, state, chars) {
+  const u = String(url || '');
+  if (!u) return;
+  const hit = VISITS.find(v => v.url === u);
+  const line = { url: u, state: state || 'ok', chars: chars || 0 };
+  if (hit) { Object.assign(hit, line); return; }
+  VISITS.push(line);
+}
 async function jget(url, ms = 9000) {
   const c = new AbortController(), t = setTimeout(() => c.abort(), ms);
   try { const r = await fetch(url, { signal: c.signal }); if (!r.ok) throw new Error('x'); return await r.json(); }
@@ -213,8 +222,16 @@ async function readViaProxy(url, ms = 16000) {
 }
 async function jtxt(url, ms = 15000) {
   const c = new AbortController(), t = setTimeout(() => c.abort(), ms);
-  try { const r = await fetch(url, { signal: c.signal }); if (!r.ok) throw new Error('x'); return await r.text(); }
-  finally { clearTimeout(t); }
+  try {
+    const r = await fetch(url, { signal: c.signal });
+    if (!r.ok) throw new Error('x');
+    const tx = await r.text();
+    if (!/jina\.ai/i.test(url)) logVisit(url, 'ok', tx.length);
+    return tx;
+  } catch (e) {
+    if (!/jina\.ai/i.test(url)) logVisit(url, 'fail', 0);
+    throw e;
+  } finally { clearTimeout(t); }
 }
 function invAbs(idx) {
   if (!idx) return '';
@@ -864,6 +881,7 @@ async function turboRead(list, limit = 40, conc = 8) {
       try {
         let md = await jtxt('https://r.jina.ai/' + s.url, 12000).catch(() => '');
         if (!md) md = await readViaProxy(s.url, 15000);
+        logVisit(s.url, md && md.length > 200 ? 'ok' : 'fail', (md || '').length);
         const lines = md.split('\n').map(x => x.trim()).filter(x => x.length > 90 && !/^(URL Source|Published Time|Markdown Content|Title):/i.test(x));
         if (lines.length) {
           s.text = lines.slice(0, 2).join(' ').slice(0, 400);
@@ -1199,6 +1217,51 @@ function groupRefsHTML(list, perGroup) {
   return out || '<div class="rs">ما لقيتش مصادر دابا.</div>';
 }
 
+
+/* ===== سجل المواقع اللي دخل ليها ===== */
+function attachVisits() {
+  const vs = VISITS.slice();
+  if (!vs.length) return;
+  const okN = vs.filter(v => v.state === 'ok').length;
+  const btn = document.createElement('span');
+  btn.className = 'exp';
+  btn.textContent = '🌐 المواقع اللي دخلت ليها (' + vs.length + ')';
+  const box = document.createElement('div');
+  box.className = 'refs on';
+  let shown = 0;
+  const CHUNK = 120;
+  const line = (v, i) => '<div class="r"><b>' + (i + 1) + '.</b> ' + (v.state === 'ok' ? '✅' : '⛔') + ' ' +
+    '<a class="lnk" href="' + esc(v.url) + '" target="_blank" rel="noopener">' + esc(v.url.slice(0, 76)) + '</a>' +
+    (v.chars ? ' <span class="rs" style="display:inline;opacity:.6">' + Math.round(v.chars / 100) / 10 + 'k حرف</span>' : '') + '</div>';
+  const head = document.createElement('div');
+  head.className = 'gh';
+  head.style.cssText = 'margin:2px 0 6px;font-size:12px;color:#00b3ff;font-weight:700';
+  head.textContent = 'نجح: ' + okN + ' · ما قدرتش: ' + (vs.length - okN);
+  box.appendChild(head);
+  const holder = document.createElement('div');
+  box.appendChild(holder);
+  const more = document.createElement('div');
+  more.style.cssText = 'text-align:center;margin:4px 0';
+  const paint = () => {
+    holder.insertAdjacentHTML('beforeend', vs.slice(shown, shown + CHUNK).map((v, i) => line(v, shown + i)).join(''));
+    shown = Math.min(vs.length, shown + CHUNK);
+    more.innerHTML = '';
+    if (shown < vs.length) {
+      const b = document.createElement('span');
+      b.className = 'exp';
+      b.textContent = '➕ عرض ' + Math.min(CHUNK, vs.length - shown) + ' · باقي ' + (vs.length - shown);
+      b.onclick = paint;
+      more.appendChild(b);
+    }
+  };
+  paint();
+  box.appendChild(more);
+  btn.onclick = () => { box.classList.toggle('on'); log.scrollTop = log.scrollHeight; };
+  log.appendChild(btn);
+  log.appendChild(box);
+  log.scrollTop = log.scrollHeight;
+}
+
 function attachRefs(list, q) {
   if (!Array.isArray(list) || !list.length) return;
   const qq = String(q || '').trim();
@@ -1359,6 +1422,7 @@ async function smartAnswer(q, data, prior) {
   const card = addMsg(h, 'in');
   addActions(card, q);
   attachRefs(data.sorted, q);
+  attachVisits();
   try {
     const arr = JSON.parse(localStorage.getItem('azzouz-conv') || '[]');
     arr.push({ q, short: sec.short || data.short });
@@ -1449,6 +1513,7 @@ async function ask(text) {
   try {
     if (LAST && LAST.q && (/(زيد|كمل|كمّل|عمّق|عمق|أكثر|اكثر|تفاصيل|والمزيد)/.test(q) || q.split(/\s+/).length <= 2) && !q.includes(LAST.q)) gq = q + ' — ' + LAST.q;
   } catch (e) {}
+  VISITS = [];
   const t = typing();
   let sources = [];
   try {
@@ -1713,6 +1778,7 @@ async function deepDive() {
   const targets = LAST.data.sorted.filter(s => s.url && /^https?:/.test(s.url)).slice(0, 3);
   if (!targets.length) return;
   addMsg('🔎 كنقرا الصفحات نفسها باش نعمّق...', 'out');
+  VISITS = [];
   const t = typing();
   const extra = [];
   for (const s of targets) {
