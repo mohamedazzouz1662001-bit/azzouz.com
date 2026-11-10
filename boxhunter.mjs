@@ -36,7 +36,14 @@ const read = (key, fallback) => {
 const write = (key, value) => { try { localStorage.setItem(key, JSON.stringify(value)); return true; } catch { return false; } };
 const getBoxes = () => { const value = read(STORE.boxes, []); return Array.isArray(value) ? value : []; };
 const getLogs = () => { const value = read(STORE.logs, []); return Array.isArray(value) ? value : []; };
-const settings = () => ({ ...DEFAULTS, ...read(STORE.settings, {}), kinds: { ...DEFAULTS.kinds, ...(read(STORE.settings, {}).kinds || {}) } });
+const settings = () => {
+  const stored = read(STORE.settings, {}) || {};
+  const merged = { ...DEFAULTS, ...stored, kinds: { ...DEFAULTS.kinds, ...(stored.kinds || {}) } };
+  // الخانات الخاوية ما كتلغيش القيم الافتراضية
+  if (!String(merged.clientKey || '').trim()) merged.clientKey = DEFAULTS.clientKey;
+  if (!String(merged.authEndpoint || '').trim()) merged.authEndpoint = DEFAULTS.authEndpoint;
+  return merged;
+};
 const safeText = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
 const fmt = ms => ms <= 0 ? 'انتهى' : `${Math.floor(ms / 60000)}د ${String(Math.floor(ms % 60000 / 1000)).padStart(2, '0')}ث`;
 const makeId = value => (String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, '').slice(-32) || `bh${Date.now()}${Math.random().toString(36).slice(2, 7)}`);

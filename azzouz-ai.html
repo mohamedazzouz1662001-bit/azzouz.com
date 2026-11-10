@@ -1407,7 +1407,7 @@ function openTools(which) {
   else if (which === 'pc') renderPC();
   else if (which === 'tiktok') renderTikTok();
   else if (which === 'account') renderAccount();
-  else if (which === 'hunter') import('./boxhunter.mjs?v=24').then(m => { (m.initBoxHunter ? m.initBoxHunter($('paneHunter'), { autoStart: true }) : (m.render($('paneHunter')), m.startWatcher())); }).catch(() => {});
+  else if (which === 'hunter') import('./boxhunter.mjs?v=25').then(m => { (m.initBoxHunter ? m.initBoxHunter($('paneHunter'), { autoStart: true }) : (m.render($('paneHunter')), m.startWatcher())); }).catch(() => {});
   else renderReport();
 }
 
@@ -1416,7 +1416,7 @@ async function renderAccount() {
   const p = $('paneAccount'); if (!p) return;
   p.innerHTML = '<div class="hd"><b>👤 حسابي</b></div><div class="sb">كنقرا الحساب من TikTok الرسمي... </div>';
   let m = null;
-  try { m = await import('./boxhunter.mjs?v=24'); } catch (e) { m = null; }
+  try { m = await import('./boxhunter.mjs?v=25'); } catch (e) { m = null; }
   if (!m) { p.innerHTML = '<div class="hd"><b>👤 حسابي</b></div><div class="sb">تعذر تحميل وحدة الحساب.</div>'; return; }
   const st = m.tkStatus ? m.tkStatus() : { state: 'none', label: 'غير مضبوط' };
   const sess = m.tkToken ? (m.tkToken() || {}) : {};
