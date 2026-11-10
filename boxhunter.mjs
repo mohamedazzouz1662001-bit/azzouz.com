@@ -150,9 +150,16 @@ function collect(id, mode) {
 
 
 /* ===== ربط حساب TikTok رسميا (Login Kit + PKCE) ===== */
-const TK = { key: 'bh-tk-client', tok: 'bh-tk-token', ver: 'bh-tk-ver' };
+const TK = { key: 'bh-tk-client', tok: 'bh-tk-token', ver: 'bh-tk-ver', user: 'bh-tk-user' };
 const TK_API = 'https://superagent-1906c8e6.base44.app/functions/tiktokAuth';
 export function tkToken() { try { const t = JSON.parse(localStorage.getItem(TK.tok) || 'null'); return t && t.access_token ? t : null; } catch (e) { return null; } }
+export function tkUser() { return (localStorage.getItem(TK.user) || '').replace(/^@+/, '').trim(); }
+export function tkSetUser(u) {
+  const v = String(u || '').replace(/^@+/, '').replace(/[^A-Za-z0-9._]/g, '').trim();
+  if (!v) { localStorage.removeItem(TK.user); return false; }
+  localStorage.setItem(TK.user, v); return true;
+}
+
 export function tkStatus() {
   const ck = localStorage.getItem(TK.key); const t = tkToken();
   if (t) return { state: 'linked', label: 'مربوط رسميا', key: ck };
@@ -298,6 +305,11 @@ export function render(root) {
       <button class="bh-b g" id="bhCkSave">💾 حفظ</button>
       <button class="bh-b g" id="bhCkClear">🗑 مسح</button>
     </div>
+    <div class="bh-row" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:6px">
+      <input id="bhUser" placeholder="اسم حساب TikTok @" value="${esc(tkUser())}" style="flex:1;min-width:120px">
+      <button class="bh-b g" id="bhUserSave">💾 ربط يدوي</button>
+      ${tkUser() ? '<a class="bh-b" href="https://www.tiktok.com/@' + esc(tkUser()) + '" target="_blank" rel="noopener">↗ الحساب</a>' : ''}
+    </div>
     <div class="bh-t">📌 المفتاح كيبدا بحروف وأرقام (بحال aw1234abcd)، وماشي App ID. كاين فـ Basic information ← Client key، والسر Client secret. ما كتحتاجش السر هنا، كيبقى فالسيرفر.</div>
     <div class="bh-row" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:6px">
       <button class="bh-b" id="bhRadar">${st.radar ? '🛰️ الرادار شاعل' : '🛰️ شغل الرادار'}</button>
@@ -306,7 +318,7 @@ export function render(root) {
       <span class="bh-t">${RADAR_BUSY ? 'كيقلب…' : 'بحث مرحلي'}</span>
       ${(() => { const n = rd('bh-need', { n: 0 }); return n.n ? '<span class="bh-t bh-warn">🔔 كتحتاج تدخلك: ' + n.n + '</span>' : '<span class="bh-t">ما كاين حتى تدخل مطلوب</span>'; })()}
     </div>
-    <div class="bh-t">حالة الحساب: ${(() => { const t = tkToken(); if (!t) return '<span class="bh-warn">ماشي مربوط رسميا</span>'; const nm = (t.me && t.me.display_name) || 'مربوط'; return '<b>' + esc(nm) + '</b> مربوط رسميا'; })()} — TikTok ما كتوفرش API عمومي لصناديق LIVE. الجمع كيتم بيدك.</div>
+    <div class="bh-t">حالة الحساب: ${(() => { const t = tkToken(); if (!t) { const mu = tkUser(); return mu ? '<b>@' + esc(mu) + '</b> مربوط يدويا (بلا OAuth)' : '<span class="bh-warn">ماشي مربوط</span>'; } const nm = (t.me && t.me.display_name) || 'مربوط'; return '<b>' + esc(nm) + '</b> مربوط رسميا'; })()} — TikTok ما كتوفرش API عمومي لصناديق LIVE. الجمع كيتم بيدك.</div>
     <div class="bh-cards">
       <div class="bh-c"><b>${B.length}</b><span>مكتشفة</span></div>
       <div class="bh-c"><b>${avail.length}</b><span>متاحة دابا</span></div>
@@ -373,6 +385,12 @@ export function render(root) {
     msg(r.ok ? '✅ تحفظ Client Key. دابا اضغط «ربط حساب TikTok».' : '⚠️ ' + r.why);
   });
   $('#bhCkClear')?.addEventListener('click', () => { localStorage.removeItem(TK.key); render(root); msg('تمسحات Client Key.'); });
+  $('#bhUserSave')?.addEventListener('click', () => {
+    const el = document.getElementById('bhUser');
+    const ok = tkSetUser(el ? el.value : '');
+    render(root);
+    msg(ok ? 'تربط الحساب يدويا: @' + tkUser() : 'كتب اسم حساب صحيح.');
+  });
   $('#bhTkIn')?.addEventListener('click', () => { tkConnect(); });
   $('#bhTkOut')?.addEventListener('click', () => { tkDisconnect(); render(root); });
   $('#bhSilent')?.addEventListener('click', () => {
