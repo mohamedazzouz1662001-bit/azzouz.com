@@ -218,6 +218,27 @@ export async function tkFinish() {
   return false;
 }
 
+export async function tkRefresh() {
+  const t = tkToken();
+  if (!t || !t.refresh_token) return false;
+  const age = (Date.now() - (t.at || 0)) / 1000;
+  if (age < (t.expires_in || 86400) - 600) return true;
+  try {
+    const r = await fetch('https://open.tiktokapis.com/v2/oauth/token/', {
+      method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ client_key: tkClientKey(), grant_type: 'refresh_token', refresh_token: t.refresh_token })
+    });
+    const j = await r.json();
+    if (j && j.access_token) {
+      localStorage.setItem(TK.tok, JSON.stringify({ ...t, ...j, at: Date.now() }));
+      logIt('auth', 'تجدد التوكن');
+      return true;
+    }
+    logIt('auth', 'فشل تجديد التوكن: ' + (j.error_description || j.error || 'خطأ'));
+  } catch (e) {}
+  return false;
+}
+
 export function render(root) {
   if (!root) return;
   if (!document.getElementById('bh-style')) {
@@ -383,6 +404,7 @@ export function startWatcher() {
   tick();
   if (BH_TIMER) return;
   BH_TIMER = setInterval(() => {
+    try { tkRefresh(); } catch (e) {}
     tick();
     const pane = document.getElementById('paneHunter');
     if (pane && !pane.hidden && !document.getElementById('bh-busy')) render(pane);
