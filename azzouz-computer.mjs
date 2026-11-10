@@ -9,7 +9,8 @@ import os from 'node:os';
 import { exec } from 'node:child_process';
 
 const RELAY = 'https://superagent-1906c8e6.base44.app/functions/azzouzComputer';
-const KEY = 'AZZOUZ-PC-2026';
+const KEY = process.env.AZZOUZ_KEY || ''; // المفتاح كيجي من متغير البيئة، ماشي مكتوب فالكود
+if (!KEY) { console.error('خاصك AZZOUZ_KEY. ستعملها من azzouz-ai.html ← الحاسوب ← مفتاح جديد.'); process.exit(1); }
 const OUT = path.join(os.homedir(), 'azzouz-work');
 const AUTO = process.env.AZZOUZ_AUTO === '1';
 const NAME = os.hostname();
@@ -40,7 +41,8 @@ function parse(job) {
 
 function sh(cmd) {
   return new Promise(res => {
-    exec(cmd, { cwd: OUT, timeout: 90000, maxBuffer: 6 * 1024 * 1024 }, (err, stdout, stderr) => {
+    if (!AUTO && process.env.AZZOUZ_ALLOW_EXEC !== '1') { console.log('[محجوز] أمر ما تنفذش: ' + cmd); return; }
+  exec(cmd, { cwd: OUT, timeout: 90000, maxBuffer: 6 * 1024 * 1024 }, (err, stdout, stderr) => {
       res(((stdout || '') + (stderr || '') + (err ? '\n' + err.message : '')).trim().slice(0, 4000));
     });
   });
