@@ -1294,6 +1294,68 @@ function attachVisits() {
   log.scrollTop = log.scrollHeight;
 }
 
+
+/* ===== توسّع فالويب كله: Bing عبر بروكسي Base44 ===== */
+async function bingPage(q, first) {
+  const target = 'https://www.bing.com/search?q=' + encodeURIComponent(q) + '&count=30' + (first ? '&first=' + first : '');
+  try {
+    const r = await fetch(PROXY, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: target, raw: true }), signal: AbortSignal.timeout(18000)
+    });
+    const j = await r.json();
+    if (!j || !j.ok || !j.html) return [];
+    const html = String(j.html);
+    const out = [];
+    const re = /<li class="b_algo"[\s\S]{0,400}?<h2[^>]*>\s*<a[^>]*href="([^"]+)"[^>]*>([\s\S]{0,300}?)<\/a>/g;
+    let m;
+    while ((m = re.exec(html)) && out.length < 30) {
+      const url = m[1].replace(/&amp;/g, '&');
+      if (!/^https?:\/\//i.test(url)) continue;
+      if (/bing\.com|microsoft\.com\/…/i.test(url)) continue;
+      const title = m[2].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+      out.push({ name: '🔎 Bing', title: title || url, url: url, sum: '' });
+    }
+    return out;
+  } catch (e) { return []; }
+}
+
+async function webWideSources(q, deep) {
+  const base = String(q || '').trim();
+  const queries = [base, base + ' pdf', base + ' youtube', base + ' github', base + ' research paper', base + ' ويكيبيديا'];
+  const firsts = deep ? [1, 11, 21] : [1];
+  const jobs = [];
+  queries.forEach(qq => firsts.forEach(f => jobs.push(() => bingPage(qq, f))));
+  const res = [];
+  let idx = 0;
+  async function worker() {
+    while (idx < jobs.length) {
+      const k = idx++;
+      const part = await jobs[k]();
+      part.forEach(x => res.push(x));
+    }
+  }
+  await Promise.all([worker(), worker(), worker()]);
+  const seen = new Set();
+  return res.filter(x => {
+    const u = x.url.split('#')[0];
+    if (seen.has(u)) return false;
+    seen.add(u);
+    return true;
+  });
+}
+
+async function expandWeb(q, box, all) {
+  const before = all.length;
+  const got = await webWideSources(q, true);
+  got.forEach(g => {
+    if (!all.some(x => String(x.url || '').split('#')[0] === g.url.split('#')[0])) all.push(g);
+  });
+  logVisit('bing.com (ويب كامل)', 'ok', got.length);
+  if (typeof renderAll === 'function') renderAll();
+  return all.length - before;
+}
+
 function attachRefs(list, q) {
   if (!Array.isArray(list) || !list.length) return;
   const qq = String(q || '').trim();
@@ -1320,6 +1382,15 @@ function attachRefs(list, q) {
     const b10 = document.createElement('span');
     b10.className = 'exp';
     b10.textContent = '⚡ جيب 10 آلاف مصدر';
+    const bweb = document.createElement('span');
+    bweb.className = 'exp';
+    bweb.textContent = '🌍 وسّع فالويب كله';
+    bweb.onclick = async () => {
+      bweb.textContent = '⏳ كنقلب فالويب كله...';
+      const n = await expandWeb(qq, box, all);
+      bweb.textContent = '🌍 +' + n + ' مصدر من الويب. زيد مرة أخرى';
+      render();
+    };
     b10.onclick = async () => {
       if (!qq) { toastMsg('ما كاينش سؤال مرتبط باش نوسّع.'); return; }
       let total = 0;
@@ -1334,7 +1405,8 @@ function attachRefs(list, q) {
     bAll.className = 'exp';
     bAll.textContent = '👁️ عرض كلشي';
     bAll.onclick = () => { box.querySelectorAll('.grp-more').forEach(m => m.click()); };
-    bar.appendChild(b10); bar.appendChild(bAll);
+    bar.appendChild(b10);
+    bar.appendChild(bweb); bar.appendChild(bAll);
     box.appendChild(bar);
 
     REF_GROUPS.forEach(g => {
