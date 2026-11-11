@@ -1296,6 +1296,19 @@ function attachVisits() {
 
 
 /* ===== توسّع فالويب كله: Bing عبر بروكسي Base44 ===== */
+function bingReal(href) {
+  const h = String(href || '').replace(/&amp;/g, '&');
+  const m = h.match(/[?&]u=a1([^&]+)/);
+  if (!m) return h;
+  try {
+    let b = decodeURIComponent(m[1]).replace(/-/g, '+').replace(/_/g, '/');
+    while (b.length % 4) b += '=';
+    const out = atob(b);
+    if (/^https?:\/\//i.test(out)) return out;
+  } catch (e) {}
+  return h;
+}
+
 async function bingPage(q, first) {
   const target = 'https://www.bing.com/search?q=' + encodeURIComponent(q) + '&count=30' + (first ? '&first=' + first : '');
   try {
@@ -1307,17 +1320,19 @@ async function bingPage(q, first) {
     if (!j || !j.ok || !j.html) return [];
     const html = String(j.html);
     const out = [];
-    const re = /<li class="b_algo"[\s\S]{0,400}?<h2[^>]*>\s*<a[^>]*href="([^"]+)"[^>]*>([\s\S]{0,300}?)<\/a>/g;
-    let m;
-    while ((m = re.exec(html)) && out.length < 30) {
-      const url = m[1].replace(/&amp;/g, '&');
-      if (!/^https?:\/\//i.test(url)) continue;
-      if (/bing\.com|microsoft\.com\/…/i.test(url)) continue;
-      const title = m[2].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    const blocks = html.split('<li class="b_algo"').slice(1);
+    blocks.forEach(b => {
+      const a = b.match(/<h2[^>]*>\s*<a[^>]+href="([^"]+)"[^>]*>([\s\S]{0,300}?)<\/a>/);
+      if (!a) return;
+      const url = bingReal(a[1]);
+      if (!/^https?:\/\//i.test(url)) return;
+      if (/^https?:\/\/(www\.)?bing\.com/i.test(url)) return;
+      const title = a[2].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
       out.push({ name: '🔎 Bing', title: title || url, url: url, sum: '' });
-    }
+    });
+    logVisit(target, 'ok', out.length);
     return out;
-  } catch (e) { return []; }
+  } catch (e) { logVisit(target, 'fail', 0); return []; }
 }
 
 async function webWideSources(q, deep) {
