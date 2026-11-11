@@ -174,14 +174,14 @@ pre.cd{background:#0d1a20;border:1px solid #2a3942;border-radius:10px;padding:10
 <div class="sheet" id="sheet">
   <div class="sh"><b>الأدوات</b><button class="icon" id="clearChat" title="مسح المحادثة">🗑️</button>
     <button class="icon" id="expChat" title="تصدير المحادثة">📤</button><button class="icon" id="shclose">✕</button></div>
-  <div class="stabs"><button data-p="report" class="on">آخر جواب</button><button data-p="threads">المحادثات</button><button data-p="pc">الحاسوب</button><button data-p="tiktok"><svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" style="vertical-align:-2px" aria-hidden="true"><path d="M16.6 3c.3 2.2 1.6 3.7 3.7 4v2.7c-1.4.1-2.7-.3-3.9-1v5.9c0 3.1-2.5 5.7-5.6 5.7S5.2 17.6 5.2 14.5c0-3 2.3-5.4 5.3-5.7v2.8c-1.5.2-2.6 1.5-2.6 3 0 1.7 1.4 3 3 3s3-1.3 3-3V3h2.7z"/></svg> تيك توك</button><button data-p="hunter">🎁 Hunter</button><button data-p="account">👤 حسابي</button><button data-p="memory">الذاكرة</button></div>
+  <div class="stabs"><button data-p="report" class="on">آخر جواب</button><button data-p="threads">المحادثات</button><button data-p="pc">الحاسوب</button><button data-p="tiktok"><svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" style="vertical-align:-2px" aria-hidden="true"><path d="M16.6 3c.3 2.2 1.6 3.7 3.7 4v2.7c-1.4.1-2.7-.3-3.9-1v5.9c0 3.1-2.5 5.7-5.6 5.7S5.2 17.6 5.2 14.5c0-3 2.3-5.4 5.3-5.7v2.8c-1.5.2-2.6 1.5-2.6 3 0 1.7 1.4 3 3 3s3-1.3 3-3V3h2.7z"/></svg> تيك توك</button><button data-p="hunter">🎁 Hunter</button><button data-p="account">👤 حسابي</button><button data-p="cycle">🌀 Cycle Lab</button><button data-p="memory">الذاكرة</button></div>
   <div class="vkey"><input id="vkey" placeholder="مفتاح الرؤية (اختياري)"><button class="mini2" id="vsave">حفظ</button></div>
   <div class="sbody" id="paneReport"></div>
   <div class="sbody" id="paneThreads" hidden></div>
   <div class="sbody" id="panePC" hidden></div>
   <div class="sbody" id="paneTikTok" hidden></div>
   <div class="sbody" id="paneHunter" hidden></div>
-  <div class="sbody" id="paneAccount" hidden></div>
+  <div class="sbody" id="paneAccount" hidden></div><div class="sbody" id="paneCycle" hidden></div>
   <div class="sbody" id="paneMemory" hidden></div>
 </div>
 <script>
@@ -1668,11 +1668,13 @@ function openTools(which) {
   const ptt = $('paneTikTok'); if (ptt) ptt.hidden = which !== 'tiktok';
   const phu = $('paneHunter'); if (phu) phu.hidden = which !== 'hunter';
   const pac = $('paneAccount'); if (pac) pac.hidden = which !== 'account';
+  const pcy = $('paneCycle'); if (pcy) pcy.hidden = which !== 'cycle';
   document.querySelectorAll('.stabs button').forEach(b => b.classList.toggle('on', b.dataset.p === which));
   if (which === 'memory') renderMemory();
   else if (which === 'threads') renderThreads();
   else if (which === 'pc') renderPC();
   else if (which === 'tiktok') renderTikTok();
+  else if (which === 'cycle') renderCycle();
   else if (which === 'account') renderAccount();
   else if (which === 'hunter') import('./boxhunter.mjs?v=26').then(m => { (m.initBoxHunter ? m.initBoxHunter($('paneHunter'), { autoStart: true }) : (m.render($('paneHunter')), m.startWatcher())); }).catch(() => {});
   else renderReport();
@@ -1715,6 +1717,19 @@ async function renderAccount() {
 /* ===== صندوق TikTok ===== */
 function tkBox() { try { return JSON.parse(localStorage.getItem('azzouz-tk-box') || '[]'); } catch (e) { return []; } }
 function tkSave(l) { try { localStorage.setItem('azzouz-tk-box', JSON.stringify(l.slice(0, 200))); } catch (e) {} }
+
+
+function renderCycle() {
+  const p = $('paneCycle');
+  if (!p) return;
+  if (!p.dataset.built) {
+    p.dataset.built = '1';
+    p.innerHTML = '<div class="hd"><b>🌀 Cycle Lab</b></div>' +
+      '<div class="sb">مختبر الدورة الكاملة ديال Azzouz: استكشاف، حماية، نور، ميزان، بناء، فحص.</div>' +
+      '<iframe src="https://elazzouz-dotcom.github.io/cycle-lab/?locale=ar" style="width:100%;height:70vh;border:1px solid #21313a;border-radius:12px;background:#04060b" loading="lazy" referrerpolicy="no-referrer"></iframe>' +
+      '<div class="sb"><a class="lnk" href="https://elazzouz-dotcom.github.io/cycle-lab/?locale=ar" target="_blank" rel="noopener">حل فتبويب جديد ↗</a></div>';
+  }
+}
 
 async function renderTikTok() {
   const p = $('paneTikTok'); if (!p) return;
