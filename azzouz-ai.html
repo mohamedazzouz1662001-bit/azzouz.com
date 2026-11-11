@@ -939,7 +939,7 @@ function visitsInlineHTML() {
   const vs = (VISITS || []).slice();
   if (!vs.length) return '';
   const okN = vs.filter(v => v.state === 'ok').length;
-  let out = '<div style="margin-top:10px;border-top:1px solid #1b2430;padding-top:8px">';
+  let out = '<div data-visitblock="1" style="margin-top:10px;border-top:1px solid #1b2430;padding-top:8px">';
   out += '<div class="h">🌐 المواقع اللي دخلت ليها (' + vs.length + ' · نجح ' + okN + ')</div>';
   out += '<details open><summary style="cursor:pointer;color:#00b3ff;font-size:12px;font-weight:700">شوف اللائحة كاملة</summary>';
   vs.slice(0, 1500).forEach((v, i) => {
@@ -992,6 +992,27 @@ function renderAnswer(q, data, prior) {
         const old = el.querySelector('[data-srcblock]');
         if (old) old.remove();
         if (src) el.insertAdjacentHTML('beforeend', src);
+
+        // توسيع تلقائي فالويب كله، وكيتزاد فبلاصتو
+        if (typeof webWideSources === 'function') {
+          webWideSources(String(q || ''), false).then(extra => {
+            try {
+              if (!extra || !extra.length) return;
+              const have = new Set(data.sorted.map(x => String(x.url || '')));
+              const add = extra.filter(x => x.url && !have.has(String(x.url)));
+              if (!add.length) return;
+              data.sorted = add.concat(data.sorted);
+              const o2 = el.querySelector('[data-srcblock]');
+              if (o2) o2.remove();
+              const s2 = sourcesInlineHTML(data.sorted);
+              if (s2) el.insertAdjacentHTML('beforeend', s2);
+              const v2 = visitsInlineHTML();
+              const ov = el.querySelector('[data-visitblock]');
+              if (ov) ov.remove();
+              if (v2) el.insertAdjacentHTML('beforeend', v2);
+            } catch (e) {}
+          }).catch(() => {});
+        }
       } catch (e) {}
     }).catch(() => {});
   } catch (e) {}
