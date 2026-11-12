@@ -174,14 +174,14 @@ pre.cd{background:#0d1a20;border:1px solid #2a3942;border-radius:10px;padding:10
 <div class="sheet" id="sheet">
   <div class="sh"><b>الأدوات</b><button class="icon" id="clearChat" title="مسح المحادثة">🗑️</button>
     <button class="icon" id="expChat" title="تصدير المحادثة">📤</button><button class="icon" id="shclose">✕</button></div>
-  <div class="stabs"><button data-p="report" class="on">آخر جواب</button><button data-p="threads">المحادثات</button><button data-p="pc">الحاسوب</button><button data-p="tiktok"><svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" style="vertical-align:-2px" aria-hidden="true"><path d="M16.6 3c.3 2.2 1.6 3.7 3.7 4v2.7c-1.4.1-2.7-.3-3.9-1v5.9c0 3.1-2.5 5.7-5.6 5.7S5.2 17.6 5.2 14.5c0-3 2.3-5.4 5.3-5.7v2.8c-1.5.2-2.6 1.5-2.6 3 0 1.7 1.4 3 3 3s3-1.3 3-3V3h2.7z"/></svg> تيك توك</button><button data-p="hunter">🎁 Hunter</button><button data-p="account">👤 حسابي</button><button data-p="cycle">🌀 Cycle Lab</button><button data-p="memory">الذاكرة</button></div>
+  <div class="stabs"><button data-p="report" class="on">آخر جواب</button><button data-p="threads">المحادثات</button><button data-p="pc">الحاسوب</button><button data-p="tiktok"><svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" style="vertical-align:-2px" aria-hidden="true"><path d="M16.6 3c.3 2.2 1.6 3.7 3.7 4v2.7c-1.4.1-2.7-.3-3.9-1v5.9c0 3.1-2.5 5.7-5.6 5.7S5.2 17.6 5.2 14.5c0-3 2.3-5.4 5.3-5.7v2.8c-1.5.2-2.6 1.5-2.6 3 0 1.7 1.4 3 3 3s3-1.3 3-3V3h2.7z"/></svg> تيك توك</button><button data-p="hunter">🎁 Hunter</button><button data-p="account">👤 حسابي</button><button data-p="term">🖥️ Terminal</button><button data-p="cycle">🌀 Cycle Lab</button><button data-p="memory">الذاكرة</button></div>
   <div class="vkey"><input id="vkey" placeholder="مفتاح الرؤية (اختياري)"><button class="mini2" id="vsave">حفظ</button></div>
   <div class="sbody" id="paneReport"></div>
   <div class="sbody" id="paneThreads" hidden></div>
   <div class="sbody" id="panePC" hidden></div>
   <div class="sbody" id="paneTikTok" hidden></div>
   <div class="sbody" id="paneHunter" hidden></div>
-  <div class="sbody" id="paneAccount" hidden></div><div class="sbody" id="paneCycle" hidden></div>
+  <div class="sbody" id="paneAccount" hidden></div><div class="sbody" id="paneTerm" hidden></div><div class="sbody" id="paneCycle" hidden></div>
   <div class="sbody" id="paneMemory" hidden></div>
 </div>
 <script>
@@ -1776,6 +1776,7 @@ function openTools(which) {
   const ptt = $('paneTikTok'); if (ptt) ptt.hidden = which !== 'tiktok';
   const phu = $('paneHunter'); if (phu) phu.hidden = which !== 'hunter';
   const pac = $('paneAccount'); if (pac) pac.hidden = which !== 'account';
+  const ptm = $('paneTerm'); if (ptm) ptm.hidden = which !== 'term';
   const pcy = $('paneCycle'); if (pcy) pcy.hidden = which !== 'cycle';
   document.querySelectorAll('.stabs button').forEach(b => b.classList.toggle('on', b.dataset.p === which));
   if (which === 'memory') renderMemory();
@@ -1783,6 +1784,7 @@ function openTools(which) {
   else if (which === 'pc') renderPC();
   else if (which === 'tiktok') renderTikTok();
   else if (which === 'cycle') renderCycle();
+  else if (which === 'term') renderTerm();
   else if (which === 'account') renderAccount();
   else if (which === 'hunter') import('./boxhunter.mjs?v=26').then(m => { (m.initBoxHunter ? m.initBoxHunter($('paneHunter'), { autoStart: true }) : (m.render($('paneHunter')), m.startWatcher())); }).catch(() => {});
   else renderReport();
@@ -1826,6 +1828,63 @@ async function renderAccount() {
 function tkBox() { try { return JSON.parse(localStorage.getItem('azzouz-tk-box') || '[]'); } catch (e) { return []; } }
 function tkSave(l) { try { localStorage.setItem('azzouz-tk-box', JSON.stringify(l.slice(0, 200))); } catch (e) {} }
 
+
+
+/* ===== تيرمينال حقيقي على الحاسوب ديالك ===== */
+let TERM_HIST = [], TERM_POS = -1;
+function renderTerm() {
+  const p = $('paneTerm');
+  if (!p) return;
+  if (p.dataset.built) return;
+  p.dataset.built = '1';
+  p.innerHTML = '<div class="hd"><b>🖥️ Terminal</b></div>' +
+    '<div class="sb">أوامر حقيقية كتنتفذ فالحاسوب ديالك عبر الجسر. خاص azzouz-computer.mjs يكون شغال.</div>' +
+    '<div id="tmState" class="sb">كنشوف واش الحاسوب متصل...</div>' +
+    '<pre id="tmOut" style="white-space:pre-wrap;font-size:12px;background:#0a1218;border:1px solid #1e2c34;border-radius:10px;padding:10px;max-height:52vh;overflow:auto"></pre>' +
+    '<div style="display:flex;gap:6px;margin-top:8px"><span style="color:#00e5a0">$</span>' +
+    '<input id="tmIn" placeholder="كتب أمر: ls · pwd · python3 --version" style="flex:1;background:#0a1218;border:1px solid #1e2c34;border-radius:8px;color:#e8f1ff;padding:8px">' +
+    '<button class="fbtn send" id="tmGo">➤</button></div>' +
+    '<div class="sb" style="margin-top:6px">↑/↓ للسجل · <span id="tmClear" style="color:#00b3ff;cursor:pointer">مسح الشاشة</span></div>';
+
+  const out = $('tmOut'), inp = $('tmIn'), st = $('tmState');
+  const print = (t) => { out.textContent += t + '\n'; out.scrollTop = out.scrollHeight; };
+  $('tmClear').onclick = () => { out.textContent = ''; };
+
+  pcCall({ op: 'state' }).then(r => {
+    if (r && r.ok) st.textContent = r.online ? ('🟢 الحاسوب متصل: ' + r.machine + ' · آخر نبضة ' + new Date(r.last_seen).toLocaleTimeString('ar-MA')) : '🔴 الحاسوب ماشي متصل. شعل azzouz-computer.mjs.';
+  }).catch(() => { st.textContent = '⚠️ ما قدرتش نشوف حالة الحاسوب.'; });
+
+  async function runCmd(cmd) {
+    const c = String(cmd || '').trim();
+    if (!c) return;
+    TERM_HIST.push(c); TERM_POS = TERM_HIST.length;
+    print('$ ' + c);
+    if (c === 'clear') { out.textContent = ''; return; }
+    print('… كننتظر تنفيذ الأمر فالحاسوب');
+    try {
+      const push = await pcCall({ op: 'push', kind: 'shell', instruction: JSON.stringify({ op: 'run', cmd: c }) });
+      const id = push && (push.job_id || push.id);
+      if (!push || !push.ok || !id) { print('⚠️ ما قدرتش نبعث الأمر: ' + ((push && push.error) || 'خطأ')); return; }
+      const t0 = Date.now();
+      while (Date.now() - t0 < 120000) {
+        await new Promise(r => setTimeout(r, 1500));
+        const j = await pcCall({ op: 'job', id });
+        if (j && j.ok && (j.status === 'done' || j.status === 'error')) {
+          print(String(j.result || '(بلا خرج)'));
+          return;
+        }
+      }
+      print('⏱️ سال الوقت (120 ثانية) بلا نتيجة. يمكن خاصك تصادق على الأمر فالحاسوب.');
+    } catch (e) { print('⚠️ خطأ: ' + e.message); }
+  }
+
+  $('tmGo').onclick = () => { const v = inp.value; inp.value = ''; runCmd(v); };
+  inp.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); const v = inp.value; inp.value = ''; runCmd(v); }
+    else if (e.key === 'ArrowUp') { if (TERM_POS > 0) inp.value = TERM_HIST[--TERM_POS] || ''; }
+    else if (e.key === 'ArrowDown') { if (TERM_POS < TERM_HIST.length - 1) inp.value = TERM_HIST[++TERM_POS] || ''; else { TERM_POS = TERM_HIST.length; inp.value = ''; } }
+  });
+}
 
 function renderCycle() {
   const p = $('paneCycle');
