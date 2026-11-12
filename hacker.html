@@ -79,6 +79,7 @@ a{color:var(--c);text-decoration:none}
     <div id="term" class="mono"></div>
     <div class="row">
       <span class="ps mono">azzouz@core:~#</span>
+      <button id="voiceBtn" title="الصوت" style="margin-bottom:10px;background:#062a20;color:#34d399;border:1px solid #10b98155;border-radius:10px;padding:8px 12px;font-weight:700;cursor:pointer">🎙️ الصوت: مطفي</button>
       <input id="cmd" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="help · quote · hack · apps · matrix">
       <button class="btn" id="go">↵</button>
     </div>
@@ -169,6 +170,7 @@ function say(t, cls) {
   d.textContent = t;
   $('#term').appendChild(d);
   $('#term').scrollTop = $('#term').scrollHeight;
+  if (typeof speak === 'function') speak(t);
 }
 const HKEY = 'azzouz-hacker-hist';
 let hist = [];
@@ -252,3 +254,23 @@ setTimeout(() => {
 </script>
 </body>
 </html>
+
+/* ---- الصوت ---- */
+let VOICE = false;
+function speak(txt) {
+  if (!VOICE || !window.speechSynthesis) return;
+  try {
+    const u = new SpeechSynthesisUtterance(String(txt).replace(/[#·▸>]/g, ' ').slice(0, 220));
+    u.lang = 'ar-SA'; u.rate = 1.02; u.pitch = 1;
+    speechSynthesis.cancel(); speechSynthesis.speak(u);
+  } catch (e) {}
+}
+document.addEventListener('DOMContentLoaded', () => {});
+const vb = document.getElementById('voiceBtn');
+if (vb) vb.onclick = () => {
+  VOICE = !VOICE;
+  vb.textContent = VOICE ? '🔊 الصوت: خدام' : '🎙️ الصوت: مطفي';
+  vb.style.borderColor = VOICE ? '#34d399' : '#10b98155';
+  if (VOICE) speak('الصوت خدام');
+  else if (window.speechSynthesis) speechSynthesis.cancel();
+};
