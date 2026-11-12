@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hacker Terminal - Azzouz Edition</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600;700&family=Tajawal:wght@500;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        body {
+            font-family: 'Tajawal', 'Fira Code', monospace;
+            background-color: #050505;
+            overflow-x: hidden;
+        }
+        .code-font {
+            font-family: 'Fira Code', monospace;
+        }
+        .neon-glow-emerald {
+            text-shadow: 0 0 10px rgba(16, 185, 129, 0.7), 0 0 20px rgba(16, 185, 129, 0.4);
+        }
+        .neon-glow-cyan {
+            text-shadow: 0 0 10px rgba(6, 182, 212, 0.7), 0 0 20px rgba(6, 182, 212, 0.4);
+        }
+        .box-glow {
+            box-shadow: 0 0 25px rgba(16, 185, 129, 0.15), inset 0 0 15px rgba(16, 185, 129, 0.05);
+        }
+        canvas#matrix {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            opacity: 0.25;
+            pointer-events: none;
+        }
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #09090b;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #10b981;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+
+<body class="min-h-screen text-emerald-400 flex flex-col items-center justify-between p-4 sm:p-6 selection:bg-emerald-500 selection:text-black">
+    <canvas id="matrix"></canvas>
+
+    <header class="w-full max-w-2xl flex justify-between items-center bg-black/60 backdrop-blur-md border border-emerald-500/30 rounded-2xl p-4 shadow-lg mb-4">
+        <div class="flex items-center space-x-3 space-x-reverse">
+            <div class="w-3 h-3 rounded-full bg-red-500 animate-pulse"></div>
+            <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
+            <div class="w-3 h-3 rounded-full bg-emerald-500"></div>
+            <span class="text-xs code-font text-emerald-400 font-bold ml-2">azzouz@core:~#</span>
+        </div>
+        <div class="flex items-center space-x-3 space-x-reverse">
+            <span class="text-xs bg-emerald-950/80 border border-emerald-500/40 text-emerald-300 px-3 py-1 rounded-full code-font">
+                <i class="fa-solid fa-shield-halved ml-1"></i> SECURE_ENV
+            </span>
+        </div>
+    </header>
+
+    <main class="w-full max-w-2xl flex-1 flex flex-col justify-center items-center my-auto">
+        <div class="w-full bg-zinc-950/85 backdrop-blur-xl border-2 border-emerald-500/40 rounded-3xl p-6 sm:p-8 box-glow relative group transition-all duration-300 hover:border-emerald-400">
+            <div class="flex justify-between items-center border-b border-emerald-500/20 pb-4 mb-6">
+                <div class="flex items-center space-x-2 space-x-reverse">
+                    <i class="fa-solid fa-terminal text-emerald-400 animate-pulse"></i>
+                    <h1 class="text-sm sm:text-base font-bold text-emerald-200 code-font">glory_protocol.py</h1>
+                </div>
+                <div class="text-xs code-font text-emerald-500/70" id="live-clock">00:00:00</div>
+            </div>
+
+            <div class="space-y-4 code-font text-sm sm:text-base leading-relaxed">
+                <div class="text-zinc-500 text-xs"># --------------------------------------------------</div>
+                <div class="text-zinc-500 text-xs"># STATUS: LEGENDARY_MODE = Active</div>
+                <div class="text-zinc-500 text-xs"># --------------------------------------------------</div>
+
+                <div>
+                    <span class="text-cyan-400">def</span> <span class="text-yellow-300">generate_glory</span>():
+                </div>
+
+                <div class="pr-6 space-y-2">
+                    <div><span class="text-purple-400">auth</span> = <span class="text-emerald-300">"AZZOUZ_ELITE"</span></div>
+                    <div><span class="text-purple-400">status</span> = <span class="text-emerald-300">True</span></div>
+                    <div><span class="text-cyan-400">return</span> <span class="text-zinc-400">"</span><span id="typed-text" class="text-emerald-300 font-bold neon-glow-emerald"></span><span class="inline-block w-2.5 h-5 bg-emerald-400 ml-1 animate-pulse"></span><span class="text-zinc-400">"</span></div>
+                </div>
+            </div>
+
+            <div class="mt-8 pt-6 border-t border-emerald-500/20">
+                <div class="text-xs text-zinc-400 mb-2 flex items-center justify-between">
+                    <span><i class="fa-solid fa-play ml-1 text-emerald-400"></i> TikTok Bio Output Preview:</span>
+                    <button onclick="copyQuote()" class="text-emerald-400 hover:text-white transition bg-emerald-950/60 hover:bg-emerald-900 border border-emerald-500/30 px-3 py-1 rounded-lg text-xs cursor-pointer flex items-center gap-1">
+                        <i class="fa-regular fa-copy"></i> ناسخ النص
+                    </button>
+                </div>
+                <div id="bio-output" class="p-4 bg-black/60 border border-emerald-500/30 rounded-2xl text-center text-lg sm:text-xl font-black text-emerald-300 neon-glow-emerald tracking-wide select-all">
+                    لَا يَصْنَعُ المَجْدَ إِلَّا مَنْ عَجِزَ عَنْهُ سِوَاهُ.
+                </div>
+            </div>
+
+            <div class="mt-6 flex flex-wrap gap-3 justify-center">
+                <button onclick="replayTyping()" class="flex-1 min-w-[130px] py-2.5 px-4 bg-emerald-900/40 hover:bg-emerald-800/60 border border-emerald-500/50 rounded-xl text-xs sm:text-sm font-bold text-emerald-300 transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer">
+                    <i class="fa-solid fa-rotate-right"></i> إعادة الكتابة
+                </button>
+                <button onclick="toggleMatrixSpeed()" id="speed-btn" class="flex-1 min-w-[130px] py-2.5 px-4 bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 rounded-xl text-xs sm:text-sm font-bold text-zinc-300 transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer">
+                    <i class="fa-solid fa-bolt text-yellow-400"></i> سرعة ماتركس: عادية
+                </button>
+            </div>
+
+            <div class="mt-5 pt-4 border-t border-emerald-500/20 text-center">
+                <a href="./apps.html" class="text-xs code-font text-emerald-400 hover:text-white transition">← رجع لجميع التطبيقات</a>
+                <span class="text-xs code-font text-zinc-600 mx-2">|</span>
+                <a href="./term.html" class="text-xs code-font text-cyan-400 hover:text-white transition">التيرمينال الحقيقي</a>
+            </div>
+        </div>
+    </main>
+
+    <div id="toast" class="fixed bottom-6 bg-emerald-500 text-black font-bold px-6 py-3 rounded-2xl shadow-2xl transition-all duration-300 opacity-0 translate-y-10 pointer-events-none z-50 text-sm code-font">
+        <i class="fa-solid fa-check-circle ml-2"></i> تم نسخ النص بنجاح للحافظة!
+    </div>
+
+    <footer class="w-full max-w-2xl text-center text-xs text-zinc-600 code-font py-4">
+        Azzouz Core Terminal &bull; Cybernetic Aesthetic v3.2
+    </footer>
+
+    <script>
+        const canvas = document.getElementById('matrix');
+        const ctx = canvas.getContext('2d');
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        const arabicChars = 'ابتثجحخدذرزسشصضطظعغفقكلمنهوية0123456789ABCDEF';
+        const fontSize = 16;
+        let columns = canvas.width / fontSize;
+        let drops = [];
+
+        for (let i = 0; i < columns; i++) {
+            drops[i] = 1;
+        }
+
+        let matrixSpeedFactor = 33;
+        let matrixInterval = setInterval(drawMatrix, matrixSpeedFactor);
+
+        function drawMatrix() {
+            ctx.fillStyle = 'rgba(5, 5, 5, 0.12)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.fillStyle = '#10b981';
+            ctx.font = fontSize + 'px monospace';
+
+            for (let i = 0; i < drops.length; i++) {
+                const text = arabicChars.charAt(Math.floor(Math.random() * arabicChars.length));
+                ctx.fillText(text, i * fontSize, drops[i] * fontSize);
+
+                if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) {
+                    drops[i] = 0;
+                }
+                drops[i]++;
+            }
+        }
+
+        function updateClock() {
+            const now = new Date();
+            const timeString = now.toTimeString().split(' ')[0];
+            document.getElementById('live-clock').innerText = timeString;
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        const quoteText = "لَا يَصْنَعُ المَجْدَ إِلَّا مَنْ عَجِزَ عَنْهُ سِوَاهُ.";
+        let charIndex = 0;
+        let typingTimer;
+
+        function typeWriter() {
+            if (charIndex < quoteText.length) {
+                document.getElementById('typed-text').innerHTML += quoteText.charAt(charIndex);
+                charIndex++;
+                typingTimer = setTimeout(typeWriter, 70);
+            }
+        }
+
+        function replayTyping() {
+            clearTimeout(typingTimer);
+            document.getElementById('typed-text').innerHTML = "";
+            charIndex = 0;
+            typeWriter();
+        }
+
+        window.onload = function() {
+            typeWriter();
+        };
+
+        let isFast = false;
+        function toggleMatrixSpeed() {
+            clearInterval(matrixInterval);
+            isFast = !isFast;
+            if (isFast) {
+                matrixSpeedFactor = 15;
+                document.getElementById('speed-btn').innerHTML = '<i class="fa-solid fa-bolt text-emerald-400"></i> سرعة ماتركس: فائقة';
+                document.getElementById('speed-btn').classList.add('border-emerald-500');
+            } else {
+                matrixSpeedFactor = 33;
+                document.getElementById('speed-btn').innerHTML = '<i class="fa-solid fa-bolt text-yellow-400"></i> سرعة ماتركس: عادية';
+                document.getElementById('speed-btn').classList.remove('border-emerald-500');
+            }
+            matrixInterval = setInterval(drawMatrix, matrixSpeedFactor);
+        }
+
+        function copyQuote() {
+            const textToCopy = quoteText;
+            const textArea = document.createElement("textarea");
+            textArea.value = textToCopy;
+            document.body.appendChild(textArea);
+            textArea.select();
+            try {
+                document.execCommand('copy');
+                showToast();
+            } catch (err) {
+                console.error('Failed to copy', err);
+            }
+            document.body.removeChild(textArea);
+        }
+
+        function showToast() {
+            const toast = document.getElementById('toast');
+            toast.classList.remove('opacity-0', 'translate-y-10');
+            toast.classList.add('opacity-100', 'translate-y-0');
+            setTimeout(() => {
+                toast.classList.remove('opacity-100', 'translate-y-0');
+                toast.classList.add('opacity-0', 'translate-y-10');
+            }, 2500);
+        }
+    </script>
+</body>
+</html>
