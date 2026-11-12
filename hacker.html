@@ -204,7 +204,7 @@ async function run(line) {
 
   const [n, ...a] = c.split(/\s+/);
   switch (n) {
-    case 'help': say('الأوامر: help · whoami · quote · copy · date · hack · matrix [on|off|fast] · apps · term · clear · echo <text>'); break;
+    case 'help': say('الأوامر: help · whoami · quote · copy · date · hack · matrix [on|off|fast] · voice [on|off] · say <text> · apps · term · clear · echo <text>'); break;
     case 'whoami': say('azzouz · AZZOUZ_ELITE · browser sandbox'); break;
     case 'quote': say(QUOTE); break;
     case 'copy': copyQuote(); say('تنسخ ✓'); break;
@@ -214,6 +214,27 @@ async function run(line) {
     case 'term': location.href = './term.html'; break;
     case 'clear': $('#term').textContent = ''; break;
     case 'echo': say(a.join(' ')); break;
+    case 'say': {
+      const txt = a.join(' ').trim();
+      if (!txt) { say('كتب: say <النص اللي بغيتي يتقرا>', 'e'); break; }
+      const was = VOICE;
+      VOICE = true;
+      say('🔊 ' + txt);
+      VOICE = was;
+      break;
+    }
+    case 'voice': {
+      const v = (a[0] || '').toLowerCase();
+      const btn = document.getElementById('voiceBtn');
+      const on = v === 'on' ? true : v === 'off' ? false : !VOICE;
+      VOICE = on;
+      if (btn) {
+        btn.textContent = on ? '🔊 الصوت: خدام' : '🎙️ الصوت: مطفي';
+        btn.style.borderColor = on ? '#34d399' : '#10b98155';
+      }
+      say(on ? 'الصوت خدام' : 'الصوت مطفي');
+      break;
+    }
     case 'matrix': {
       const m = a[0] || 'fast';
       if (m === 'off') { matrixOff(); say('matrix = off'); }
