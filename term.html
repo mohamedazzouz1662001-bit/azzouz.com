@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>AZZOUZ Term — تيرمينال فالمتصفح</title>
+<meta name="theme-color" content="#04060b">
+<style>
+:root{--bg:#05070a;--bar:#0b1218;--line:#1b2a33;--txt:#d8e9ef;--dim:#7f97a5;--g:#00e5a0;--b:#00b3ff;--red:#ff6b6b}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--txt);font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,"Courier New",monospace;display:flex;flex-direction:column;overflow:hidden}
+header{background:var(--bar);border-bottom:1px solid var(--line);padding:9px 12px;display:flex;align-items:center;gap:10px;font-size:12.5px}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--g);box-shadow:0 0 8px var(--g)}
+header b{color:var(--g);font-weight:700}
+header .sp{flex:1}
+header a{color:var(--b);text-decoration:none;font-size:12px}
+#out{flex:1;overflow-y:auto;padding:12px;font-size:12.5px;line-height:1.6;white-space:pre-wrap;word-break:break-word;direction:ltr;text-align:left}
+#out .c{color:var(--g)}
+#out .e{color:var(--red)}
+#out .m{color:var(--dim)}
+#out .u{color:var(--b)}
+form{display:flex;gap:8px;padding:10px 12px calc(10px + env(safe-area-inset-bottom));background:var(--bar);border-top:1px solid var(--line)}
+#ps{color:var(--g);font-size:12.5px;white-space:nowrap;align-self:center}
+#in{flex:1;background:transparent;border:0;outline:0;color:var(--txt);font:inherit;font-size:13px;min-width:0}
+#go{background:var(--g);color:#04120c;border:0;border-radius:8px;padding:7px 12px;font-weight:700;font-family:inherit}
+.keys{display:flex;gap:6px;padding:0 12px 8px;background:var(--bar);overflow-x:auto}
+.keys button{background:#0f1a21;border:1px solid var(--line);color:var(--dim);border-radius:8px;padding:6px 9px;font-size:11.5px;font-family:inherit;white-space:nowrap}
+.keys button:active{border-color:var(--g);color:var(--g)}
+</style></head>
+<body>
+<header><span class="dot"></span><b>AZZOUZ Term</b><span style="color:var(--dim)">· فالمتصفح</span><span class="sp"></span><a href="./apps.html">كل التطبيقات</a><a href="./azzouz-ai.html">Azzouz</a></header>
+<div id="out"></div>
+<div class="keys">
+  <button data-c="help">help</button>
+  <button data-c="ls">ls</button>
+  <button data-c="pwd">pwd</button>
+  <button data-c="tree">tree</button>
+  <button data-c="df">df</button>
+  <button data-c="py">py</button>
+  <button data-c="clear">clear</button>
+</div>
+<form id="f"><span id="ps">~$</span><input id="in" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="كتب أمر… help"><button id="go" type="submit">↵</button></form>
+
+<script src="./term-core.js"></script>
+<script>
+(function () {
+  const out = document.getElementById('out'), inp = document.getElementById('in'), ps = document.getElementById('ps');
+  const PROXY = 'https://superagent-1906c8e6.base44.app/functions/azzouzProxy';
+  const t = TermCore.create();
+  let pyodide = null, pyBusy = false;
+  const HKEY = 'azzouz-term-hist';
+  let hist = [];
+  try { hist = JSON.parse(localStorage.getItem(HKEY) || '[]'); } catch (e) { hist = []; }
+  let pos = hist.length;
+
+  function line(txt, cls) {
+    const d = document.createElement('div');
+    if (cls) d.className = cls;
+    d.textContent = txt;
+    out.appendChild(d);
+    out.scrollTop = out.scrollHeight;
+  }
+
+  line('AZZOUZ Term — تيرمينال فالمتصفح، كيخدم على التيليفون بلا سيرفر.', 'm');
+  line('كتب help باش تشوف الأوامر. python: كتب py. جلب صفحة: curl <url>.', 'm');
+  line('');
+
+  function setPrompt(p) { ps.textContent = p || '~$'; }
+
+  async function onCurl(url) {
+    line('… كنجيب ' + url, 'm');
+    try {
+      const r = await fetch(PROXY, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }), signal: AbortSignal.timeout(25000) });
+      const j = await r.json();
+      if (!j.ok) return 'curl: ' + (j.error || 'فشل');
+      return String(j.text || '').slice(0, 6000);
+    } catch (e) { return 'curl: ' + e.message; }
+  }
+
+  async function onPython(code) {
+    if (pyBusy) return 'Python باقي كيتشعل، عاود من بعد شوية.';
+    pyBusy = true;
+    try {
+      if (!pyodide) {
+        line('⏳ كنشعل Python فالمتصفح (أول مرة غير، ~8 ميغا)…', 'm');
+        if (!window.loadPyodide) {
+          await new Promise((res, rej) => {
+            const s = document.createElement('script');
+            s.src = 'https://cdn.jsdelivr.net/pyodide/v0.26.2/full/pyodide.js';
+            s.onload = res; s.onerror = () => rej(new Error('تعذر تحميل Pyodide'));
+            document.head.appendChild(s);
+          });
+        }
+        pyodide = await window.loadPyodide({ indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.26.2/full/' });
+        line('✅ Python جاهز. أمثلة: py print(2**100) — py import math; print(math.pi)', 'm');
+        if (!code) return '';
+      }
+      if (!code) return 'كتب: py print("سلام")';
+      const res = await pyodide.runPythonAsync(code);
+      return res === undefined ? '' : String(res);
+    } catch (e) {
+      return 'Python: ' + (e && e.message ? e.message : String(e));
+    } finally { pyBusy = false; }
+  }
+
+  async function exec(cmd) {
+    const r = await t.run(cmd, { onCurl, onPython });
+    if (r.clear) { out.textContent = ''; }
+    if (r.out) line(r.out);
+    setPrompt(r.prompt);
+    if (cmd.trim()) {
+      hist.push(cmd.trim());
+      if (hist.length > 200) hist = hist.slice(-200);
+      try { localStorage.setItem(HKEY, JSON.stringify(hist)); } catch (e) {}
+      pos = hist.length;
+    }
+  }
+
+  document.getElementById('f').addEventListener('submit', async e => {
+    e.preventDefault();
+    const v = inp.value;
+    inp.value = '';
+    line(ps.textContent + ' ' + v, 'c');
+    await exec(v);
+  });
+
+  inp.addEventListener('keydown', e => {
+    if (e.key === 'ArrowUp') { if (pos > 0) { pos--; inp.value = hist[pos] || ''; } e.preventDefault(); }
+    else if (e.key === 'ArrowDown') { if (pos < hist.length - 1) { pos++; inp.value = hist[pos] || ''; } else { pos = hist.length; inp.value = ''; } e.preventDefault(); }
+  });
+
+  document.querySelectorAll('.keys button').forEach(b => {
+    b.addEventListener('click', () => {
+      const c = b.dataset.c;
+      if (c === 'py') { inp.value = 'py '; inp.focus(); return; }
+      inp.value = '';
+      line(ps.textContent + ' ' + c, 'c');
+      exec(c);
+    });
+  });
+
+  setPrompt(t.prompt());
+  line('حطيت ' + (localStorage.getItem('azzouz-term-vfs') ? 'ملفاتك المحفوظة' : 'نظام جديد') + '.', 'm');
+})();
+</script>
+</body></html>
