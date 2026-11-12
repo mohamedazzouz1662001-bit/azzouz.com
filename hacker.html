@@ -1,247 +1,254 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hacker Terminal - Azzouz Edition</title>
-
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600;700&family=Tajawal:wght@500;700;900&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-
-    <style>
-        body {
-            font-family: 'Tajawal', 'Fira Code', monospace;
-            background-color: #050505;
-            overflow-x: hidden;
-        }
-        .code-font {
-            font-family: 'Fira Code', monospace;
-        }
-        .neon-glow-emerald {
-            text-shadow: 0 0 10px rgba(16, 185, 129, 0.7), 0 0 20px rgba(16, 185, 129, 0.4);
-        }
-        .neon-glow-cyan {
-            text-shadow: 0 0 10px rgba(6, 182, 212, 0.7), 0 0 20px rgba(6, 182, 212, 0.4);
-        }
-        .box-glow {
-            box-shadow: 0 0 25px rgba(16, 185, 129, 0.15), inset 0 0 15px rgba(16, 185, 129, 0.05);
-        }
-        canvas#matrix {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: -1;
-            opacity: 0.25;
-            pointer-events: none;
-        }
-        ::-webkit-scrollbar {
-            width: 6px;
-        }
-        ::-webkit-scrollbar-track {
-            background: #09090b;
-        }
-        ::-webkit-scrollbar-thumb {
-            background: #10b981;
-            border-radius: 3px;
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AZZOUZ CORE — Hacker Terminal v4</title>
+<meta name="theme-color" content="#050505">
+<link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600;700&family=Tajawal:wght@500;700;900&display=swap" rel="stylesheet">
+<style>
+:root{--g:#10b981;--c:#22d3ee;--bg:#050505;--dim:#6b7280;--red:#ef4444}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{font-family:'Tajawal','Fira Code',monospace;background:var(--bg);color:var(--g);min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:14px;overflow-x:hidden}
+canvas#matrix{position:fixed;inset:0;width:100%;height:100%;z-index:-2;opacity:.22;pointer-events:none}
+.scan{position:fixed;inset:0;z-index:-1;pointer-events:none;background:repeating-linear-gradient(180deg,rgba(16,185,129,.05) 0 1px,transparent 1px 3px);animation:flick 6s infinite}
+@keyframes flick{0%,97%{opacity:.35}98%{opacity:.15}100%{opacity:.35}}
+.mono{font-family:'Fira Code',monospace}
+.neon{text-shadow:0 0 10px rgba(16,185,129,.7),0 0 24px rgba(16,185,129,.35)}
+.glowbox{box-shadow:0 0 25px rgba(16,185,129,.16),inset 0 0 18px rgba(16,185,129,.05)}
+header,main,footer{width:100%;max-width:720px}
+header{display:flex;align-items:center;gap:10px;background:rgba(0,0,0,.6);backdrop-filter:blur(8px);border:1px solid rgba(16,185,129,.3);border-radius:16px;padding:12px 14px;margin-bottom:12px}
+.dots{display:flex;gap:6px}
+.dot{width:10px;height:10px;border-radius:50%}
+.d1{background:var(--red);animation:pulse 2s infinite}
+.d2{background:#eab308}
+.d3{background:var(--g)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+.badge{margin-inline-start:auto;font-size:11px;border:1px solid rgba(16,185,129,.4);background:rgba(4,30,24,.8);color:#6ee7b7;padding:4px 10px;border-radius:999px}
+.card{background:rgba(9,9,11,.9);backdrop-filter:blur(14px);border:1.5px solid rgba(16,185,129,.4);border-radius:22px;padding:18px;margin-bottom:12px}
+.card h1{font-size:14px;margin:0;color:#a7f3d0;letter-spacing:.5px}
+.head{display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(16,185,129,.2);padding-bottom:10px;margin-bottom:14px;gap:8px}
+.clock{font-size:11px;color:rgba(16,185,129,.7)}
+#boot{font-size:12.5px;line-height:1.9;color:#6b7280;min-height:70px;white-space:pre-wrap;direction:ltr;text-align:left}
+#boot .ok{color:var(--g)}
+.quote{background:rgba(0,0,0,.6);border:1px solid rgba(16,185,129,.3);border-radius:16px;padding:16px;text-align:center;font-weight:900;font-size:19px;color:#6ee7b7;margin-top:14px}
+.cursor{display:inline-block;width:9px;height:18px;background:var(--g);vertical-align:-3px;animation:blink 1s steps(2) infinite;margin-inline-start:2px}
+@keyframes blink{50%{opacity:0}}
+#term{background:rgba(0,0,0,.75);border:1px solid rgba(16,185,129,.28);border-radius:14px;padding:10px 12px;height:190px;overflow-y:auto;font-size:12.5px;line-height:1.7;direction:ltr;text-align:left;white-space:pre-wrap;margin-top:12px}
+#term .p{color:var(--c)}
+#term .e{color:#f87171}
+.row{display:flex;gap:8px;margin-top:8px;align-items:center}
+.row span.ps{color:var(--g);font-size:12.5px}
+input#cmd{flex:1;background:transparent;border:0;outline:0;color:#d1fae5;font:inherit;font-size:13px;min-width:0}
+button{font-family:inherit;cursor:pointer}
+.btn{background:rgba(6,78,59,.45);border:1px solid rgba(16,185,129,.5);color:#6ee7b7;border-radius:12px;padding:9px 12px;font-size:12px;font-weight:700}
+.btn:active{background:rgba(6,95,70,.8)}
+.grid{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.grid .btn{flex:1;min-width:118px}
+#toast{position:fixed;bottom:20px;left:50%;transform:translate(-50%,40px);background:var(--g);color:#04120c;font-weight:800;padding:12px 18px;border-radius:14px;opacity:0;transition:.28s;z-index:50;font-size:13px}
+#toast.on{opacity:1;transform:translate(-50%,0)}
+footer{text-align:center;font-size:11px;color:#4b5563;padding:8px 0 18px;direction:ltr}
+a{color:var(--c);text-decoration:none}
+@media(min-width:640px){.quote{font-size:22px}.card{padding:22px}}
+</style>
 </head>
+<body>
+<canvas id="matrix"></canvas>
+<div class="scan"></div>
 
-<body class="min-h-screen text-emerald-400 flex flex-col items-center justify-between p-4 sm:p-6 selection:bg-emerald-500 selection:text-black">
-    <canvas id="matrix"></canvas>
+<header>
+  <div class="dots"><i class="dot d1"></i><i class="dot d2"></i><i class="dot d3"></i></div>
+  <span class="mono" style="font-size:11.5px;color:#34d399">azzouz@core:~#</span>
+  <span class="badge mono">🛡️ SECURE_ENV</span>
+</header>
 
-    <header class="w-full max-w-2xl flex justify-between items-center bg-black/60 backdrop-blur-md border border-emerald-500/30 rounded-2xl p-4 shadow-lg mb-4">
-        <div class="flex items-center space-x-3 space-x-reverse">
-            <div class="w-3 h-3 rounded-full bg-red-500 animate-pulse"></div>
-            <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
-            <div class="w-3 h-3 rounded-full bg-emerald-500"></div>
-            <span class="text-xs code-font text-emerald-400 font-bold ml-2">azzouz@core:~#</span>
-        </div>
-        <div class="flex items-center space-x-3 space-x-reverse">
-            <span class="text-xs bg-emerald-950/80 border border-emerald-500/40 text-emerald-300 px-3 py-1 rounded-full code-font">
-                <i class="fa-solid fa-shield-halved ml-1"></i> SECURE_ENV
-            </span>
-        </div>
-    </header>
-
-    <main class="w-full max-w-2xl flex-1 flex flex-col justify-center items-center my-auto">
-        <div class="w-full bg-zinc-950/85 backdrop-blur-xl border-2 border-emerald-500/40 rounded-3xl p-6 sm:p-8 box-glow relative group transition-all duration-300 hover:border-emerald-400">
-            <div class="flex justify-between items-center border-b border-emerald-500/20 pb-4 mb-6">
-                <div class="flex items-center space-x-2 space-x-reverse">
-                    <i class="fa-solid fa-terminal text-emerald-400 animate-pulse"></i>
-                    <h1 class="text-sm sm:text-base font-bold text-emerald-200 code-font">glory_protocol.py</h1>
-                </div>
-                <div class="text-xs code-font text-emerald-500/70" id="live-clock">00:00:00</div>
-            </div>
-
-            <div class="space-y-4 code-font text-sm sm:text-base leading-relaxed">
-                <div class="text-zinc-500 text-xs"># --------------------------------------------------</div>
-                <div class="text-zinc-500 text-xs"># STATUS: LEGENDARY_MODE = Active</div>
-                <div class="text-zinc-500 text-xs"># --------------------------------------------------</div>
-
-                <div>
-                    <span class="text-cyan-400">def</span> <span class="text-yellow-300">generate_glory</span>():
-                </div>
-
-                <div class="pr-6 space-y-2">
-                    <div><span class="text-purple-400">auth</span> = <span class="text-emerald-300">"AZZOUZ_ELITE"</span></div>
-                    <div><span class="text-purple-400">status</span> = <span class="text-emerald-300">True</span></div>
-                    <div><span class="text-cyan-400">return</span> <span class="text-zinc-400">"</span><span id="typed-text" class="text-emerald-300 font-bold neon-glow-emerald"></span><span class="inline-block w-2.5 h-5 bg-emerald-400 ml-1 animate-pulse"></span><span class="text-zinc-400">"</span></div>
-                </div>
-            </div>
-
-            <div class="mt-8 pt-6 border-t border-emerald-500/20">
-                <div class="text-xs text-zinc-400 mb-2 flex items-center justify-between">
-                    <span><i class="fa-solid fa-play ml-1 text-emerald-400"></i> TikTok Bio Output Preview:</span>
-                    <button onclick="copyQuote()" class="text-emerald-400 hover:text-white transition bg-emerald-950/60 hover:bg-emerald-900 border border-emerald-500/30 px-3 py-1 rounded-lg text-xs cursor-pointer flex items-center gap-1">
-                        <i class="fa-regular fa-copy"></i> ناسخ النص
-                    </button>
-                </div>
-                <div id="bio-output" class="p-4 bg-black/60 border border-emerald-500/30 rounded-2xl text-center text-lg sm:text-xl font-black text-emerald-300 neon-glow-emerald tracking-wide select-all">
-                    لَا يَصْنَعُ المَجْدَ إِلَّا مَنْ عَجِزَ عَنْهُ سِوَاهُ.
-                </div>
-            </div>
-
-            <div class="mt-6 flex flex-wrap gap-3 justify-center">
-                <button onclick="replayTyping()" class="flex-1 min-w-[130px] py-2.5 px-4 bg-emerald-900/40 hover:bg-emerald-800/60 border border-emerald-500/50 rounded-xl text-xs sm:text-sm font-bold text-emerald-300 transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer">
-                    <i class="fa-solid fa-rotate-right"></i> إعادة الكتابة
-                </button>
-                <button onclick="toggleMatrixSpeed()" id="speed-btn" class="flex-1 min-w-[130px] py-2.5 px-4 bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 rounded-xl text-xs sm:text-sm font-bold text-zinc-300 transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer">
-                    <i class="fa-solid fa-bolt text-yellow-400"></i> سرعة ماتركس: عادية
-                </button>
-            </div>
-
-            <div class="mt-5 pt-4 border-t border-emerald-500/20 text-center">
-                <a href="./apps.html" class="text-xs code-font text-emerald-400 hover:text-white transition">← رجع لجميع التطبيقات</a>
-                <span class="text-xs code-font text-zinc-600 mx-2">|</span>
-                <a href="./term.html" class="text-xs code-font text-cyan-400 hover:text-white transition">التيرمينال الحقيقي</a>
-            </div>
-        </div>
-    </main>
-
-    <div id="toast" class="fixed bottom-6 bg-emerald-500 text-black font-bold px-6 py-3 rounded-2xl shadow-2xl transition-all duration-300 opacity-0 translate-y-10 pointer-events-none z-50 text-sm code-font">
-        <i class="fa-solid fa-check-circle ml-2"></i> تم نسخ النص بنجاح للحافظة!
+<main>
+  <div class="card glowbox">
+    <div class="head">
+      <h1 class="mono">glory_protocol.py <span style="color:#22d3ee">v4.0</span></h1>
+      <span class="clock mono" id="clock">00:00:00</span>
     </div>
 
-    <footer class="w-full max-w-2xl text-center text-xs text-zinc-600 code-font py-4">
-        Azzouz Core Terminal &bull; Cybernetic Aesthetic v3.2
-    </footer>
+    <div id="boot"></div>
 
-    <script>
-        const canvas = document.getElementById('matrix');
-        const ctx = canvas.getContext('2d');
+    <div class="quote">
+      <span id="typed"></span><span class="cursor"></span>
+    </div>
 
-        function resizeCanvas() {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-        }
-        window.addEventListener('resize', resizeCanvas);
-        resizeCanvas();
+    <div id="term" class="mono"></div>
+    <div class="row">
+      <span class="ps mono">azzouz@core:~#</span>
+      <input id="cmd" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="help · quote · hack · apps · matrix">
+      <button class="btn" id="go">↵</button>
+    </div>
 
-        const arabicChars = 'ابتثجحخدذرزسشصضطظعغفقكلمنهوية0123456789ABCDEF';
-        const fontSize = 16;
-        let columns = canvas.width / fontSize;
-        let drops = [];
+    <div class="grid">
+      <button class="btn" onclick="copyQuote()">📋 ناسخ النص</button>
+      <button class="btn" onclick="replay()">↻ عاود الكتابة</button>
+      <button class="btn" id="spd" onclick="toggleSpeed()">⚡ ماتركس: عادية</button>
+      <button class="btn" onclick="location.href='./term.html'">🖥️ تيرمينال حقيقي</button>
+      <button class="btn" onclick="location.href='./apps.html'">🏠 كل التطبيقات</button>
+    </div>
+  </div>
+</main>
 
-        for (let i = 0; i < columns; i++) {
-            drops[i] = 1;
-        }
+<footer>Azzouz Core Terminal · Cybernetic Aesthetic v4.0 · <span id="up">0s</span></footer>
+<div id="toast">✅ تنسخ النص</div>
 
-        let matrixSpeedFactor = 33;
-        let matrixInterval = setInterval(drawMatrix, matrixSpeedFactor);
+<script>
+const QUOTE = "لَا يَصْنَعُ المَجْدَ إِلَّا مَنْ عَجِزَ عَنْهُ سِوَاهُ.";
+const $ = s => document.querySelector(s);
 
-        function drawMatrix() {
-            ctx.fillStyle = 'rgba(5, 5, 5, 0.12)';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
+/* ---- ماتركس ---- */
+const cv = $('#matrix'), cx = cv.getContext('2d');
+const CH = 'ابتثجحخدذرزسشصضطظعغفقكلمنهوية01ABCDEF#$%&';
+const FS = 16;
+let cols = 0, drops = [];
+function size() { cv.width = innerWidth; cv.height = innerHeight; cols = Math.floor(cv.width / FS); drops = new Array(cols).fill(1); }
+addEventListener('resize', size); size();
+let speed = 33, timer = setInterval(draw, speed);
+function draw() {
+  cx.fillStyle = 'rgba(5,5,5,.12)';
+  cx.fillRect(0, 0, cv.width, cv.height);
+  cx.fillStyle = '#10b981';
+  cx.font = FS + 'px monospace';
+  for (let i = 0; i < drops.length; i++) {
+    cx.fillText(CH.charAt(Math.random() * CH.length | 0), i * FS, drops[i] * FS);
+    if (drops[i] * FS > cv.height && Math.random() > .975) drops[i] = 0;
+    drops[i]++;
+  }
+}
+function toggleSpeed() {
+  clearInterval(timer);
+  const fast = speed === 33;
+  speed = fast ? 14 : 33;
+  $('#spd').textContent = fast ? '⚡ ماتركس: فائقة' : '⚡ ماتركس: عادية';
+  timer = setInterval(draw, speed);
+  say('matrix speed = ' + (fast ? 'fast' : 'normal'), 'p');
+}
+function matrixOff() { clearInterval(timer); timer = null; cx.clearRect(0, 0, cv.width, cv.height); }
+function matrixOn() { if (!timer) timer = setInterval(draw, speed); }
 
-            ctx.fillStyle = '#10b981';
-            ctx.font = fontSize + 'px monospace';
+/* ---- ساعة + مدة ---- */
+const t0 = Date.now();
+setInterval(() => {
+  $('#clock').textContent = new Date().toTimeString().slice(0, 8);
+  $('#up').textContent = Math.floor((Date.now() - t0) / 1000) + 's';
+}, 1000);
 
-            for (let i = 0; i < drops.length; i++) {
-                const text = arabicChars.charAt(Math.floor(Math.random() * arabicChars.length));
-                ctx.fillText(text, i * fontSize, drops[i] * fontSize);
+/* ---- كتابة الشعار ---- */
+let ci = 0, typer;
+function typeQ() {
+  if (ci < QUOTE.length) { $('#typed').textContent += QUOTE.charAt(ci++); typer = setTimeout(typeQ, 65); }
+}
+function replay() { clearTimeout(typer); $('#typed').textContent = ''; ci = 0; typeQ(); }
 
-                if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) {
-                    drops[i] = 0;
-                }
-                drops[i]++;
-            }
-        }
+/* ---- بوت ---- */
+const BOOT = [
+  '[ ok ] loading kernel azzouz-core 4.0',
+  '[ ok ] matrix renderer online',
+  '[ ok ] secure env: AES-GCM / local only',
+  '[ ok ] memory: localStorage + IndexedDB',
+  '[ ok ] tools: apps.html · term.html · azzouz-ai.html',
+  '[ ok ] LEGENDARY_MODE = ACTIVE'
+];
+function bootSeq() {
+  const el = $('#boot');
+  el.textContent = '';
+  BOOT.forEach((l, i) => setTimeout(() => {
+    el.textContent += l.replace('[ ok ]', '[ ok ]') + '\n';
+    el.scrollTop = el.scrollHeight;
+  }, i * 260));
+}
 
-        function updateClock() {
-            const now = new Date();
-            const timeString = now.toTimeString().split(' ')[0];
-            document.getElementById('live-clock').innerText = timeString;
-        }
-        setInterval(updateClock, 1000);
-        updateClock();
+/* ---- تيرمينال ---- */
+function say(t, cls) {
+  const d = document.createElement('div');
+  if (cls) d.className = cls;
+  d.textContent = t;
+  $('#term').appendChild(d);
+  $('#term').scrollTop = $('#term').scrollHeight;
+}
+const HKEY = 'azzouz-hacker-hist';
+let hist = [];
+try { hist = JSON.parse(localStorage.getItem(HKEY) || '[]'); } catch (e) { hist = []; }
+let hp = hist.length;
 
-        const quoteText = "لَا يَصْنَعُ المَجْدَ إِلَّا مَنْ عَجِزَ عَنْهُ سِوَاهُ.";
-        let charIndex = 0;
-        let typingTimer;
+function fakeHack() {
+  let p = 0;
+  const line = document.createElement('div');
+  $('#term').appendChild(line);
+  const iv = setInterval(() => {
+    p += Math.random() * 18;
+    if (p >= 100) {
+      p = 100; clearInterval(iv);
+      line.textContent = '██████████ 100% · ACCESS GRANTED · ' + QUOTE;
+      line.style.color = '#34d399';
+      $('#term').scrollTop = $('#term').scrollHeight;
+      return;
+    }
+    line.textContent = '█'.repeat(Math.floor(p / 5)).padEnd(20, '░') + ' ' + Math.floor(p) + '% · كنفك التشفير...';
+  }, 220);
+}
 
-        function typeWriter() {
-            if (charIndex < quoteText.length) {
-                document.getElementById('typed-text').innerHTML += quoteText.charAt(charIndex);
-                charIndex++;
-                typingTimer = setTimeout(typeWriter, 70);
-            }
-        }
+async function run(line) {
+  const c = line.trim();
+  if (!c) return;
+  say('azzouz@core:~# ' + c, 'p');
+  hist.push(c); if (hist.length > 80) hist = hist.slice(-80);
+  try { localStorage.setItem(HKEY, JSON.stringify(hist)); } catch (e) {}
+  hp = hist.length;
 
-        function replayTyping() {
-            clearTimeout(typingTimer);
-            document.getElementById('typed-text').innerHTML = "";
-            charIndex = 0;
-            typeWriter();
-        }
+  const [n, ...a] = c.split(/\s+/);
+  switch (n) {
+    case 'help': say('الأوامر: help · whoami · quote · copy · date · hack · matrix [on|off|fast] · apps · term · clear · echo <text>'); break;
+    case 'whoami': say('azzouz · AZZOUZ_ELITE · browser sandbox'); break;
+    case 'quote': say(QUOTE); break;
+    case 'copy': copyQuote(); say('تنسخ ✓'); break;
+    case 'date': say(new Date().toLocaleString('ar-MA')); break;
+    case 'hack': fakeHack(); break;
+    case 'apps': location.href = './apps.html'; break;
+    case 'term': location.href = './term.html'; break;
+    case 'clear': $('#term').textContent = ''; break;
+    case 'echo': say(a.join(' ')); break;
+    case 'matrix': {
+      const m = a[0] || 'fast';
+      if (m === 'off') { matrixOff(); say('matrix = off'); }
+      else if (m === 'on') { matrixOn(); say('matrix = on'); }
+      else toggleSpeed();
+      break;
+    }
+    default: say(n + ': أمر ماشي معروف. كتب help', 'e');
+  }
+}
 
-        window.onload = function() {
-            typeWriter();
-        };
+$('#go').onclick = () => { const v = $('#cmd').value; $('#cmd').value = ''; run(v); };
+$('#cmd').addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.preventDefault(); const v = $('#cmd').value; $('#cmd').value = ''; run(v); }
+  else if (e.key === 'ArrowUp') { if (hp > 0) { hp--; $('#cmd').value = hist[hp] || ''; } e.preventDefault(); }
+  else if (e.key === 'ArrowDown') { if (hp < hist.length - 1) { hp++; $('#cmd').value = hist[hp] || ''; } else { hp = hist.length; $('#cmd').value = ''; } e.preventDefault(); }
+});
 
-        let isFast = false;
-        function toggleMatrixSpeed() {
-            clearInterval(matrixInterval);
-            isFast = !isFast;
-            if (isFast) {
-                matrixSpeedFactor = 15;
-                document.getElementById('speed-btn').innerHTML = '<i class="fa-solid fa-bolt text-emerald-400"></i> سرعة ماتركس: فائقة';
-                document.getElementById('speed-btn').classList.add('border-emerald-500');
-            } else {
-                matrixSpeedFactor = 33;
-                document.getElementById('speed-btn').innerHTML = '<i class="fa-solid fa-bolt text-yellow-400"></i> سرعة ماتركس: عادية';
-                document.getElementById('speed-btn').classList.remove('border-emerald-500');
-            }
-            matrixInterval = setInterval(drawMatrix, matrixSpeedFactor);
-        }
+/* ---- نسخ ---- */
+function copyQuote() {
+  const done = () => { const t = $('#toast'); t.classList.add('on'); setTimeout(() => t.classList.remove('on'), 2000); };
+  if (navigator.clipboard) { navigator.clipboard.writeText(QUOTE).then(done).catch(() => fallback()); }
+  else fallback();
+  function fallback() {
+    const ta = document.createElement('textarea');
+    ta.value = QUOTE; document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); done(); } catch (e) {}
+    ta.remove();
+  }
+}
 
-        function copyQuote() {
-            const textToCopy = quoteText;
-            const textArea = document.createElement("textarea");
-            textArea.value = textToCopy;
-            document.body.appendChild(textArea);
-            textArea.select();
-            try {
-                document.execCommand('copy');
-                showToast();
-            } catch (err) {
-                console.error('Failed to copy', err);
-            }
-            document.body.removeChild(textArea);
-        }
-
-        function showToast() {
-            const toast = document.getElementById('toast');
-            toast.classList.remove('opacity-0', 'translate-y-10');
-            toast.classList.add('opacity-100', 'translate-y-0');
-            setTimeout(() => {
-                toast.classList.remove('opacity-100', 'translate-y-0');
-                toast.classList.add('opacity-0', 'translate-y-10');
-            }, 2500);
-        }
-    </script>
+bootSeq();
+typeQ();
+setTimeout(() => {
+  say('AZZOUZ CORE v4 · كتب help باش تشوف الأوامر.');
+  say('جرّب: hack · quote · matrix fast · term');
+}, 1800);
+</script>
 </body>
 </html>
