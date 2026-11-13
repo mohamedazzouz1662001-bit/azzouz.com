@@ -49,7 +49,7 @@ body{background:#04060b;color:#e8f1ff;font-family:system-ui,-apple-system,"Segoe
   <div style="padding:0 14px;color:#7f97a5;font-size:11.5px;line-height:1.7">🐧 الأيقونات من الجيهة الأخرى كتحل حواسيب مفتوحة المصدر فالنافذة: WebVM (لينكس كامل)، v86 (محاكي x86)، JSLinux. إلا حجب المتصفح التضمين، كتلقى رابط «افتح فتبويب جديد».</div>
   <div id="icons"></div>
   <div id="tpane">
-  <div id="thead"><b>🖥️ طرفية</b><span class="sp"></span><span style="color:#7f97a5;font-size:11px">أوامر: help · ls · pwd · date · clear</span><button id="tclose">✕</button></div>
+  <div id="thead"><b>🖥️ طرفية</b><span class="sp"></span><span style="color:#7f97a5;font-size:11px">أوامر: help · ls · pwd · rss · xml · news · clear</span><button id="tclose">✕</button></div>
   <div id="tout"></div>
   <div id="tinrow"><span>~$</span><input id="tin" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="كتب أمر…"></div>
 </div>
@@ -174,6 +174,69 @@ dock.appendChild(off);
   };
   print('AZZOUZ PC · طرفية داخل الحاسوب. كتب help.');
   async function exec(cmd) {
+    const c0 = String(cmd || '').trim();
+
+    // XML / RSS فطرفية الحاسوب
+    let m = c0.match(/^(rss|atom|feed)\s+(.+)$/i);
+    if (m) {
+      const u = /^https?:\/\//i.test(m[2].trim()) ? m[2].trim() : 'https://' + m[2].trim();
+      print('📡 كنقرا الخلاصة: ' + u);
+      try {
+        const res = await fetch('https://superagent-1906c8e6.base44.app/functions/azzouzProxy', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: u }) });
+        const j = await res.json();
+        if (!j || !j.ok) { print('⛔ ما قدرتش: ' + ((j && j.error) || 'محجوبة')); return; }
+        const doc = new DOMParser().parseFromString(String(j.text || ''), 'application/xml');
+        if (doc.querySelector('parsererror')) { print('⛔ XML ماشي سليم'); return; }
+        const isAtom = doc.documentElement.tagName.toLowerCase() === 'feed';
+        const items = Array.from(doc.querySelectorAll(isAtom ? 'entry' : 'item')).slice(0, 10);
+        const title = (doc.querySelector('channel > title') || doc.querySelector('feed > title') || {}).textContent || u;
+        print('🔖 ' + String(title).trim() + ' · ' + items.length + ' عنصر');
+        items.forEach((el, i) => {
+          const gt = t => { const n = el.querySelector(t); return n ? n.textContent.trim() : ''; };
+          let link = gt('link');
+          if (!link) { const l = el.querySelector('link[href]'); if (l) link = l.getAttribute('href'); }
+          print((i + 1) + '. ' + gt('title') + '\n   ' + (link || gt('guid') || '') + (gt('pubDate') ? '\n   🕒 ' + gt('pubDate') : ''));
+        });
+      } catch (e) { print('خطأ: ' + e.message); }
+      return;
+    }
+
+    if (/^xml\s+/i.test(c0)) {
+      const u = c0.replace(/^xml\s+/i, '').trim().match(/^https?:\/\//i) ? c0.replace(/^xml\s+/i, '').trim() : 'https://' + c0.replace(/^xml\s+/i, '').trim();
+      print('🧩 كنفك XML: ' + u);
+      try {
+        const res = await fetch('https://superagent-1906c8e6.base44.app/functions/azzouzProxy', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: u }) });
+        const j = await res.json();
+        if (!j || !j.ok) { print('⛔ ما قدرتش: ' + ((j && j.error) || 'محجوبة')); return; }
+        const doc = new DOMParser().parseFromString(String(j.text || ''), 'application/xml');
+        if (doc.querySelector('parsererror')) { print('⛔ XML ماشي سليم'); return; }
+        const lines = [];
+        const walk = (n, lvl) => {
+          if (lvl > 3 || n.nodeType !== 1 || lines.length > 50) return;
+          const kids = Array.from(n.children);
+          lines.push('  '.repeat(lvl) + '<' + n.nodeName + '>' + (kids.length ? '' : ' ' + String(n.textContent || '').trim().slice(0, 60)));
+          kids.slice(0, 10).forEach(k => walk(k, lvl + 1));
+        };
+        walk(doc.documentElement, 0);
+        print('الجذر: <' + doc.documentElement.nodeName + '>');
+        lines.forEach(l => print(l));
+      } catch (e) { print('خطأ: ' + e.message); }
+      return;
+    }
+
+    if (/^news$/i.test(c0)) {
+      print('📰 كنجمع الأخبار…');
+      try {
+        const res = await fetch('https://superagent-1906c8e6.base44.app/functions/rssDigest', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ per: 3 }) });
+        const j = await res.json();
+        (j.feeds || []).forEach(f => {
+          print('🔖 ' + f.feed + (f.error ? ' ⛔' : ' (' + f.count + ')'));
+          (f.items || []).forEach((it, i) => print((i + 1) + '. ' + it.title + '\n   ' + it.link));
+        });
+      } catch (e) { print('خطأ: ' + e.message); }
+      return;
+    }
+
     const r = await t.run(cmd, {
       onCurl: async u => {
         try {
