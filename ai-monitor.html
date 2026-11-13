@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AZZOUZ — رصد المحركات الذكية</title>
+<style>
+:root{--bg:#04060b;--card:#0a1218;--line:#1d2b35;--txt:#e8f1ff;--dim:#8fa3b5;--g:#00e5a0;--b:#00b3ff;--r:#ff6b6b;--gold:#d4af37}
+*{box-sizing:border-box}
+body{margin:0;background:radial-gradient(700px 400px at 50% -10%,#0b2230,#04060b 65%);color:var(--txt);font-family:system-ui,-apple-system,"Segoe UI",Tahoma,sans-serif;padding:16px 14px 40px}
+h1{font-size:18px;margin:6px 0 4px;text-align:center}
+.sub{color:var(--dim);font-size:12.5px;text-align:center;margin-bottom:16px}
+.wrap{max-width:720px;margin:0 auto}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px}
+.t{font-weight:700;font-size:14px;margin-bottom:10px}
+.row{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px dashed #14212a;font-size:13px}
+.row:last-child{border:0}
+.row .n{flex:1;color:#cfe3ee;word-break:break-all}
+.ok{color:var(--g)}.bad{color:var(--r)}.wait{color:var(--dim)}
+.pill{font-size:11px;border:1px solid var(--line);border-radius:999px;padding:2px 8px;color:var(--dim)}
+a{color:var(--b);text-decoration:none}
+.btn{display:block;text-align:center;background:#08222b;border:1px solid #164c5c;color:#9fe8ff;border-radius:10px;padding:10px;margin-top:8px;font-size:13px;font-weight:700}
+</style></head>
+<body>
+<div class="wrap">
+  <h1>🧠 رصد المحركات الذكية</h1>
+  <div class="sub">واش الموقع مقروء ومتاح لمحركات الذكاء الاصطناعي (ChatGPT · Claude · Perplexity · Gemini)</div>
+
+  <div class="card">
+    <div class="t">1. الملفات اللي كتسمح للذكاء الاصطناعي</div>
+    <div id="files"></div>
+  </div>
+
+  <div class="card">
+    <div class="t">2. صفحات الموقع</div>
+    <div id="pages"></div>
+  </div>
+
+  <div class="card">
+    <div class="t">3. جرّب الظهور فالمحركات</div>
+    <a class="btn" target="_blank" rel="noopener" href="https://www.perplexity.ai/search?q=site%3Amohamedazzouz1662001-bit.github.io%20azzouz">🔎 قلب عليه فـPerplexity</a>
+    <a class="btn" target="_blank" rel="noopener" href="https://chatgpt.com/?q=%D8%B4%D9%86%D9%88+%D9%87%D9%88+AZZOUZ+AZZOUZ+AI+%D8%B9%D9%84%D9%89+mohamedazzouz1662001-bit.github.io">💬 سولو ChatGPT على AZZOUZ</a>
+    <a class="btn" target="_blank" rel="noopener" href="https://www.google.com/search?q=site%3Amohamedazzouz1662001-bit.github.io">🌍 شوف واش Google فهرسناه</a>
+  </div>
+
+  <div class="card">
+    <div class="t">4. كيفاش تزيد الفهم ديال المحركات</div>
+    <div class="sub" style="text-align:right;margin:0">
+      الموقع فيه llms.txt وrobots.txt مفتوحين للمحركات، وفي sitemap.xml. باش يولي كيبان فالأجوبة، خاصتك محتوى مكتوب بالعربية الفصحى فكل صفحة، وعنوان واضح، ووصف مختصر، وروابط داخلية.
+    </div>
+  </div>
+</div>
+
+<script>
+const BASE = location.origin + location.pathname.replace(/[^/]*$/, '');
+const PAGES = ['apps.html', 'azzouz-ai.html', 'term.html', 'hacker.html', 'crawler.html', 'auto-fixer.html'];
+const BOTS = ['GPTBot', 'ClaudeBot', 'PerplexityBot', 'Google-Extended', 'CCBot'];
+
+function row(host, name, state, note) {
+  const d = document.createElement('div');
+  d.className = 'row';
+  d.innerHTML = '<span>' + (state === 'ok' ? '✅' : state === 'bad' ? '⛔' : '⏳') + '</span>' +
+    '<span class="n">' + name + (note ? ' <span class="pill">' + note + '</span>' : '') + '</span>';
+  document.getElementById(host).appendChild(d);
+}
+
+async function checkFiles() {
+  const files = ['robots.txt', 'llms.txt', 'sitemap.xml'];
+  for (const f of files) {
+    try {
+      const r = await fetch(BASE + f + '?t=' + Date.now());
+      if (!r.ok) { row('files', f, 'bad', 'HTTP ' + r.status); continue; }
+      const txt = await r.text();
+      row('files', f, 'ok', txt.length + ' حرف');
+      if (f === 'robots.txt') {
+        BOTS.forEach(b => {
+          const allow = new RegExp('User-agent:\\s*' + b + '[\\s\\S]{0,40}Allow:\\s*/', 'i').test(txt);
+          row('files', '🤖 ' + b, allow ? 'ok' : 'bad', allow ? 'مسموح' : 'ماشي مذكور');
+        });
+      }
+    } catch (e) { row('files', f, 'bad', 'ما وصلش'); }
+  }
+}
+
+async function checkPages() {
+  for (const p of PAGES) {
+    try {
+      const r = await fetch(BASE + p + '?t=' + Date.now());
+      if (!r.ok) { row('pages', p, 'bad', 'HTTP ' + r.status); continue; }
+      const html = await r.text();
+      const title = (html.match(/<title>([^<]*)<\/title>/i) || [])[1] || '';
+      const desc = /name="description"/i.test(html);
+      const jsonld = /application\/ld\+json/i.test(html);
+      const bits = [];
+      if (title) bits.push('عنوان'); if (desc) bits.push('وصف'); if (jsonld) bits.push('JSON-LD');
+      row('pages', p, title ? 'ok' : 'bad', bits.join(' · ') || 'ناقص');
+    } catch (e) { row('pages', p, 'bad', 'ما وصلش'); }
+  }
+}
+
+checkFiles();
+checkPages();
+</script>
+</body></html>
