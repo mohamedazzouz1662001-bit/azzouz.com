@@ -270,7 +270,7 @@ async function run(line) {
 
   const [n, ...a] = c.split(/\s+/);
   switch (n) {
-    case 'help': say('الأوامر: help · whoami · quote · copy · date · hack · matrix [on|off|fast] · voice [on|off] · say <text> · net · ping · addserver <url> · deep <موضوع> · last · save · open <url> · read <url> · search <q> · apps · term · clear · echo <text>'); break;
+    case 'help': say('الأوامر: help · whoami · quote · copy · date · hack · matrix [on|off|fast] · voice [on|off] · say <text> · net · ping · addserver <url> · deep <موضوع> · last · save · b44 <سؤال> · open <url> · read <url> · search <q> · apps · term · clear · echo <text>'); break;
     case 'whoami': say('azzouz · AZZOUZ_ELITE · browser sandbox'); break;
     case 'quote': say(QUOTE); break;
     case 'copy': copyQuote(); say('تنسخ ✓'); break;
@@ -694,5 +694,36 @@ run = async function (line) {
     return;
   }
   return _runPrev(line);
+};
+</script>
+<script>
+/* ===== قاعدة Base44: وثائق + بياناتك (نظام سيبراني داخلي) ===== */
+const BRAIN = 'https://superagent-1906c8e6.base44.app/functions/base44Brain';
+async function b44Ask(q) {
+  const r = await fetch(BRAIN, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ op: 'all', q }), signal: AbortSignal.timeout(25000) });
+  return await r.json();
+}
+const _runB = run;
+run = async function (line) {
+  const c = String(line || '').trim();
+  const m = c.match(/^b44\s*(.*)$/i);
+  if (m) {
+    const q = m[1].trim();
+    say('🔵 كنقلب فـBase44: ' + (q || 'كلشي') + ' …', 'p');
+    try {
+      const j = await b44Ask(q);
+      if (!j || !j.ok) { say('ما قدرتش نوصل للقاعدة.', 'e'); return; }
+      say('📚 وثائق Base44 (' + (j.docs_total || 0) + ' صفحة):', 'p');
+      (j.docs || []).slice(0, 8).forEach((d, i) => say((i + 1) + '. ' + d.title + ' — ' + d.section + '\n   ' + d.url));
+      say('🗄️ بياناتك فـBase44:', 'p');
+      Object.keys(j.data || {}).forEach(k => {
+        const v = j.data[k] || {};
+        say('• ' + k + ': ' + (v.count_sample ?? 0) + ' عنصر' + (v.latest && v.latest[0] ? ' · آخر واحد: ' + (v.latest[0].note || '—') : ''));
+      });
+      say('🕒 ' + new Date(j.at).toLocaleString('ar-MA'));
+    } catch (e) { say('خطأ: ' + e.message, 'e'); }
+    return;
+  }
+  return _runB(line);
 };
 </script>
