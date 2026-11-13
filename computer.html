@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="ar" dir="rtl"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>AZZOUZ PC — حاسوب فالمتصفح</title>
+<meta name="theme-color" content="#0a1020">
+<style>
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:#04060b;color:#e8f1ff;font-family:system-ui,-apple-system,"Segoe UI",Tahoma,sans-serif;overflow:hidden}
+#desk{position:fixed;inset:0;background:
+  radial-gradient(900px 600px at 20% 0%,#12314a 0%,transparent 60%),
+  radial-gradient(700px 500px at 90% 20%,#1b1746 0%,transparent 55%),
+  linear-gradient(160deg,#050a12,#04060b 70%);display:flex;flex-direction:column}
+#top{display:flex;align-items:center;gap:10px;padding:8px 12px;background:rgba(4,10,16,.72);backdrop-filter:blur(12px);border-bottom:1px solid #16242e;font-size:12px}
+#top .logo{font-weight:800;color:#00e5a0}
+#top .sp{flex:1}
+#clock{font-variant-numeric:tabular-nums;color:#9fe8ff}
+#icons{flex:1;overflow:auto;padding:16px 12px 90px;display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:14px;align-content:start}
+.ico{background:rgba(12,22,30,.62);border:1px solid #1b2b35;border-radius:16px;padding:12px 6px;text-align:center;cursor:pointer;transition:.15s;text-decoration:none;color:#dbeaf5}
+.ico:active{transform:scale(.95);border-color:#00e5a0}
+.ico .e{font-size:24px;display:block;margin-bottom:6px}
+.ico .n{font-size:11px;line-height:1.35;word-break:break-word}
+#dock{position:fixed;bottom:0;left:0;right:0;display:flex;gap:8px;justify-content:center;padding:10px 12px calc(10px + env(safe-area-inset-bottom));background:linear-gradient(0deg,rgba(4,10,16,.95),rgba(4,10,16,.6));backdrop-filter:blur(10px);border-top:1px solid #16242e;overflow-x:auto}
+#dock a,#dock button{background:#0d1a22;border:1px solid #1d2b35;color:#9fe8ff;border-radius:12px;padding:9px 12px;font-size:12px;text-decoration:none;white-space:nowrap;cursor:pointer;font-family:inherit}
+#dock a:active{background:#12262f}
+#win{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;padding:14px;z-index:50}
+#win.on{display:flex}
+#winbox{background:#0a1218;border:1px solid #1d2b35;border-radius:16px;width:100%;max-width:520px;height:78vh;display:flex;flex-direction:column;overflow:hidden}
+#winbar{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid #1d2b35;font-size:12px}
+#winbar .sp{flex:1}
+#winbar button{background:#12262f;border:1px solid #1d2b35;color:#9fe8ff;border-radius:8px;padding:5px 10px;font-size:12px;font-family:inherit}
+#frame{flex:1;border:0;background:#04060b;width:100%}
+.hint{color:#7f97a5;font-size:11.5px;text-align:center;padding:6px 12px}
+</style></head>
+<body>
+<div id="desk">
+  <div id="top"><span class="logo">AZZOUZ PC</span><span class="sp"></span><span id="clock">--:--</span></div>
+  <div id="icons"></div>
+  <div id="dock">
+    <a href="./apps.html">كل الأدوات</a>
+    <a href="./azzouz-ai.html">AZZOUZ AI</a>
+    <a href="./term.html">Terminal</a>
+    <a href="./calculator.html">Calc</a>
+    <button id="refresh">↻ تحديث</button>
+  </div>
+</div>
+
+<div id="win"><div id="winbox">
+  <div id="winbar"><span id="wintitle">نافذة</span><span class="sp"></span><button id="full">⤢ كامل</button><button id="close">✕</button></div>
+  <iframe id="frame" title="نافذة"></iframe>
+  <div class="hint" id="hint"></div>
+</div></div>
+
+<script>
+const APPS = [
+  { n: 'AZZOUZ AI', e: '🧠', u: './azzouz-ai.html' },
+  { n: 'Terminal', e: '🖥️', u: './term.html' },
+  { n: 'Hacker', e: '🟩', u: './hacker.html' },
+  { n: 'Calc', e: '🧮', u: './calculator.html' },
+  { n: 'Spy', e: '🕵️', u: './spy.html' },
+  { n: 'Crawler', e: '🕷️', u: './crawler.html' },
+  { n: 'Auto-Fixer', e: '🛠️', u: './auto-fixer.html' },
+  { n: 'GitHub', e: '🐙', u: './github-studios.html' },
+  { n: 'Whales', e: '🐋', u: './uw.html' },
+  { n: 'TikTok', e: '🎵', u: './tk.html' },
+  { n: 'AI رصد', e: '📡', u: './ai-monitor.html' },
+  { n: 'Cycle Lab', e: '🌀', u: 'https://elazzouz-dotcom.github.io/cycle-lab/?locale=ar' },
+  { n: 'الموقع الشخصي', e: '👤', u: './portfolio.html' },
+  { n: 'كل الأدوات', e: '🗂️', u: './apps.html' }
+];
+
+const icons = document.getElementById('icons');
+APPS.forEach(a => {
+  const el = document.createElement('a');
+  el.className = 'ico';
+  el.href = a.u;
+  el.innerHTML = '<span class="e">' + a.e + '</span><span class="n">' + a.n + '</span>';
+  el.addEventListener('click', ev => {
+    // إلا كان الرابط خارج الموقع كيتحل فتبويب جديد
+    try {
+      const same = new URL(a.u, location.href).origin === location.origin;
+      if (!same) return;
+      ev.preventDefault();
+      openWin(a.n, a.u);
+    } catch (err) {}
+  });
+  icons.appendChild(el);
+});
+
+function openWin(title, url) {
+  document.getElementById('wintitle').textContent = title;
+  const f = document.getElementById('frame');
+  f.src = url;
+  document.getElementById('hint').textContent = url.replace('./', '');
+  document.getElementById('win').classList.add('on');
+}
+document.getElementById('close').onclick = () => {
+  document.getElementById('win').classList.remove('on');
+  document.getElementById('frame').src = 'about:blank';
+};
+document.getElementById('full').onclick = () => {
+  const box = document.getElementById('winbox');
+  box.style.maxWidth = box.style.maxWidth === 'none' ? '520px' : 'none';
+  box.style.height = box.style.height === '96vh' ? '78vh' : '96vh';
+};
+document.getElementById('refresh').onclick = () => location.reload();
+
+function tick() {
+  const d = new Date();
+  document.getElementById('clock').textContent =
+    d.toLocaleTimeString('ar-MA', { hour: '2-digit', minute: '2-digit' }) + ' · ' +
+    d.toLocaleDateString('ar-MA', { weekday: 'short', day: 'numeric', month: 'short' });
+}
+tick(); setInterval(tick, 20000);
+</script>
+</body></html>
