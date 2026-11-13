@@ -195,6 +195,70 @@ function fakeHack() {
   }, 220);
 }
 
+
+/* ===== شبكة السيرفرات: دوران وتجاوز الأخطاء ===== */
+const POOL_KEY = 'azzouz-net-pool';
+const NET = [
+  { n: 'Base44', k: 'b44' },
+  { n: 'Jina', k: 'jina' },
+  { n: 'AllOrigins', k: 'allorigins' },
+  { n: 'CorsProxy', k: 'corsproxy' }
+];
+let CUSTOM = [];
+try { CUSTOM = JSON.parse(localStorage.getItem(POOL_KEY) || '[]'); } catch (e) { CUSTOM = []; }
+let SRV_STATS = {};
+let LAST_SRV = '';
+
+function saveCustom() { try { localStorage.setItem(POOL_KEY, JSON.stringify(CUSTOM.slice(0, 5000))); } catch (e) {} }
+
+async function oneServer(sv, url, raw) {
+  const enc = encodeURIComponent(url);
+  if (sv.k === 'b44') {
+    const r = await fetch(PROXY, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url, raw: !!raw }), signal: AbortSignal.timeout(18000) });
+    const j = await r.json();
+    if (!j || !j.ok) throw new Error((j && j.error) || 'blocked');
+    return { text: String(j.text || ''), html: String(j.html || ''), chars: j.chars || String(j.text || '').length };
+  }
+  if (sv.k === 'jina') {
+    const r = await fetch('https://r.jina.ai/' + url, { signal: AbortSignal.timeout(20000) });
+    if (!r.ok) throw new Error('jina ' + r.status);
+    const t = await r.text();
+    return { text: t, html: '', chars: t.length };
+  }
+  if (sv.k === 'allorigins') {
+    const r = await fetch('https://api.allorigins.win/raw?url=' + enc, { signal: AbortSignal.timeout(20000) });
+    if (!r.ok) throw new Error('allorigins ' + r.status);
+    const t = await r.text();
+    return { text: t.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim(), html: t, chars: t.length };
+  }
+  if (sv.k === 'corsproxy') {
+    const r = await fetch('https://corsproxy.io/?' + enc, { signal: AbortSignal.timeout(20000) });
+    if (!r.ok) throw new Error('corsproxy ' + r.status);
+    const t = await r.text();
+    return { text: t.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim(), html: t, chars: t.length };
+  }
+  // سيرفر ديالك: كتلصق البادئة وهو كيزيد الرابط فالآخر
+  const r = await fetch(sv.u + enc, { signal: AbortSignal.timeout(20000) });
+  if (!r.ok) throw new Error('srv ' + r.status);
+  const t = await r.text();
+  return { text: t.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim(), html: t, chars: t.length };
+}
+
+async function fetchAny(url, raw) {
+  const list = NET.concat(CUSTOM);
+  for (const sv of list) {
+    try {
+      const out = await oneServer(sv, url, raw);
+      SRV_STATS[sv.n] = (SRV_STATS[sv.n] || 0) + 1;
+      LAST_SRV = sv.n;
+      return out;
+    } catch (e) {
+      SRV_STATS[sv.n] = SRV_STATS[sv.n] || 0;
+    }
+  }
+  throw new Error('كل السيرفرات رفضو');
+}
+
 async function run(line) {
   const c = line.trim();
   if (!c) return;
@@ -205,7 +269,7 @@ async function run(line) {
 
   const [n, ...a] = c.split(/\s+/);
   switch (n) {
-    case 'help': say('الأوامر: help · whoami · quote · copy · date · hack · matrix [on|off|fast] · voice [on|off] · say <text> · open <url> · read <url> · search <q> · apps · term · clear · echo <text>'); break;
+    case 'help': say('الأوامر: help · whoami · quote · copy · date · hack · matrix [on|off|fast] · voice [on|off] · say <text> · net · ping · addserver <url> · open <url> · read <url> · search <q> · apps · term · clear · echo <text>'); break;
     case 'whoami': say('azzouz · AZZOUZ_ELITE · browser sandbox'); break;
     case 'quote': say(QUOTE); break;
     case 'copy': copyQuote(); say('تنسخ ✓'); break;
@@ -229,11 +293,9 @@ async function run(line) {
       const full = /^https?:\/\//i.test(u) ? u : 'https://' + u;
       say('كنقرا ' + full + ' …');
       try {
-        const r = await fetch(PROXY, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: full }) });
-        const j = await r.json();
-        if (!j || !j.ok) { say('ما قدرتش نقراها: ' + ((j && j.error) || 'محجوبة'), 'e'); break; }
-        say('(' + (j.chars || 0) + ' حرف) ' + String(j.text || '').slice(0, 700));
-      } catch (e) { say('خطأ فالقراية: ' + e.message, 'e'); }
+        const j = await fetchAny(full, false);
+        say('[' + LAST_SRV + '] (' + (j.chars || 0) + ' حرف) ' + String(j.text || '').slice(0, 700));
+      } catch (e) { say('ما قدرتش نقراها: ' + e.message, 'e'); }
       break;
     }
     case 'search': {
@@ -241,8 +303,7 @@ async function run(line) {
       if (!qq) { say('كتب: search <شي حاجة>', 'e'); break; }
       say('كنقلب على: ' + qq + ' …');
       try {
-        const r = await fetch(PROXY, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: 'https://www.bing.com/search?q=' + encodeURIComponent(qq) + '&count=20', raw: true }) });
-        const j = await r.json();
+        const j = await fetchAny('https://www.bing.com/search?q=' + encodeURIComponent(qq) + '&count=20', true);
         const html = (j && j.html) || '';
         const blocks = html.split('<li class="b_algo"').slice(1).slice(0, 6);
         if (!blocks.length) { say('ما لقيتش نتائج.', 'e'); break; }
@@ -256,6 +317,28 @@ async function run(line) {
           say((i + 1) + '. ' + t + '\n   ' + u);
         });
       } catch (e) { say('خطأ فالبحث: ' + e.message, 'e'); }
+      break;
+    }
+    case 'net': {
+      const lines = NET.concat(CUSTOM).map((sv, i) => (i + 1) + '. ' + sv.n + ' — استعمل ' + (SRV_STATS[sv.n] || 0) + ' مرة').join('\n');
+      say('سيرفرات فالشبكة: ' + (NET.length + CUSTOM.length) + '\n' + lines + '\nآخر واحد خدم: ' + (LAST_SRV || 'بلا'));
+      break;
+    }
+    case 'addserver': {
+      const u = (a[0] || '').trim();
+      if (!u || !/^https?:\/\//i.test(u)) { say('كتب: addserver https://proxy.dialk/?url=', 'e'); break; }
+      CUSTOM.push({ n: 'مخصص' + (CUSTOM.length + 1), k: 'custom', u: u });
+      saveCustom();
+      say('تزاد سيرفر. العدد دابا: ' + (NET.length + CUSTOM.length));
+      break;
+    }
+    case 'ping': {
+      say('كنجرب السيرفرات…');
+      const list = NET.concat(CUSTOM);
+      for (const sv of list) {
+        try { await oneServer(sv, 'https://example.com', false); say('✅ ' + sv.n); }
+        catch (e) { say('⛔ ' + sv.n + ' — ' + e.message, 'e'); }
+      }
       break;
     }
     case 'say': {
