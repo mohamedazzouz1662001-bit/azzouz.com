@@ -269,7 +269,7 @@ async function run(line) {
 
   const [n, ...a] = c.split(/\s+/);
   switch (n) {
-    case 'help': say('الأوامر: help · whoami · quote · copy · date · hack · matrix [on|off|fast] · voice [on|off] · say <text> · net · ping · addserver <url> · deep <موضوع> (20 كراولر) · last · open <url> · read <url> · search <q> · apps · term · clear · echo <text>'); break;
+    case 'help': say('الأوامر: help · whoami · quote · copy · date · hack · matrix [on|off|fast] · voice [on|off] · say <text> · net · ping · addserver <url> · deep <موضوع> · last · save · open <url> · read <url> · search <q> · apps · term · clear · echo <text>'); break;
     case 'whoami': say('azzouz · AZZOUZ_ELITE · browser sandbox'); break;
     case 'quote': say(QUOTE); break;
     case 'copy': copyQuote(); say('تنسخ ✓'); break;
@@ -596,5 +596,102 @@ deepCrawl = async function (q, workers) {
   balanced.forEach(x => say(_kind(x.u) + ' — ' + x.t + '\n   ' + x.u));
   try { localStorage.setItem('azzouz-deep-last', JSON.stringify(balanced.slice(0, 500))); } catch (e) {}
   return balanced;
+};
+</script>
+<script>
+/* ===== نسخة متطورة: ترتيب بالصلة + قراية الصفحات + تصدير ===== */
+const _deepOld = deepCrawl;
+deepCrawl = async function (q, workers) {
+  const N = 20, VARS = [q, q + ' pdf', q + ' research', q + ' youtube', q + ' github'];
+  const per = Math.floor(N / VARS.length);
+  const jobs = [];
+  VARS.forEach(vq => { for (let k = 0; k < per; k++) jobs.push({ q: vq, first: 1 + k * 10 }); });
+
+  const words = String(q).toLowerCase().split(/\s+/).filter(w => w.length > 2);
+  const found = [], seen = new Set();
+  let done = 0;
+  const bar = document.createElement('div');
+  bar.style.color = '#22d3ee';
+  document.getElementById('term').appendChild(bar);
+  const paint = txt => { bar.textContent = txt || ('🕷️ ' + done + '/' + N + ' · مصادر: ' + found.length); };
+  paint();
+
+  async function worker(j) {
+    try {
+      const url = 'https://www.bing.com/search?q=' + encodeURIComponent(j.q) + '&count=30' + (j.first > 1 ? '&first=' + j.first : '');
+      const r = await fetchAny(url, true);
+      _parseBing(r.html).forEach(x => { if (!seen.has(x.u)) { seen.add(x.u); found.push(x); } });
+    } catch (e) {}
+    done++; paint();
+  }
+  await Promise.all(jobs.map(worker));
+
+  // ترتيب بالصلة: كلمات السؤال فالعنوان/الرابط
+  const score = x => {
+    const hay = (x.t + ' ' + x.u).toLowerCase();
+    let s = 0;
+    words.forEach(w => { if (hay.includes(w)) s += 2; });
+    if (/wikipedia|arxiv|\.edu|\.gov|github/i.test(x.u)) s += 1;
+    return s;
+  };
+  found.forEach(x => { x.sc = score(x); });
+  found.sort((a, b) => b.sc - a.sc);
+
+  // تنويع: ما نزيدش 3 روابط من نفس الموقع
+  const host = u => { try { return new URL(u).hostname.replace(/^www\./, ''); } catch (e) { return 'x'; } };
+  const perHost = {}, picked = [];
+  found.forEach(x => {
+    const h = host(x.u);
+    perHost[h] = (perHost[h] || 0) + 1;
+    if (perHost[h] <= 3) picked.push(x);
+  });
+
+  // قراية أول 10 صفحات: ملخص حقيقي
+  paint('📖 كنقرا أول 10 صفحات…');
+  const top = picked.slice(0, 10);
+  let read = 0;
+  await Promise.all(top.map(async x => {
+    try {
+      const r = await fetchAny(x.u, false);
+      const t = String(r.text || '').replace(/\s+/g, ' ').trim();
+      x.s = t.slice(0, 220);
+      if (t.length > 400) read++;
+    } catch (e) {}
+  }));
+
+  bar.textContent = '✅ 20 كراولر · ' + found.length + ' مصدر · قرينا ' + read + '/10 صفحات · ' + picked.length + ' بعد التنويع';
+
+  const bags = {};
+  picked.forEach(x => { const k = _kind(x.u); (bags[k] = bags[k] || []).push(x); });
+  const cap = Math.max(3, Math.min(8, Math.min.apply(null, Object.values(bags).map(a => a.length)) || 3));
+  const out = [];
+  Object.keys(bags).forEach(k => { bags[k].slice(0, cap).forEach(x => out.push({ ...x, k })); });
+
+  out.forEach((x, i) => say((i + 1) + '. ' + x.k + ' · صلة ' + x.sc + '\n   ' + x.t + '\n   ' + x.u + (x.s ? '\n   ↳ ' + x.s : '')));
+  try {
+    localStorage.setItem('azzouz-deep-last', JSON.stringify(out.slice(0, 300)));
+    localStorage.setItem('azzouz-deep-q', String(q));
+  } catch (e) {}
+  return out;
+};
+
+const _runPrev = run;
+run = async function (line) {
+  const c = String(line || '').trim();
+  if (/^save$/i.test(c)) {
+    let arr = [], qq = '';
+    try { arr = JSON.parse(localStorage.getItem('azzouz-deep-last') || '[]'); qq = localStorage.getItem('azzouz-deep-q') || 'بحث'; } catch (e) {}
+    if (!arr.length) { say('ما كاين حتى بحث محفوظ. كتب: deep <موضوع>', 'e'); return; }
+    let md = '# ' + qq + '\n\nعدد المصادر: ' + arr.length + '\n\n';
+    arr.forEach((x, i) => { md += (i + 1) + '. [' + (x.k || '') + '] ' + x.t + '\n   ' + x.u + (x.s ? '\n   ' + x.s : '') + '\n\n'; });
+    const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'azzouz-' + String(qq).slice(0, 24).replace(/\s+/g, '-') + '.md';
+    document.body.appendChild(a); a.click(); a.remove();
+    say('📥 تصدر ' + arr.length + ' مصدر فملف ' + a.download);
+    return;
+  }
+  return _runPrev(line);
 };
 </script>
