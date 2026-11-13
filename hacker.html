@@ -269,7 +269,7 @@ async function run(line) {
 
   const [n, ...a] = c.split(/\s+/);
   switch (n) {
-    case 'help': say('الأوامر: help · whoami · quote · copy · date · hack · matrix [on|off|fast] · voice [on|off] · say <text> · net · ping · addserver <url> · open <url> · read <url> · search <q> · apps · term · clear · echo <text>'); break;
+    case 'help': say('الأوامر: help · whoami · quote · copy · date · hack · matrix [on|off|fast] · voice [on|off] · say <text> · net · ping · addserver <url> · deep <موضوع> (20 كراولر) · last · open <url> · read <url> · search <q> · apps · term · clear · echo <text>'); break;
     case 'whoami': say('azzouz · AZZOUZ_ELITE · browser sandbox'); break;
     case 'quote': say(QUOTE); break;
     case 'copy': copyQuote(); say('تنسخ ✓'); break;
@@ -462,5 +462,87 @@ fetchAny = async function (url, raw) {
     } catch (e) { SRV_STATS[sv.n] = SRV_STATS[sv.n] || 0; }
   }
   throw new Error('كل السيرفرات رفضو');
+};
+</script>
+<script>
+/* ===== 20 كراولر كيخدمو بالتوازي ===== */
+function _dec(href) {
+  let u = String(href || '').replace(/&amp;/g, '&');
+  const m = u.match(/[?&]u=a1([^&]+)/);
+  if (!m) return u;
+  try {
+    let x = decodeURIComponent(m[1]).replace(/-/g, '+').replace(/_/g, '/');
+    while (x.length % 4) x += '=';
+    const d = atob(x);
+    if (/^https?:/i.test(d)) return d;
+  } catch (e) {}
+  return u;
+}
+function _parseBing(html) {
+  const out = [];
+  String(html || '').split('<li class="b_algo"').slice(1).forEach(b => {
+    const m = b.match(/<h2[^>]*>\s*<a[^>]+href="([^"]+)"[^>]*>([\s\S]{0,200}?)<\/a>/);
+    if (!m) return;
+    const u = _dec(m[1]);
+    if (!/^https?:\/\//i.test(u) || /bing\.com/i.test(u)) return;
+    out.push({ t: m[2].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim(), u });
+  });
+  return out;
+}
+async function deepCrawl(q, workers) {
+  const N = workers || 20;
+  const variants = [q, q + ' pdf', q + ' research', q + ' youtube', q + ' github', q + ' news', q + ' ويكيبيديا', q + ' تقرير'];
+  const jobs = [];
+  for (let i = 0; i < N; i++) {
+    const vq = variants[i % variants.length];
+    const first = 1 + 10 * Math.floor(i / variants.length);
+    jobs.push({ q: vq, first });
+  }
+  const found = [];
+  const seen = new Set();
+  let done = 0;
+  const bar = document.createElement('div');
+  bar.style.color = '#22d3ee';
+  document.getElementById('term').appendChild(bar);
+  const paint = () => { bar.textContent = '🕷️ كراولر: ' + done + '/' + N + ' · مصادر: ' + found.length; };
+  paint();
+
+  async function worker(j) {
+    try {
+      const url = 'https://www.bing.com/search?q=' + encodeURIComponent(j.q) + '&count=30' + (j.first > 1 ? '&first=' + j.first : '');
+      const r = await fetchAny(url, true);
+      _parseBing(r.html).forEach(x => { if (!seen.has(x.u)) { seen.add(x.u); found.push(x); } });
+    } catch (e) {}
+    done++; paint();
+  }
+  const lanes = [];
+  for (let i = 0; i < N; i++) lanes.push(worker(jobs[i]));
+  await Promise.all(lanes);
+  bar.textContent = '✅ كراولر سالا: ' + N + ' مهمة · ' + found.length + ' مصدر بدون تكرار';
+  try { localStorage.setItem('azzouz-deep-last', JSON.stringify(found.slice(0, 500))); } catch (e) {}
+  return found;
+}
+const _oldRun = run;
+run = async function (line) {
+  const c = String(line || '').trim();
+  const m = c.match(/^(deep|crawl)\s+(.+)$/i);
+  if (m) {
+    say('🕷️ ' + m[2] + ' — كنطلق 20 كراولر…', 'p');
+    hist.push(c); hp = hist.length;
+    try { localStorage.setItem(HKEY, JSON.stringify(hist.slice(-80))); } catch (e) {}
+    const found = await deepCrawl(m[2], 20);
+    found.slice(0, 12).forEach((x, i) => say((i + 1) + '. ' + x.t + '\n   ' + x.u));
+    if (!found.length) say('ما لقيتش حتى مصدر.', 'e');
+    return;
+  }
+  if (/^last$/i.test(c)) {
+    let arr = [];
+    try { arr = JSON.parse(localStorage.getItem('azzouz-deep-last') || '[]'); } catch (e) {}
+    if (!arr.length) { say('ما كاين حتى بحث محفوظ. كتب: deep <موضوع>', 'e'); return; }
+    say('آخر ' + arr.length + ' مصدر محفوظ:');
+    arr.slice(0, 15).forEach((x, i) => say((i + 1) + '. ' + x.t + '\n   ' + x.u));
+    return;
+  }
+  return _oldRun(line);
 };
 </script>
