@@ -32,13 +32,29 @@ body{background:#04060b;color:#e8f1ff;font-family:system-ui,-apple-system,"Segoe
 #winbar button{background:#12262f;border:1px solid #1d2b35;color:#9fe8ff;border-radius:8px;padding:5px 10px;font-size:12px;font-family:inherit}
 #frame{flex:1;border:0;background:#04060b;width:100%}
 .hint{color:#7f97a5;font-size:11.5px;text-align:center;padding:6px 12px}
+
+#tpane{position:fixed;left:0;right:0;bottom:56px;background:rgba(4,10,16,.96);border-top:1px solid #1d2b35;border-radius:14px 14px 0 0;display:none;flex-direction:column;max-height:46vh;z-index:40;backdrop-filter:blur(10px)}
+#tpane.on{display:flex}
+#thead{display:flex;align-items:center;gap:8px;padding:8px 12px;font-size:12px;color:#9fe8ff;border-bottom:1px solid #16242e}
+#thead .sp{flex:1}
+#thead button{background:#12262f;border:1px solid #1d2b35;color:#9fe8ff;border-radius:8px;padding:4px 9px;font-size:11.5px;font-family:inherit}
+#tout{flex:1;overflow:auto;padding:10px 12px;font-family:ui-monospace,monospace;font-size:12px;line-height:1.65;white-space:pre-wrap;direction:ltr;text-align:left;color:#d8e9ef}
+#tinrow{display:flex;gap:6px;align-items:center;padding:8px 12px calc(8px + env(safe-area-inset-bottom));border-top:1px solid #16242e}
+#tinrow span{color:#00e5a0;font-family:monospace;font-size:12px}
+#tin{flex:1;background:transparent;border:0;outline:0;color:#d8e9ef;font:inherit;font-size:12.5px;min-width:0}
 </style></head>
 <body>
 <div id="desk">
   <div id="top"><span class="logo">AZZOUZ PC</span><span class="sp"></span><span id="clock">--:--</span></div>
   <div style="padding:0 14px;color:#7f97a5;font-size:11.5px;line-height:1.7">🐧 الأيقونات من الجيهة الأخرى كتحل حواسيب مفتوحة المصدر فالنافذة: WebVM (لينكس كامل)، v86 (محاكي x86)، JSLinux. إلا حجب المتصفح التضمين، كتلقى رابط «افتح فتبويب جديد».</div>
   <div id="icons"></div>
-  <div id="dock">
+  <div id="tpane">
+  <div id="thead"><b>🖥️ طرفية</b><span class="sp"></span><span style="color:#7f97a5;font-size:11px">أوامر: help · ls · pwd · date · clear</span><button id="tclose">✕</button></div>
+  <div id="tout"></div>
+  <div id="tinrow"><span>~$</span><input id="tin" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="كتب أمر…"></div>
+</div>
+
+<div id="dock">
     <a href="./apps.html">كل الأدوات</a>
     <a href="./azzouz-ai.html">AZZOUZ AI</a>
     <a href="./term.html">Terminal</a>
@@ -141,5 +157,54 @@ off.onclick = () => {
   off.textContent = '✅ توقف';
 };
 dock.appendChild(off);
+</script>
+<script src="./term-core.js"></script>
+<script>
+(function () {
+  const pane = document.getElementById('tpane');
+  const out = document.getElementById('tout');
+  const inp = document.getElementById('tin');
+  if (!pane || !window.TermCore) return;
+  const t = TermCore.create();
+  const print = (txt, cls) => {
+    const d = document.createElement('div');
+    d.textContent = txt;
+    out.appendChild(d);
+    out.scrollTop = out.scrollHeight;
+  };
+  print('AZZOUZ PC · طرفية داخل الحاسوب. كتب help.');
+  async function exec(cmd) {
+    const r = await t.run(cmd, {
+      onCurl: async u => {
+        try {
+          const res = await fetch('https://superagent-1906c8e6.base44.app/functions/azzouzProxy', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: u }) });
+          const j = await res.json();
+          return j && j.ok ? String(j.text || '').slice(0, 1200) : ('curl: ' + ((j && j.error) || 'فشل'));
+        } catch (e) { return 'curl: ' + e.message; }
+      },
+      onPython: async () => 'Python كاين فـterm.html (كتب py).'
+    });
+    if (r.clear) out.innerHTML = '';
+    if (r.out) print(r.out);
+    inp.placeholder = 'كتب أمر…';
+  }
+  inp.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { const v = inp.value; inp.value = ''; print('~$ ' + v); exec(v); }
+  });
+  document.getElementById('tclose').onclick = () => pane.classList.remove('on');
+
+  // زر فالشرط السفلي
+  const dock = document.getElementById('dock');
+  const b = document.createElement('button');
+  b.textContent = '🖥️ طرفية';
+  b.onclick = () => {
+    pane.classList.toggle('on');
+    if (pane.classList.contains('on')) inp.focus();
+  };
+  dock.insertBefore(b, dock.firstChild);
+
+  // كتحل أوتوماتيكيا
+  setTimeout(() => { pane.classList.add('on'); }, 500);
+})();
 </script>
 </body></html>
