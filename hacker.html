@@ -270,7 +270,7 @@ async function run(line) {
 
   const [n, ...a] = c.split(/\s+/);
   switch (n) {
-    case 'help': say('الأوامر: help · whoami · quote · copy · date · hack · matrix [on|off|fast] · voice [on|off] · say <text> · net · ping · addserver <url> · deep <موضوع> · last · save · b44 <سؤال> · rss <رابط> · xml <رابط> · open <url> · read <url> · search <q> · apps · term · clear · echo <text>'); break;
+    case 'help': say('الأوامر: help · whoami · quote · copy · date · hack · matrix [on|off|fast] · voice [on|off] · say <text> · net · ping · addserver <url> · deep <موضوع> · last · save · b44 <سؤال> · news · rss <رابط> · xml <رابط> · open <url> · read <url> · search <q> · apps · term · clear · echo <text>'); break;
     case 'whoami': say('azzouz · AZZOUZ_ELITE · browser sandbox'); break;
     case 'quote': say(QUOTE); break;
     case 'copy': copyQuote(); say('تنسخ ✓'); break;
@@ -801,5 +801,27 @@ run = async function (line) {
     return;
   }
   return _runX(line);
+};
+</script>
+<script>
+/* ===== خلاصة RSS لواتساب/الصفحة ===== */
+const RSSF = 'https://superagent-1906c8e6.base44.app/functions/rssDigest';
+const _runR = run;
+run = async function (line) {
+  const c = String(line || '').trim();
+  if (/^news$/i.test(c)) {
+    say('📰 كنجمع الأخبار…', 'p');
+    try {
+      const r = await fetch(RSSF, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ per: 3 }), signal: AbortSignal.timeout(25000) });
+      const j = await r.json();
+      (j.feeds || []).forEach(f => {
+        say('🔖 ' + f.feed + (f.error ? ' ⛔ ' + f.error : ' (' + f.count + ')'), 'p');
+        (f.items || []).forEach((it, i) => say((i + 1) + '. ' + it.title + '\n   ' + it.link));
+      });
+      say('🕒 ' + new Date(j.at).toLocaleString('ar-MA'));
+    } catch (e) { say('خطأ: ' + e.message, 'e'); }
+    return;
+  }
+  return _runR(line);
 };
 </script>
