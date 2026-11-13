@@ -71,7 +71,8 @@ const APPS = [
   { n: 'كل الأدوات', e: '🗂️', u: './apps.html' },
   { n: 'WebVM لينكس', e: '🐧', u: 'https://webvm.io', ext: true },
   { n: 'v86 (x86)', e: '🧱', u: 'https://copy.sh/v86/', ext: true },
-  { n: 'JSLinux', e: '🖲️', u: 'https://bellard.org/jslinux/', ext: true }
+  { n: 'JSLinux', e: '🖲️', u: 'https://bellard.org/jslinux/', ext: true },
+  { n: 'js-dos ألعاب', e: '🕹️', u: 'https://js-dos.com/', ext: true }
 ];
 
 const icons = document.getElementById('icons');
@@ -118,5 +119,27 @@ function tick() {
     d.toLocaleDateString('ar-MA', { weekday: 'short', day: 'numeric', month: 'short' });
 }
 tick(); setInterval(tick, 20000);
+
+/* WebVM كيتحل بوحدو أول مرة فكل جلسة، وتقدر تسدو */
+function autoWebvm() {
+  try {
+    const skip = localStorage.getItem('azzouz-pc-nowebvm') === '1';
+    const done = sessionStorage.getItem('azzouz-pc-booted') === '1';
+    if (skip || done) return;
+    sessionStorage.setItem('azzouz-pc-booted', '1');
+    setTimeout(() => openWin('WebVM لينكس', 'https://webvm.io'), 700);
+  } catch (e) {}
+}
+autoWebvm();
+
+/* زر لإيقاف الفتح الأوتوماتيكي */
+const dock = document.getElementById('dock');
+const off = document.createElement('button');
+off.textContent = '⏹️ وقف WebVM أوتوماتيك';
+off.onclick = () => {
+  try { localStorage.setItem('azzouz-pc-nowebvm', '1'); } catch (e) {}
+  off.textContent = '✅ توقف';
+};
+dock.appendChild(off);
 </script>
 </body></html>
