@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="ar" dir="rtl"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AZZOUZ Spy — جاسوس متنقل</title>
+<meta name="theme-color" content="#04060b">
+<style>
+:root{--bg:#04060b;--card:#0a1218;--line:#1d2b35;--txt:#e8f1ff;--dim:#8fa3b5;--g:#00e5a0;--b:#00b3ff;--r:#ff6b6b;--gold:#d4af37}
+*{box-sizing:border-box}
+body{margin:0;background:radial-gradient(700px 400px at 50% -10%,#0b2230,#04060b 65%);color:var(--txt);font-family:system-ui,-apple-system,"Segoe UI",Tahoma,sans-serif;padding:14px 12px 40px}
+h1{font-size:17px;margin:4px 0 2px;text-align:center}
+.sub{color:var(--dim);font-size:12px;text-align:center;margin-bottom:14px;line-height:1.6}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:13px;margin-bottom:12px;max-width:720px;margin-inline:auto}
+label{font-size:12px;color:var(--dim);display:block;margin:8px 0 4px}
+input,select{width:100%;background:#071016;border:1px solid var(--line);border-radius:9px;color:var(--txt);padding:10px;font:inherit;font-size:13px}
+.row{display:flex;gap:8px}
+button{border:0;border-radius:10px;padding:11px 14px;font:inherit;font-weight:700;font-size:13px}
+.primary{background:var(--g);color:#04120c;width:100%;margin-top:10px}
+.ghost{background:#0f1a21;border:1px solid var(--line);color:var(--dim);font-size:12px;padding:8px 10px}
+.t{display:flex;align-items:center;gap:8px;padding:10px 0;border-bottom:1px dashed #14212a}
+.t:last-child{border:0}
+.t .n{flex:1;min-width:0;font-size:12.5px;word-break:break-all}
+.t .n b{display:block;color:#cfe3ee;font-size:12.5px;margin-bottom:2px;word-break:break-word}
+.t .n small{color:var(--dim);font-size:11px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--dim);flex:none}
+.dot.on{background:var(--g);box-shadow:0 0 8px var(--g)}
+.dot.chg{background:var(--gold);box-shadow:0 0 8px var(--gold)}
+.log{font-size:12px;color:var(--dim);max-height:200px;overflow:auto;direction:ltr;text-align:left;font-family:ui-monospace,monospace;line-height:1.7}
+.log b{color:var(--gold)}
+a{color:var(--b);text-decoration:none}
+.foot{text-align:center;font-size:11.5px;color:var(--dim);margin-top:10px}
+</style></head>
+<body>
+<h1>🕵️ AZZOUZ Spy — جاسوس متنقل</h1>
+<div class="sub">كيراقب صفحات عمومية من التيليفون: كيشوف التغييرات، وكينبهك أول ما يوقع شي جديد. كلشي فجهازك، بلا سيرفر.</div>
+
+<div class="card">
+  <label>الرابط اللي بغيتي تراقبو</label>
+  <input id="url" placeholder="https://example.com/news" autocomplete="off">
+  <label>كل شحال يعاود يشوف</label>
+  <select id="every">
+    <option value="60">كل دقيقة</option>
+    <option value="180">كل 3 دقايق</option>
+    <option value="300" selected>كل 5 دقايق</option>
+    <option value="900">كل ربع ساعة</option>
+  </select>
+  <label>كلمة مفتاحية (اختياري) — كينبهك غير إلا بانت</label>
+  <input id="kw" placeholder="مثلا: عرض، منحة، نتيجة" autocomplete="off">
+  <button class="primary" id="add">➕ زيد للمراقبة</button>
+  <div class="row" style="margin-top:8px">
+    <button class="ghost" id="perm">🔔 شعل الإشعارات</button>
+    <button class="ghost" id="checkall">⚡ فحص دابا</button>
+  </div>
+</div>
+
+<div class="card">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+    <b style="font-size:13px">الأهداف (<span id="cnt">0</span>)</b>
+    <span style="font-size:11px;color:var(--dim)" id="state">متوقف</span>
+  </div>
+  <div id="list"></div>
+  <div class="sub" style="margin:8px 0 0" id="empty">ما كاين حتى هدف. زيد رابط لفوق.</div>
+</div>
+
+<div class="card">
+  <b style="font-size:13px">سجل الرصد</b>
+  <div class="log" id="log" style="margin-top:6px">—</div>
+</div>
+
+<div class="foot">خاص الموقع يكون عمومي (بلا تسجيل دخول). المراقبة كتخدم غير والصفحة محلولة.<br><a href="./apps.html">كل الأدوات</a> · <a href="./term.html">التيرمينال</a> · <a href="./portfolio.html">الموقع الشخصي</a></div>
+
+<script>
+const PROXY = 'https://superagent-1906c8e6.base44.app/functions/azzouzProxy';
+const KEY = 'azzouz-spy-targets';
+const $ = s => document.querySelector(s);
+let targets = [];
+try { targets = JSON.parse(localStorage.getItem(KEY) || '[]'); } catch (e) { targets = []; }
+let timer = null;
+
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify(targets)); } catch (e) {} };
+const hash = t => { let h = 5381; for (let i = 0; i < t.length; i += 7) h = ((h << 5) + h + t.charCodeAt(i)) | 0; return h + ':' + t.length; };
+
+function log(t) {
+  const el = $('#log');
+  const line = document.createElement('div');
+  line.innerHTML = '<b>' + new Date().toLocaleTimeString('ar-MA') + '</b> · ' + t;
+  el.prepend(line);
+  while (el.children.length > 60) el.lastChild.remove();
+}
+
+async function grab(url) {
+  const r = await fetch(PROXY, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ url }), signal: AbortSignal.timeout(25000)
+  });
+  const j = await r.json();
+  if (!j || !j.ok) throw new Error((j && j.error) || 'blocked');
+  return String(j.text || '');
+}
+
+function notify(title, body, url) {
+  try {
+    if (window.Notification && Notification.permission === 'granted') {
+      const n = new Notification(title, { body, tag: url });
+      n.onclick = () => { window.open(url, '_blank'); };
+    }
+  } catch (e) {}
+}
+
+function render() {
+  const list = $('#list');
+  list.innerHTML = '';
+  $('#cnt').textContent = targets.length;
+  $('#empty').style.display = targets.length ? 'none' : 'block';
+  targets.forEach((t, i) => {
+    const d = document.createElement('div');
+    d.className = 't';
+    d.innerHTML = '<span class="dot ' + (t.state || '') + '"></span>' +
+      '<span class="n"><b>' + (t.label || t.url) + '</b><small>' + t.url + ' · كل ' + Math.round(t.every / 60) + ' د · ' +
+      (t.last ? 'آخر فحص ' + new Date(t.last).toLocaleTimeString('ar-MA') : 'ما تفحصش') + (t.changes ? ' · تغييرات ' + t.changes : '') + '</small></span>' +
+      '<button class="ghost" data-i="' + i + '" data-a="check">فحص</button>' +
+      '<button class="ghost" data-i="' + i + '" data-a="del">حيد</button>';
+    list.appendChild(d);
+  });
+  list.querySelectorAll('button').forEach(b => b.onclick = async () => {
+    const i = Number(b.dataset.i);
+    if (b.dataset.a === 'del') { targets.splice(i, 1); save(); render(); return; }
+    await checkTarget(i, true);
+  });
+}
+
+async function checkTarget(i, manual) {
+  const t = targets[i];
+  if (!t) return;
+  try {
+    const txt = await grab(t.url);
+    const h = hash(txt);
+    const hadSnap = !!t.hash;
+    t.last = Date.now();
+    const kwHit = t.kw ? txt.toLowerCase().includes(String(t.kw).toLowerCase()) : null;
+    if (!hadSnap) {
+      t.hash = h; t.state = 'on';
+      log('مراقبة بدات: ' + t.url + ' (' + txt.length + ' حرف)');
+    } else if (h !== t.hash) {
+      t.hash = h; t.changes = (t.changes || 0) + 1; t.state = 'chg';
+      log('⚠️ تبدل المحتوى: ' + t.url);
+      notify('تبدل شي حاجة فالصفحة', t.url, t.url);
+      if (t.kw && kwHit) { notify('الكلمة «' + t.kw + '» بانت', t.url, t.url); log('🎯 الكلمة «' + t.kw + '» بانت فـ' + t.url); }
+      const box = document.createElement('div');
+      render(); 
+    } else if (t.kw && kwHit && !t.kwWas) {
+      t.kwWas = true; t.state = 'chg';
+      log('🎯 الكلمة «' + t.kw + '» ظهرات فـ' + t.url);
+      notify('الكلمة «' + t.kw + '» ظهرات', t.url, t.url);
+    } else {
+      t.state = 'on';
+      if (manual) log('ما كاين حتى تغيير: ' + t.url);
+    }
+    if (!kwHit) t.kwWas = false;
+    save(); render();
+  } catch (e) {
+    t.state = '';
+    log('⛔ ما قدرتش نفحص ' + t.url + ' — ' + e.message);
+    save(); render();
+  }
+}
+
+async function checkAll() {
+  for (let i = 0; i < targets.length; i++) {
+    await checkTarget(i, false);
+    await new Promise(r => setTimeout(r, 900));
+  }
+}
+
+function startLoop() {
+  clearInterval(timer);
+  timer = setInterval(checkAll, 60 * 1000);
+  $('#state').textContent = 'خدام · فحص كل دقيقة';
+}
+
+$('#add').onclick = () => {
+  let u = $('#url').value.trim();
+  if (!u) return;
+  if (!/^https?:\/\//i.test(u)) u = 'https://' + u;
+  targets.push({ url: u, every: Number($('#every').value) * 1000, kw: $('#kw').value.trim(), hash: '', changes: 0, state: '' });
+  save(); render(); checkTarget(targets.length - 1, false);
+  $('#url').value = ''; $('#kw').value = '';
+  if (!timer) startLoop();
+};
+
+$('#checkall').onclick = checkAll;
+$('#perm').onclick = async () => {
+  if (!window.Notification) { log('الجهاز ما كيدعمش الإشعارات'); return; }
+  const p = await Notification.requestPermission();
+  log('إشعارات: ' + p);
+  if (p === 'granted') notify('AZZOUZ Spy', 'الإشعارات خدامة', location.href);
+};
+
+render();
+if (targets.length) { startLoop(); checkAll(); }
+</script>
+</body></html>
