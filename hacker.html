@@ -172,6 +172,7 @@ function say(t, cls) {
   $('#term').scrollTop = $('#term').scrollHeight;
   if (typeof speak === 'function') speak(t);
 }
+const PROXY = 'https://superagent-1906c8e6.base44.app/functions/azzouzProxy';
 const HKEY = 'azzouz-hacker-hist';
 let hist = [];
 try { hist = JSON.parse(localStorage.getItem(HKEY) || '[]'); } catch (e) { hist = []; }
@@ -204,7 +205,7 @@ async function run(line) {
 
   const [n, ...a] = c.split(/\s+/);
   switch (n) {
-    case 'help': say('الأوامر: help · whoami · quote · copy · date · hack · matrix [on|off|fast] · voice [on|off] · say <text> · apps · term · clear · echo <text>'); break;
+    case 'help': say('الأوامر: help · whoami · quote · copy · date · hack · matrix [on|off|fast] · voice [on|off] · say <text> · open <url> · read <url> · search <q> · apps · term · clear · echo <text>'); break;
     case 'whoami': say('azzouz · AZZOUZ_ELITE · browser sandbox'); break;
     case 'quote': say(QUOTE); break;
     case 'copy': copyQuote(); say('تنسخ ✓'); break;
@@ -214,6 +215,49 @@ async function run(line) {
     case 'term': location.href = './term.html'; break;
     case 'clear': $('#term').textContent = ''; break;
     case 'echo': say(a.join(' ')); break;
+    case 'open': {
+      const u = (a[0] || '').trim();
+      if (!u) { say('كتب: open example.com', 'e'); break; }
+      const full = /^https?:\/\//i.test(u) ? u : 'https://' + u;
+      say('كنحل ' + full);
+      window.open(full, '_blank', 'noopener');
+      break;
+    }
+    case 'read': {
+      const u = (a[0] || '').trim();
+      if (!u) { say('كتب: read example.com', 'e'); break; }
+      const full = /^https?:\/\//i.test(u) ? u : 'https://' + u;
+      say('كنقرا ' + full + ' …');
+      try {
+        const r = await fetch(PROXY, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: full }) });
+        const j = await r.json();
+        if (!j || !j.ok) { say('ما قدرتش نقراها: ' + ((j && j.error) || 'محجوبة'), 'e'); break; }
+        say('(' + (j.chars || 0) + ' حرف) ' + String(j.text || '').slice(0, 700));
+      } catch (e) { say('خطأ فالقراية: ' + e.message, 'e'); }
+      break;
+    }
+    case 'search': {
+      const qq = a.join(' ').trim();
+      if (!qq) { say('كتب: search <شي حاجة>', 'e'); break; }
+      say('كنقلب على: ' + qq + ' …');
+      try {
+        const r = await fetch(PROXY, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: 'https://www.bing.com/search?q=' + encodeURIComponent(qq) + '&count=20', raw: true }) });
+        const j = await r.json();
+        const html = (j && j.html) || '';
+        const blocks = html.split('<li class="b_algo"').slice(1).slice(0, 6);
+        if (!blocks.length) { say('ما لقيتش نتائج.', 'e'); break; }
+        blocks.forEach((b, i) => {
+          const m = b.match(/<h2[^>]*>\s*<a[^>]+href="([^"]+)"[^>]*>([\s\S]{0,200}?)<\/a>/);
+          if (!m) return;
+          let u = m[1].replace(/&amp;/g, '&');
+          const mm = u.match(/[?&]u=a1([^&]+)/);
+          if (mm) { try { let x = decodeURIComponent(mm[1]).replace(/-/g, '+').replace(/_/g, '/'); while (x.length % 4) x += '='; const d = atob(x); if (/^https?:/i.test(d)) u = d; } catch (e) {} }
+          const t = m[2].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+          say((i + 1) + '. ' + t + '\n   ' + u);
+        });
+      } catch (e) { say('خطأ فالبحث: ' + e.message, 'e'); }
+      break;
+    }
     case 'say': {
       const txt = a.join(' ').trim();
       if (!txt) { say('كتب: say <النص اللي بغيتي يتقرا>', 'e'); break; }
