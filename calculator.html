@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="ar" dir="rtl"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AZZOUZ Calc — آلة حاسبة</title>
+<meta name="theme-color" content="#04060b">
+<meta name="description" content="آلة حاسبة فالمتصفح: عمليات، نسب، جذور، ذاكرة، وسجل، خدامة على التيليفون.">
+<style>
+:root{--bg:#04060b;--card:#0a1218;--line:#1d2b35;--txt:#e8f1ff;--dim:#8fa3b5;--g:#00e5a0;--b:#00b3ff;--r:#ff6b6b;--gold:#d4af37}
+*{box-sizing:border-box}
+body{margin:0;background:radial-gradient(700px 420px at 50% -10%,#0c2430,#04060b 65%);color:var(--txt);font-family:system-ui,-apple-system,"Segoe UI",Tahoma,sans-serif;padding:14px 12px 30px;min-height:100vh}
+.wrap{max-width:420px;margin:0 auto}
+h1{font-size:16px;text-align:center;margin:4px 0 12px;font-weight:700}
+.screen{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px;margin-bottom:10px}
+.expr{min-height:22px;color:var(--dim);font-size:13px;direction:ltr;text-align:right;word-break:break-all}
+.res{font-size:34px;font-weight:800;direction:ltr;text-align:right;margin-top:6px;color:var(--txt);word-break:break-all}
+.pad{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+button{border:1px solid var(--line);background:#0e1a21;color:var(--txt);border-radius:14px;padding:16px 0;font-size:18px;font-weight:700;font-family:inherit;cursor:pointer;transition:.12s}
+button:active{transform:scale(.96);border-color:var(--g)}
+.fn{background:#0b151c;color:var(--b);font-size:15px}
+.op{background:#10202a;color:var(--g)}
+.eq{background:linear-gradient(135deg,#00e5a0,#00b3ff);color:#04120c}
+.zero{grid-column:span 2}
+.hist{margin-top:12px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px 12px;max-height:150px;overflow:auto;font-size:12.5px;color:var(--dim);direction:ltr;text-align:left}
+.hist b{color:var(--txt)}
+.hist div{padding:4px 0;border-bottom:1px dashed #14212a}
+.hist div:last-child{border:0}
+.foot{text-align:center;font-size:11.5px;color:var(--dim);margin-top:12px}
+a{color:var(--b);text-decoration:none}
+</style></head>
+<body>
+<div class="wrap">
+  <h1>🧮 AZZOUZ Calc</h1>
+
+  <div class="screen">
+    <div class="expr" id="expr">0</div>
+    <div class="res" id="res">0</div>
+  </div>
+
+  <div class="pad">
+    <button class="fn" data-k="AC">AC</button>
+    <button class="fn" data-k="DEL">⌫</button>
+    <button class="fn" data-k="%">%</button>
+    <button class="op" data-k="/">÷</button>
+
+    <button data-k="7">7</button>
+    <button data-k="8">8</button>
+    <button data-k="9">9</button>
+    <button class="op" data-k="*">×</button>
+
+    <button data-k="4">4</button>
+    <button data-k="5">5</button>
+    <button data-k="6">6</button>
+    <button class="op" data-k="-">−</button>
+
+    <button data-k="1">1</button>
+    <button data-k="2">2</button>
+    <button data-k="3">3</button>
+    <button class="op" data-k="+">+</button>
+
+    <button class="fn" data-k="sqrt">√</button>
+    <button data-k="0">0</button>
+    <button data-k=".">.</button>
+    <button class="eq" data-k="=">=</button>
+
+    <button class="fn" data-k="(">(</button>
+    <button class="fn" data-k=")">)</button>
+    <button class="fn" data-k="pow">xʸ</button>
+    <button class="fn" data-k="pi">π</button>
+  </div>
+
+  <div class="hist" id="hist">—</div>
+  <div class="foot"><a href="./apps.html">كل الأدوات</a> · <a href="./term.html">التيرمينال</a></div>
+</div>
+
+<script>
+const exprEl = document.getElementById('expr'), resEl = document.getElementById('res'), histEl = document.getElementById('hist');
+let cur = '', lastAns = 0;
+const hist = [];
+try { const h = JSON.parse(localStorage.getItem('azzouz-calc-hist') || '[]'); h.forEach(x => hist.push(x)); } catch (e) {}
+const HK = 'azzouz-calc-hist';
+
+function paint() {
+  exprEl.textContent = cur || '0';
+  if (!cur) { resEl.textContent = '0'; return; }
+  try {
+    const v = evaluate(cur + '=');
+    resEl.textContent = (v === null || isNaN(v)) ? '…' : fmt(v);
+  } catch (e) { resEl.textContent = '…'; }
+}
+function fmt(n) {
+  if (!isFinite(n)) return '∞';
+  const r = Math.round(n * 1e10) / 1e10;
+  return String(r).length > 16 ? r.toExponential(8) : String(r);
+}
+
+/* محلل آمن: بلا eval */
+function tokenize(s) {
+  const out = [];
+  let i = 0;
+  while (i < s.length) {
+    const c = s[i];
+    if (/\s/.test(c)) { i++; continue; }
+    if (/[0-9.]/.test(c)) {
+      let n = '';
+      while (i < s.length && /[0-9.]/.test(s[i])) n += s[i++];
+      out.push({ t: 'num', v: parseFloat(n) });
+      continue;
+    }
+    if ('+-*/%^()'.includes(c)) { out.push({ t: c }); i++; continue; }
+    if (c === 'π') { out.push({ t: 'num', v: Math.PI }); i++; continue; }
+    if (c === '√') { out.push({ t: 'sqrt' }); i++; continue; }
+    if (c === 'a') { out.push({ t: 'ans' }); i++; continue; }
+    i++;
+  }
+  return out;
+}
+
+function evaluate(src, ans) {
+  const toks = tokenize(String(src).replace(/=/g, ''));
+  let p = 0;
+  const peek = () => toks[p];
+  const eat = t => { if (toks[p] && toks[p].t === t) { p++; return true; } return false; };
+
+  function primary() {
+    const tk = peek();
+    if (!tk) return 0;
+    if (tk.t === 'num') { p++; return tk.v; }
+    if (tk.t === '(') { p++; const v = expr(); eat(')'); return v; }
+    if (tk.t === 'sqrt') { p++; return Math.sqrt(primary()); }
+    if (tk.t === 'ans') { p++; return ans || 0; }
+    if (tk.t === '-') { p++; return -primary(); }
+    if (tk.t === '+') { p++; return primary(); }
+    p++;
+    return 0;
+  }
+  function power() {
+    let base = primary();
+    if (eat('^')) base = Math.pow(base, power());
+    return base;
+  }
+  function term() {
+    let v = power();
+    for (;;) {
+      if (eat('*')) v *= power();
+      else if (eat('/')) { const d = power(); v = d === 0 ? NaN : v / d; }
+      else if (eat('%')) { const d = power(); v = v * (d / 100); }
+      else break;
+    }
+    return v;
+  }
+  function expr() {
+    let v = term();
+    for (;;) {
+      if (eat('+')) v += term();
+      else if (eat('-')) v -= term();
+      else break;
+    }
+    return v;
+  }
+  return expr();
+}
+
+function push(k) {
+  if (k === 'AC') { cur = ''; paint(); return; }
+  if (k === 'DEL') { cur = cur.slice(0, -1); paint(); return; }
+  if (k === '=') {
+    if (!cur) return;
+    try {
+      const v = evaluate(cur, lastAns);
+      const line = cur + ' = ' + fmt(v);
+      hist.unshift(line);
+      while (hist.length > 30) hist.pop();
+      try { localStorage.setItem(HK, JSON.stringify(hist)); } catch (e) {}
+      renderHist();
+      lastAns = v;
+      cur = fmt(v);
+      exprEl.textContent = line;
+      resEl.textContent = fmt(v);
+    } catch (e) { resEl.textContent = 'خطأ'; }
+    return;
+  }
+  if (k === 'sqrt') { cur += '√'; paint(); return; }
+  if (k === 'pow') { cur += '^'; paint(); return; }
+  if (k === 'pi') { cur += 'π'; paint(); return; }
+  cur += k;
+  paint();
+}
+
+function renderHist() {
+  if (!hist.length) { histEl.textContent = '—'; return; }
+  histEl.innerHTML = hist.slice(0, 12).map(h => '<div><b>' + h + '</b></div>').join('');
+}
+
+document.querySelectorAll('.pad button').forEach(b => b.onclick = () => push(b.dataset.k));
+
+document.addEventListener('keydown', e => {
+  const k = e.key;
+  if (/^[0-9.]$/.test(k)) { push(k); e.preventDefault(); }
+  else if ('+-*/%()^'.includes(k)) { push(k); e.preventDefault(); }
+  else if (k === 'Enter' || k === '=') { push('='); e.preventDefault(); }
+  else if (k === 'Backspace') { push('DEL'); e.preventDefault(); }
+  else if (k === 'Escape') { push('AC'); e.preventDefault(); }
+});
+
+renderHist();
+paint();
+</script>
+</body></html>
