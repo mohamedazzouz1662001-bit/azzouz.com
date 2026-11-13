@@ -270,7 +270,7 @@ async function run(line) {
 
   const [n, ...a] = c.split(/\s+/);
   switch (n) {
-    case 'help': say('الأوامر: help · whoami · quote · copy · date · hack · matrix [on|off|fast] · voice [on|off] · say <text> · net · ping · addserver <url> · deep <موضوع> · last · save · b44 <سؤال> · news · rss <رابط> · xml <رابط> · open <url> · read <url> · search <q> · apps · term · clear · echo <text>'); break;
+    case 'help': say('الأوامر: help · whoami · quote · copy · date · hack · matrix [on|off|fast] · voice [on|off] · say <text> · net · ping · addserver <url> · deep <موضوع> · last · save · b44 <سؤال> · cmatrix [fast|slow] · news · rss <رابط> · xml <رابط> · open <url> · read <url> · search <q> · apps · term · clear · echo <text>'); break;
     case 'whoami': say('azzouz · AZZOUZ_ELITE · browser sandbox'); break;
     case 'quote': say(QUOTE); break;
     case 'copy': copyQuote(); say('تنسخ ✓'); break;
@@ -823,5 +823,82 @@ run = async function (line) {
     return;
   }
   return _runR(line);
+};
+</script>
+<script>
+/* ===== cmatrix: مطر الماتركس بملء الشاشة ===== */
+let CM = null;
+function cmatrix(speedArg) {
+  if (CM) { CM.stop(); CM = null; }
+  const cv = document.createElement('canvas');
+  cv.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;z-index:9999;background:#000;cursor:pointer';
+  const hint = document.createElement('div');
+  hint.textContent = 'cmatrix · دوس فالبلاصة باش تخرج';
+  hint.style.cssText = 'position:fixed;bottom:14px;left:50%;transform:translateX(-50%);z-index:10000;color:#10b981;font:12px "Fira Code",monospace;background:#000a;padding:6px 12px;border:1px solid #10b98155;border-radius:8px';
+  document.body.appendChild(cv);
+  document.body.appendChild(hint);
+  const ctx = cv.getContext('2d');
+  const CH = 'ابتثجحخدذرزسشصضطظعغفقكلمنهوية01ABCDEF$#@%&*';
+  const FS = 16;
+  let cols = 0, drops = [], raf = 0, stop = false;
+  const fit = () => {
+    cv.width = innerWidth; cv.height = innerHeight;
+    cols = Math.floor(cv.width / FS);
+    drops = new Array(cols).fill(0).map(() => Math.random() * -50);
+  };
+  fit();
+  addEventListener('resize', fit);
+  const step = () => {
+    if (stop) return;
+    ctx.fillStyle = 'rgba(0,0,0,.08)';
+    ctx.fillRect(0, 0, cv.width, cv.height);
+    ctx.font = FS + 'px monospace';
+    for (let i = 0; i < drops.length; i++) {
+      const y = drops[i] * FS;
+      const ch = CH.charAt(Math.random() * CH.length | 0);
+      ctx.fillStyle = Math.random() > .97 ? '#d1fae5' : '#10b981';
+      ctx.fillText(ch, i * FS, y);
+      if (y > cv.height && Math.random() > .975) drops[i] = 0;
+      drops[i] += 1;
+    }
+    raf = requestAnimationFrame(step);
+  };
+  const fps = speedArg === 'slow' ? 2 : speedArg === 'fast' ? 1 : 1.4;
+  let last = performance.now();
+  const loop = t => {
+    if (stop) return;
+    if (t - last > 1000 / (60 / fps)) { last = t; step(); }
+    raf = requestAnimationFrame(loop);
+  };
+  loop(performance.now());
+  const close = () => {
+    stop = true;
+    cancelAnimationFrame(raf);
+    removeEventListener('resize', fit);
+    cv.remove(); hint.remove();
+    CM = null;
+    say('cmatrix تسدات. كتب cmatrix باش تعاود.', 'p');
+  };
+  cv.onclick = close;
+  hint.onclick = e => { e.stopPropagation(); close(); };
+  const key = e => { if (e.key === 'Escape' || e.key === 'q' || e.key === 'Enter') { document.removeEventListener('keydown', key); close(); } };
+  document.addEventListener('keydown', key);
+  CM = { stop: close };
+}
+
+const _runC = run;
+run = async function (line) {
+  const c = String(line || '').trim();
+  const m = c.match(/^cmatrix(?:\s+(fast|slow))?$/i);
+  if (m) {
+    say('🟩 cmatrix ' + (m[1] || '') + ' — دوس باش تخرج', 'p');
+    cmatrix(m[1]);
+    return;
+  }
+  if (/^cmatrix\s+stop$/i.test(c)) {
+    if (CM) { CM.stop(); } else say('ماشي خدامة دابا.', 'e');
+    return;
+  }
+  return _runC(line);
 };
 </script>
