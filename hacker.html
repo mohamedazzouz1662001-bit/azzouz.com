@@ -270,7 +270,7 @@ async function run(line) {
 
   const [n, ...a] = c.split(/\s+/);
   switch (n) {
-    case 'help': say('الأوامر: help · whoami · quote · copy · date · hack · matrix [on|off|fast] · voice [on|off] · say <text> · net · ping · addserver <url> · deep <موضوع> · last · save · b44 <سؤال> · open <url> · read <url> · search <q> · apps · term · clear · echo <text>'); break;
+    case 'help': say('الأوامر: help · whoami · quote · copy · date · hack · matrix [on|off|fast] · voice [on|off] · say <text> · net · ping · addserver <url> · deep <موضوع> · last · save · b44 <سؤال> · rss <رابط> · xml <رابط> · open <url> · read <url> · search <q> · apps · term · clear · echo <text>'); break;
     case 'whoami': say('azzouz · AZZOUZ_ELITE · browser sandbox'); break;
     case 'quote': say(QUOTE); break;
     case 'copy': copyQuote(); say('تنسخ ✓'); break;
@@ -725,5 +725,81 @@ run = async function (line) {
     return;
   }
   return _runB(line);
+};
+</script>
+<script>
+/* ===== التوصيل بلغة XML: خلاصات RSS/Atom وأي XML ===== */
+function xmlDoc(text) {
+  const clean = String(text || '').replace(/^\uFEFF/, '').trim();
+  const d = new DOMParser().parseFromString(clean, 'application/xml');
+  if (d.querySelector('parsererror')) throw new Error('XML ماشي سليم');
+  return d;
+}
+async function xmlGrab(url) {
+  const out = await fetchAny(url, false);
+  return String(out.text || '');
+}
+async function rssList(url) {
+  const txt = await xmlGrab(url);
+  const d = xmlDoc(txt);
+  const isAtom = d.documentElement.tagName.toLowerCase() === 'feed';
+  const items = Array.from(d.querySelectorAll(isAtom ? 'entry' : 'item'));
+  const pick = (el, tags) => {
+    for (const t of tags) { const n = el.querySelector(t); if (n && n.textContent.trim()) return n.textContent.trim(); }
+    return '';
+  };
+  const feedTitle = (d.querySelector('channel > title') || d.querySelector('feed > title') || {}).textContent || url;
+  const rows = items.slice(0, 12).map((el, i) => {
+    const title = pick(el, ['title']);
+    let link = pick(el, ['link']);
+    if (!link) { const l = el.querySelector('link[href]'); if (l) link = l.getAttribute('href'); }
+    if (!link) link = pick(el, ['guid', 'id']);
+    const date = pick(el, ['pubDate', 'published', 'updated', 'dc\\:date']);
+    return (i + 1) + '. ' + title + '\n   ' + link + (date ? '\n   🕒 ' + date : '');
+  });
+  return { title: String(feedTitle).trim(), count: items.length, rows };
+}
+async function xmlTree(url, depth) {
+  const txt = await xmlGrab(url);
+  const d = xmlDoc(txt);
+  const lines = [];
+  const walk = (node, lvl) => {
+    if (lvl > (depth || 3)) return;
+    if (node.nodeType !== 1) return;
+    if (lines.length > 60) return;
+    const kids = Array.from(node.children);
+    lines.push('  '.repeat(lvl) + '<' + node.nodeName + '>' + (kids.length ? '' : ' ' + String(node.textContent || '').trim().slice(0, 70)));
+    kids.slice(0, 12).forEach(k => walk(k, lvl + 1));
+  };
+  walk(d.documentElement, 0);
+  return { root: d.documentElement.nodeName, lines };
+}
+const _runX = run;
+run = async function (line) {
+  const c = String(line || '').trim();
+  let m = c.match(/^(rss|atom|feed)\s+(.+)$/i);
+  if (m) {
+    const url = m[2].trim().match(/^https?:\/\//i) ? m[2].trim() : 'https://' + m[2].trim();
+    say('📡 كنقرا الخلاصة: ' + url, 'p');
+    try {
+      const r = await rssList(url);
+      say('🔖 ' + r.title + ' · ' + r.count + ' عنصر');
+      r.rows.forEach(x => say(x));
+      if (!r.count) say('ما لقيتش عناصر فهاد الخلاصة.', 'e');
+    } catch (e) { say('خطأ فالقراية: ' + e.message, 'e'); }
+    return;
+  }
+  m = c.match(/^(xml)\s+(.+)$/i);
+  if (m) {
+    const url = m[2].trim().match(/^https?:\/\//i) ? m[2].trim() : 'https://' + m[2].trim();
+    say('🧩 كنفك XML: ' + url, 'p');
+    try {
+      const r = await xmlTree(url, 3);
+      say('الجذر: <' + r.root + '>');
+      r.lines.forEach(x => say(x));
+    } catch (e) { say('خطأ: ' + e.message, 'e'); }
+    return;
+  }
+  return _runX(line);
 };
 </script>
