@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>El Azzouz | منشئ برمجيات من طنجة</title>
+  <meta name="description" content="el azzouz — منشئ برمجيات من طنجة. أبني تطبيقات ويب وأدوات رقمية: مساعد ذكاء اصطناعي بالدارجة، تيرمينال فالمتصفح، زاحف ويب، ولوحات بيانات." />
+  <meta name="author" content="el azzouz" />
+  <meta name="theme-color" content="#0b1020" />
+
+  <meta property="og:title" content="El Azzouz | منشئ برمجيات" />
+  <meta property="og:description" content="موقع el azzouz الشخصي: مشاريع، مهارات، وتواصل." />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://mohamedazzouz1662001-bit.github.io/portfolio.html" />
+  <link rel="canonical" href="https://mohamedazzouz1662001-bit.github.io/azzouz.com/portfolio.html" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet" />
+
+  <script type="application/ld+json">
+  {"@context":"https://schema.org","@type":"Person","name":"el azzouz","alternateName":"AZZOUZ","jobTitle":"منشئ برمجيات","address":{"@type":"PostalAddress","addressLocality":"طنجة","addressCountry":"MA"},"email":"elazzouz4@gmail.com","url":"https://mohamedazzouz1662001-bit.github.io/azzouz.com/portfolio.html","sameAs":["https://github.com/mohamedazzouz1662001-bit"],"knowsAbout":["HTML","CSS","JavaScript","UI/UX","GitHub Pages"]}
+  </script>
+
+  <style>
+    :root {
+      --bg: #0b1020;
+      --surface: #121a30;
+      --text: #eef2ff;
+      --muted: #9aa7c7;
+      --primary: #4f7cff;
+      --primary-2: #7b5cff;
+      --border: rgba(255, 255, 255, .1);
+      --radius: 18px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: "Tajawal", system-ui, sans-serif;
+      background:
+        radial-gradient(900px 500px at 85% -10%, rgba(79, 124, 255, .22), transparent),
+        radial-gradient(700px 450px at 10% 10%, rgba(123, 92, 255, .18), transparent),
+        var(--bg);
+      color: var(--text);
+      line-height: 1.7;
+      min-height: 100vh;
+    }
+    .container { width: min(1100px, 92%); margin-inline: auto; }
+    header {
+      position: sticky; top: 0; z-index: 10; backdrop-filter: blur(14px);
+      background: rgba(11, 16, 32, .72); border-bottom: 1px solid var(--border);
+    }
+    .nav { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 16px 0; }
+    .logo { font-weight: 800; font-size: 1.2rem; text-decoration: none; color: var(--text); }
+    .logo span { color: var(--primary); }
+    nav ul { display: flex; gap: 8px; list-style: none; }
+    nav a { color: var(--muted); text-decoration: none; padding: 9px 14px; border-radius: 999px; font-weight: 500; transition: .2s; }
+    nav a:hover { color: #fff; background: rgba(79, 124, 255, .16); }
+    .hero { padding: 90px 0 70px; text-align: center; }
+    .badge {
+      display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--border);
+      background: rgba(255, 255, 255, .05); color: var(--muted); padding: 8px 16px;
+      border-radius: 999px; font-size: .9rem; margin-bottom: 22px;
+    }
+    h1 { font-size: clamp(2.4rem, 7vw, 4.6rem); line-height: 1.15; font-weight: 800; letter-spacing: -.5px; }
+    .gradient { background: linear-gradient(90deg, var(--primary), var(--primary-2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+    .hero p { max-width: 680px; margin: 20px auto 32px; color: var(--muted); font-size: 1.1rem; }
+    .actions { display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; }
+    .btn { display: inline-flex; align-items: center; gap: 10px; padding: 13px 24px; border-radius: 999px; text-decoration: none; font-weight: 700; border: 1px solid transparent; transition: .2s; }
+    .btn-primary { background: linear-gradient(90deg, var(--primary), var(--primary-2)); color: #fff; box-shadow: 0 12px 30px rgba(79, 124, 255, .28); }
+    .btn-primary:hover { transform: translateY(-2px); }
+    .btn-outline { color: var(--text); border-color: var(--border); background: rgba(255, 255, 255, .04); }
+    .btn-outline:hover { border-color: rgba(79, 124, 255, .55); transform: translateY(-2px); }
+    section { padding: 70px 0; }
+    .section-head { text-align: center; margin-bottom: 40px; }
+    .section-head h2 { font-size: clamp(1.8rem, 4vw, 2.5rem); font-weight: 800; }
+    .section-head p { color: var(--muted); max-width: 620px; margin: 10px auto 0; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 18px; }
+    .card { background: rgba(255, 255, 255, .04); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; transition: .25s; display: block; text-decoration: none; color: inherit; }
+    .card:hover { transform: translateY(-4px); border-color: rgba(79, 124, 255, .45); background: rgba(79, 124, 255, .08); }
+    .card h3 { font-size: 1.15rem; margin-bottom: 8px; }
+    .card p { color: var(--muted); font-size: .97rem; }
+    .card .go { display: inline-block; margin-top: 10px; font-size: .85rem; color: var(--primary); font-weight: 700; }
+    .skills { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+    .skill { padding: 10px 16px; border-radius: 999px; border: 1px solid var(--border); background: rgba(255, 255, 255, .04); color: var(--text); font-weight: 500; }
+    .contact-card { text-align: center; background: linear-gradient(135deg, rgba(79, 124, 255, .18), rgba(123, 92, 255, .12)); border: 1px solid var(--border); border-radius: 24px; padding: 48px 24px; }
+    .contact-card h2 { font-size: clamp(1.7rem, 4vw, 2.4rem); margin-bottom: 12px; }
+    .contact-card p { color: var(--muted); max-width: 560px; margin: 0 auto 26px; }
+    footer { border-top: 1px solid var(--border); padding: 26px 0; color: var(--muted); text-align: center; font-size: .9rem; }
+    footer a { color: var(--muted); text-decoration: none; }
+    @media (max-width: 720px) {
+      nav ul { display: none; }
+      .hero { padding: 65px 0 50px; }
+      section { padding: 50px 0; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="container nav">
+      <a class="logo" href="#home">El<span>Azzouz</span></a>
+      <nav>
+        <ul>
+          <li><a href="#about">نبذة</a></li>
+          <li><a href="#skills">المهارات</a></li>
+          <li><a href="#projects">المشاريع</a></li>
+          <li><a href="#contact">تواصل</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero" id="home">
+      <div class="container">
+        <div class="badge">متاح للعمل والمشاريع</div>
+        <h1>
+          مرحبًا، أنا <span class="gradient">el azzouz</span><br />
+          منشئ برمجيات من طنجة
+        </h1>
+        <p>
+          أبني تجارب رقمية حديثة: مواقع، تطبيقات ويب، وأدوات تساعد على إنجاز الأعمال بشكل أسرع وأبسط.
+        </p>
+        <div class="actions">
+          <a class="btn btn-primary" href="#projects">استعرض مشاريعي</a>
+          <a class="btn btn-outline" href="./apps.html">كل الأدوات</a>
+        </div>
+      </div>
+    </section>
+
+    <section id="about">
+      <div class="container">
+        <div class="section-head">
+          <h2>نبذة عني</h2>
+          <p>أركز على بناء منتجات رقمية واضحة، سريعة، وسهلة الاستخدام.</p>
+        </div>
+        <div class="grid">
+          <article class="card">
+            <h3>تطوير الويب</h3>
+            <p>أصمم وأطور واجهات ومواقع متوافقة مع جميع الأجهزة، مع اهتمام بالتجربة والأداء.</p>
+          </article>
+          <article class="card">
+            <h3>بناء المنتجات</h3>
+            <p>أحوّل الأفكار إلى أدوات ومشاريع عملية، من الفكرة الأولى إلى إصدار قابل للاستخدام.</p>
+          </article>
+          <article class="card">
+            <h3>حلول رقمية</h3>
+            <p>أعمل على تبسيط المهام المتكررة وبناء أنظمة تساعد الأفراد والشركات على العمل بكفاءة.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="skills">
+      <div class="container">
+        <div class="section-head">
+          <h2>المهارات</h2>
+          <p>أدوات وتقنيات أستخدمها في بناء المشاريع.</p>
+        </div>
+        <div class="skills">
+          <span class="skill">HTML</span>
+          <span class="skill">CSS</span>
+          <span class="skill">JavaScript</span>
+          <span class="skill">Responsive Design</span>
+          <span class="skill">Git &amp; GitHub</span>
+          <span class="skill">GitHub Pages</span>
+          <span class="skill">UI/UX</span>
+          <span class="skill">Problem Solving</span>
+          <span class="skill">Web Scraping</span>
+          <span class="skill">AI Integration</span>
+        </div>
+      </div>
+    </section>
+
+    <section id="projects">
+      <div class="container">
+        <div class="section-head">
+          <h2>المشاريع</h2>
+          <p>أدوات مبنية ومشتغلة دابا، كل واحدة قابلة للاستعمال من التيليفون.</p>
+        </div>
+        <div class="grid">
+          <a class="card" href="./azzouz-ai.html">
+            <h3>AZZOUZ AI</h3>
+            <p>مساعد بحث بالدارجة المغربية: كيقلب فكل الويب، كيجمع المصادر ويصنفها، وكيقرا PDF والصور.</p>
+            <span class="go">جرّبو ←</span>
+          </a>
+          <a class="card" href="./term.html">
+            <h3>AZZOUZ Term</h3>
+            <p>تيرمينال كيخدم فالمتصفح: نظام ملفات، أوامر، Python وJavaScript، وجلب صفحات بلا سيرفر.</p>
+            <span class="go">حل التيرمينال ←</span>
+          </a>
+          <a class="card" href="./hacker.html">
+            <h3>Hacker Terminal</h3>
+            <p>واجهة تفاعلية بالصوت: أوامر، بحث فالويب، وشبكة سيرفرات بدوران أوتوماتيكي.</p>
+            <span class="go">شوف الواجهة ←</span>
+          </a>
+          <a class="card" href="./crawler.html">
+            <h3>Crawler V2</h3>
+            <p>زاحف ويب كيقرا الصفحات وPDF وكيحترم robots.txt، مع تصدير النتائج.</p>
+            <span class="go">شوف الزاحف ←</span>
+          </a>
+          <a class="card" href="https://elazzouz-dotcom.github.io/cycle-lab/?locale=ar">
+            <h3>Cycle Lab</h3>
+            <p>مختبر دورة كاملة: استكشاف، حماية، نور، ميزان، بناء، وفحص، بواجهة عربية.</p>
+            <span class="go">دخل للمختبر ←</span>
+          </a>
+          <a class="card" href="./ai-monitor.html">
+            <h3>رصد المحركات الذكية</h3>
+            <p>لوحة كتفحص واش الموقع مقروء ومتاح لـChatGPT وClaude وPerplexity وGemini.</p>
+            <span class="go">شوف الرصد ←</span>
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <section id="contact">
+      <div class="container">
+        <div class="contact-card">
+          <h2>لنبنِ شيئًا مفيدًا</h2>
+          <p>هل لديك فكرة، مشروع، أو تحتاج إلى مطور؟ أرسل لي رسالة وسأرد عليك في أقرب وقت.</p>
+          <div class="actions">
+            <a class="btn btn-primary" href="mailto:elazzouz4@gmail.com">راسلني عبر البريد</a>
+            <a class="btn btn-outline" href="https://github.com/mohamedazzouz1662001-bit" target="_blank" rel="noopener">GitHub</a>
+            <a class="btn btn-outline" href="./apps.html">كل التطبيقات</a>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="container">
+      © <span id="year"></span> el azzouz — طنجة، المغرب
+    </div>
+  </footer>
+
+  <script>
+    document.getElementById("year").textContent = new Date().getFullYear();
+  </script>
+</body>
+</html>
