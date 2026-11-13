@@ -32,7 +32,7 @@ a{color:var(--b);text-decoration:none}
 </style></head>
 <body>
 <h1>🕵️ AZZOUZ Spy — جاسوس متنقل</h1>
-<div class="sub">كيراقب صفحات عمومية من التيليفون: كيشوف التغييرات، وكينبهك أول ما يوقع شي جديد. كلشي فجهازك، بلا سيرفر.</div>
+<div class="sub">كيراقب صفحات عمومية: فالمتصفح دابا، وفالسيرفر كل 30 دقيقة حتى والصفحة مسدودة، وكيوصل الإشعار فواتساب.</div>
 
 <div class="card">
   <label>الرابط اللي بغيتي تراقبو</label>
@@ -72,12 +72,20 @@ a{color:var(--b);text-decoration:none}
 <script>
 const PROXY = 'https://superagent-1906c8e6.base44.app/functions/azzouzProxy';
 const KEY = 'azzouz-spy-targets';
+const API = 'https://superagent-1906c8e6.base44.app/functions/spyTargets';
+const SKEY = 'AZZOUZ-SPY-2026';
 const $ = s => document.querySelector(s);
 let targets = [];
 try { targets = JSON.parse(localStorage.getItem(KEY) || '[]'); } catch (e) { targets = []; }
 let timer = null;
 
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(targets)); } catch (e) {} };
+const cloud = async (body) => {
+  try {
+    const r = await fetch(API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: SKEY, ...body }) });
+    return await r.json();
+  } catch (e) { return { ok: false }; }
+};
 const hash = t => { let h = 5381; for (let i = 0; i < t.length; i += 7) h = ((h << 5) + h + t.charCodeAt(i)) | 0; return h + ':' + t.length; };
 
 function log(t) {
@@ -124,7 +132,7 @@ function render() {
   });
   list.querySelectorAll('button').forEach(b => b.onclick = async () => {
     const i = Number(b.dataset.i);
-    if (b.dataset.a === 'del') { targets.splice(i, 1); save(); render(); return; }
+    if (b.dataset.a === 'del') { const t = targets[i]; targets.splice(i, 1); save(); render(); if (t && t.sid) cloud({ op: 'del', id: t.sid }); return; }
     await checkTarget(i, true);
   });
 }
@@ -182,8 +190,10 @@ $('#add').onclick = () => {
   let u = $('#url').value.trim();
   if (!u) return;
   if (!/^https?:\/\//i.test(u)) u = 'https://' + u;
-  targets.push({ url: u, every: Number($('#every').value) * 1000, kw: $('#kw').value.trim(), hash: '', changes: 0, state: '' });
+  const rec = { url: u, every: Number($('#every').value) * 1000, kw: $('#kw').value.trim(), hash: '', changes: 0, state: '' };
+  targets.push(rec);
   save(); render(); checkTarget(targets.length - 1, false);
+  cloud({ op: 'add', url: u, label: u, keyword: rec.kw }).then(j => { if (j && j.ok && j.id) { rec.sid = j.id; save(); render(); } });
   $('#url').value = ''; $('#kw').value = '';
   if (!timer) startLoop();
 };
@@ -197,6 +207,17 @@ $('#perm').onclick = async () => {
 };
 
 render();
+(async () => {
+  const j = await cloud({ op: 'list' });
+  if (j && j.ok && Array.isArray(j.items)) {
+    const have = new Set(targets.map(t => t.url));
+    j.items.forEach(it => {
+      if (!have.has(it.url)) targets.push({ url: it.url, every: 300000, kw: it.keyword || '', hash: '', changes: it.changes || 0, state: '', sid: it.id, cloud: true, last: it.last_check ? new Date(it.last_check).getTime() : 0 });
+    });
+    save(); render();
+    if (j.items.length) log('☁️ ' + j.items.length + ' هدف فالمراقبة السحابية (خدامة 24/7)');
+  }
+})();
 if (targets.length) { startLoop(); checkAll(); }
 </script>
 </body></html>
