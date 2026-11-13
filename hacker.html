@@ -270,7 +270,7 @@ async function run(line) {
 
   const [n, ...a] = c.split(/\s+/);
   switch (n) {
-    case 'help': say('الأوامر: help · whoami · quote · copy · date · hack · matrix [on|off|fast] · voice [on|off] · say <text> · net · ping · addserver <url> · deep <موضوع> · last · save · b44 <سؤال> · cmatrix [fast|slow] · news · rss <رابط> · xml <رابط> · open <url> · read <url> · search <q> · apps · term · clear · echo <text>'); break;
+    case 'help': say('الأوامر: help · whoami · quote · copy · date · hack · matrix [on|off|fast] · voice [on|off] · say <text> · net · ping · addserver <url> · deep <موضوع> · last · save · b44 <سؤال> · cmatrix [fast|slow] · ma (وطني) · news · rss <رابط> · xml <رابط> · open <url> · read <url> · search <q> · apps · term · clear · echo <text>'); break;
     case 'whoami': say('azzouz · AZZOUZ_ELITE · browser sandbox'); break;
     case 'quote': say(QUOTE); break;
     case 'copy': copyQuote(); say('تنسخ ✓'); break;
@@ -997,5 +997,36 @@ run = async function (line) {
     return;
   }
   return _runP(line);
+};
+</script>
+<script>
+/* ===== الكراولر الوطني: قائمة مواقع مغربية ===== */
+const MA_FEEDS = [
+  'https://www.hespress.com/feed',
+  'https://barlamane.com/feed/',
+  'https://ar.yabiladi.com/rss/news.xml',
+  'https://www.telquel.ma/feed/',
+  'https://www.maroc.ma/ar/rss.xml'
+];
+const _runMA = run;
+run = async function (line) {
+  const c = String(line || '').trim();
+  if (/^(ma|wma|وطني)$/i.test(c)) {
+    say('🇲🇦 كنقلب فالمواقع المغربية (5 مصادر)…', 'p');
+    try {
+      const r = await fetch(RSSF, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ feeds: MA_FEEDS, per: 3 }), signal: AbortSignal.timeout(30000) });
+      const j = await r.json();
+      let ok = 0;
+      (j.feeds || []).forEach(f => {
+        if (f.error || !f.items || !f.items.length) { say('⛔ ' + f.feed + ' — ' + (f.error || 'بلا أخبار'), 'e'); return; }
+        ok++;
+        say('🔖 ' + f.feed.split('.m')[0].replace(/^https?:\/\//, '') + ' (' + f.count + ')', 'p');
+        f.items.forEach((it, i) => say((i + 1) + '. ' + it.title + '\n   ' + it.link));
+      });
+      say('✅ ' + ok + '/' + (j.feeds || []).length + ' مصدر مغربي خدام');
+    } catch (e) { say('خطأ: ' + e.message, 'e'); }
+    return;
+  }
+  return _runMA(line);
 };
 </script>

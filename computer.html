@@ -49,7 +49,7 @@ body{background:#04060b;color:#e8f1ff;font-family:system-ui,-apple-system,"Segoe
   <div style="padding:0 14px;color:#7f97a5;font-size:11.5px;line-height:1.7">🐧 الأيقونات من الجيهة الأخرى كتحل حواسيب مفتوحة المصدر فالنافذة: WebVM (لينكس كامل)، v86 (محاكي x86)، JSLinux. إلا حجب المتصفح التضمين، كتلقى رابط «افتح فتبويب جديد».</div>
   <div id="icons"></div>
   <div id="tpane">
-  <div id="thead"><b>🖥️ طرفية</b><span class="sp"></span><span style="color:#7f97a5;font-size:11px">أوامر: help · ls · pwd · rss · xml · news · clear</span><button id="tclose">✕</button></div>
+  <div id="thead"><b>🖥️ طرفية</b><span class="sp"></span><span style="color:#7f97a5;font-size:11px">أوامر: help · ls · rss · xml · news · ma · clear</span><button id="tclose">✕</button></div>
   <div id="tout"></div>
   <div id="tinrow"><span>~$</span><input id="tin" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="كتب أمر…"></div>
 </div>
@@ -220,6 +220,23 @@ dock.appendChild(off);
         walk(doc.documentElement, 0);
         print('الجذر: <' + doc.documentElement.nodeName + '>');
         lines.forEach(l => print(l));
+      } catch (e) { print('خطأ: ' + e.message); }
+      return;
+    }
+
+    if (/^(ma|wma|وطني)$/i.test(c0)) {
+      print('🇲🇦 كنقلب فالمواقع المغربية…');
+      try {
+        const res = await fetch('https://superagent-1906c8e6.base44.app/functions/rssDigest', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ per: 3, feeds: ['https://www.hespress.com/feed','https://barlamane.com/feed/','https://ar.yabiladi.com/rss/news.xml','https://www.telquel.ma/feed/','https://www.maroc.ma/ar/rss.xml'] })
+        });
+        const j = await res.json();
+        (j.feeds || []).forEach(f => {
+          if (f.error || !f.items.length) { print('⛔ ' + f.feed); return; }
+          print('🔖 ' + f.feed.replace(/^https?:\/\//, '').split('/')[0] + ' (' + f.count + ')');
+          f.items.forEach((it, i) => print((i + 1) + '. ' + it.title + '\n   ' + it.link));
+        });
       } catch (e) { print('خطأ: ' + e.message); }
       return;
     }
