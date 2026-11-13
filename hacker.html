@@ -902,3 +902,100 @@ run = async function (line) {
   return _runC(line);
 };
 </script>
+<script>
+/* ===== pkg (محاكي حزم) + screenfetch ===== */
+const PKG_KEY = 'azzouz-pkgs';
+let INSTALLED = [];
+try { INSTALLED = JSON.parse(localStorage.getItem(PKG_KEY) || '["cmatrix"]'); } catch (e) { INSTALLED = ['cmatrix']; }
+const savePkgs = () => { try { localStorage.setItem(PKG_KEY, JSON.stringify(INSTALLED)); } catch (e) {} };
+
+function screenfetch() {
+  const nav = navigator;
+  const ua = (nav.userAgent || '').replace(/\s+/g, ' ');
+  const os = /Android/i.test(ua) ? 'Android' : /iPhone|iPad/i.test(ua) ? 'iOS' : /Windows/i.test(ua) ? 'Windows' : /Mac/i.test(ua) ? 'macOS' : 'Linux';
+  const br = /Edg/i.test(ua) ? 'Edge' : /Chrome/i.test(ua) ? 'Chrome' : /Firefox/i.test(ua) ? 'Firefox' : /Safari/i.test(ua) ? 'Safari' : 'Browser';
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || '—';
+  let store = 0;
+  try { Object.keys(localStorage).forEach(k => store += (localStorage.getItem(k) || '').length); } catch (e) {}
+  const logo = [
+    '   ▄▄▄▄▄▄▄   ',
+    '  █ ▄▄▄▄▄ █  ',
+    '  █ █▀▀▀█ █  ',
+    '  █ █▄▄▄█ █  ',
+    '  █▄▄▄▄▄▄▄█  ',
+    '   ▀▀▀▀▀▀▀   '
+  ];
+  const info = [
+    'azzouz@core',
+    '-----------',
+    'OS: ' + os,
+    'Browser: ' + br,
+    'Lang: ' + (nav.language || '—'),
+    'TZ: ' + tz,
+    'Screen: ' + innerWidth + 'x' + innerHeight,
+    'Cores: ' + (nav.hardwareConcurrency || '?'),
+    'Memory: ' + (nav.deviceMemory ? nav.deviceMemory + ' GB' : '—'),
+    'Online: ' + (nav.onLine ? 'yes' : 'no'),
+    'Storage: ' + (store / 1024).toFixed(1) + ' KB',
+    'Packages: ' + (INSTALLED.length ? INSTALLED.join(', ') : '—'),
+    'Time: ' + new Date().toLocaleString('ar-MA')
+  ];
+  const n = Math.max(logo.length, info.length);
+  const lines = [];
+  for (let i = 0; i < n; i++) lines.push((logo[i] || '             ') + '  ' + (info[i] || ''));
+  return lines.join('\n');
+}
+
+async function pkg(cmd) {
+  const argv = cmd.split(/\s+/).slice(1);
+  const sub = (argv[0] || '').toLowerCase();
+  if (sub === 'update' || sub === 'upgrade') {
+    say('Hit:1 https://packages.azzouz.dev stable InRelease');
+    say('Reading package lists... Done');
+    say('✅ القوائم تحدثات · 3 حزم متوفرة: cmatrix · screenfetch · neofetch');
+    return;
+  }
+  if (sub === 'install' || sub === 'add') {
+    const names = argv.slice(1).filter(a => !a.startsWith('-'));
+    if (!names.length) { say('كتب: pkg install cmatrix screenfetch -y', 'e'); return; }
+    for (const nm of names) {
+      const n = nm.toLowerCase();
+      if (!['cmatrix', 'screenfetch', 'neofetch'].includes(n)) { say('E: Unable to locate package ' + n, 'e'); continue; }
+      if (INSTALLED.includes(n)) { say(n + ' already installed', 'p'); continue; }
+      say('Get:1 ' + n + ' (browser build)');
+      await new Promise(r => setTimeout(r, 350));
+      INSTALLED.push(n); savePkgs();
+      say('✅ تثبت ' + n + ' · استعمل: ' + n);
+    }
+    return;
+  }
+  if (sub === 'list' || sub === 'list-installed') {
+    say('مثبت: ' + (INSTALLED.join(', ') || 'والو'));
+    say('متوفر: cmatrix · screenfetch · neofetch');
+    return;
+  }
+  if (sub === 'remove' || sub === 'uninstall') {
+    const n = (argv[1] || '').toLowerCase();
+    INSTALLED = INSTALLED.filter(x => x !== n); savePkgs();
+    say('🗑️ تحيد ' + (n || '—'));
+    return;
+  }
+  say('pkg: أوامر: update · install <اسم> · list · remove <اسم>', 'e');
+}
+
+const _runP = run;
+run = async function (line) {
+  const c = String(line || '').trim();
+  if (/^pkg\b/i.test(c)) { await pkg(c); return; }
+  if (/^screenfetch$|^neofetch$/i.test(c)) {
+    if (!INSTALLED.includes(c.toLowerCase())) { say('E: ' + c + ' ماشي مثبت. كتب: pkg install screenfetch -y', 'e'); return; }
+    say(screenfetch());
+    return;
+  }
+  if (/^cmatrix/i.test(c) && !INSTALLED.includes('cmatrix')) {
+    say('E: cmatrix ماشي مثبت. كتب: pkg install cmatrix -y', 'e');
+    return;
+  }
+  return _runP(line);
+};
+</script>
